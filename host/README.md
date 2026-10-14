@@ -4,6 +4,16 @@ English | [中文](README.zh.md)
 
 This fork adds a dedicated host deployment. DSH Web runs the Bot team, models, tools, schedules and persistence on one computer. Other computers and phones open its browser UI; they need neither Node.js nor a local DSH installation. Closing a browser does not stop host work. Stopping the host stops execution.
 
+## Rabi remote computer panel
+
+Install and configure [dsh-rabiroute-agent](https://github.com/vb2250158/dsh-rabiroute-agent) in the same host Web profile, then open **Settings → Computers → Use Rabi computer panel**. The switch is unavailable without that adapter; an unready Rabi displays a connection error. The adapter discovers the current Manager, checks `/meta` identity and preserves uncertain writes. The panel stores neither Manager addresses nor access credentials.
+
+Use Rabi's existing pairing, tray, connection and authorization interfaces. DS Bot displays online computers and their actual terminals, with create CMD/PowerShell, send, interrupt and exit controls. Available shells come from the client; Windows terminal interfaces do not imply macOS device acceptance. Closing the panel or disabling its switch retains the original Rabi terminal. **Exit terminal and stop child processes** closes it explicitly.
+
+Input retains the original `terminalId` and increasing `sequence`. A timeout, connection failure or uncertain response blocks further input until **Query original sessions** reads back the current state. Commands are never replayed automatically and no replacement terminal is created. Host Agents continue using Rabi tools; this switch controls only the panel entry.
+
+`node host/test/rabi-browser-smoke.mjs` uses synthetic Rabi receipts in an isolated browser fixture to check the switch, original-terminal reuse, input/output and uncertain-input readback. Real Rabi and remote-machine acceptance require an installed, online controller and client.
+
 ## Install and start
 
 Install Node.js 22.19+ or 24+, Git and pnpm on the host. In this checkout:

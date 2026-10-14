@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { rm } from 'node:fs/promises'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -176,7 +177,7 @@ test('a call made in a group chat stays group use after the room is gone', async
 test('a plain chat journals its owner before the first scan, so a deleted Bot keeps its name', async (t) => {
   const first = start()
   const { home } = first
-  t.after(() => rmSync(home, { recursive: true, force: true, maxRetries: 5 }))
+  t.after(() => rm(home, { recursive: true, force: true, maxRetries: 5 }))
   // Writer talks once, Usage is never opened: the meter lets the request
   // through, but the Session's owner lands in the ledger on its own.
   const passed = (async function* () { yield { type: 'text', text: 'hi' } })()

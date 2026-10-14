@@ -5,6 +5,28 @@
 export const NAMESPACE = 'ds-bot'
 
 const ZH = {
+  'Computers': '电脑',
+  'Remote terminal': '远端终端',
+  'Closing this panel keeps the Rabi terminal. Exit terminal ends its child processes.': '关闭面板保留 Rabi 终端；退出终端会结束其中的子程序。',
+  'Earlier output was truncated': '较早输出已超出缓存范围',
+  'Exit code': '退出码',
+  'Original terminal': '原终端',
+  'Query original sessions': '查询原会话',
+  'New {shell} terminal': '新建 {shell} 终端',
+  'Remote working directory': '远端工作目录',
+  'Terminal output': '终端输出',
+  'Remote command': '远程命令',
+  'Send command': '发送命令',
+  'Interrupt command': '中断命令',
+  'Exit terminal and stop child processes': '退出终端并结束子程序',
+  'Rabi remote computers': 'Rabi 远端电脑',
+  'Use Rabi computer panel': '使用 Rabi 电脑面板',
+  'Reuses Rabi connections and permissions. This switch only controls the DS Bot panel.': '复用 Rabi 的连接和授权。此开关只控制 DS Bot 的面板入口。',
+  'Install and configure dsh-rabiroute-agent on the controller first.': '先在主控安装并配置 dsh-rabiroute-agent。',
+  'Connected computers': '已连接电脑',
+  'Online': '在线',
+  'Offline': '离线',
+  'No Rabi remote computers found. Pair clients in Rabi.': '没有发现 Rabi 远端电脑。请在 Rabi 中配对客户端。',
   // Shared
   'Main Bot': '主 Bot',
   Working: '工作中',

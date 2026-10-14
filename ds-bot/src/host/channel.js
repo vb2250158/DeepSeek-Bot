@@ -83,6 +83,10 @@ export function install(rt) {
   const READS = new Set(['state', 'models', 'efforts', 'earlier', 'room-progress', 'exchange', 'usage', 'schedules', 'memory-view', 'browser-wait', 'browser-result', 'diagnostics', 'diagnostics-log', 'diagnostics-clear', 'update-check', 'update-install', 'dsh-update-install', 'repo-stars', 'approval-answer'])
 
   function setPrefs(body) {
+    if (body.rabiComputers !== undefined) {
+      if (typeof body.rabiComputers !== 'boolean') throw invalid('Invalid Rabi computer panel setting')
+      state.prefs.rabiComputers = body.rabiComputers
+    }
     if (body.theme !== undefined) {
       if (typeof body.theme !== 'string' || !/^[a-z][\w-]{0,31}$/.test(body.theme)) throw invalid('Unknown theme')
       state.prefs.theme = body.theme
@@ -107,6 +111,12 @@ export function install(rt) {
       const readOnly = rt.readOnly()
       if (readOnly !== undefined && !READS.has(endpoint)) return fail(readOnly, 'bot/read-only')
       switch (endpoint) {
+        case 'rabi-computers-status':
+        case 'rabi-computers-list':
+        case 'rabi-computer-terminals':
+        case 'rabi-computer-output':
+        case 'rabi-computer-terminal':
+          return ok(await rt.rabiComputerEndpoint(endpoint, body, signal))
         case 'state':
           if (typeof body.locale === 'string' && /^[a-z]{2,3}(-[\w-]+)?$/i.test(body.locale)) uiLocale = body.locale
           if (readOnly === undefined) await rt.bootstrap()

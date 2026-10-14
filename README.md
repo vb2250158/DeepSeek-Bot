@@ -7,6 +7,8 @@
 
 # DeepSeek Bot
 
+**Remote computers:** with `dsh-rabiroute-agent` installed and configured on the controller, enable the Rabi computer panel in **Settings → Computers**. The panel reuses Rabi connections and remote terminals. Other computers run the Rabi client without a separate DSH runtime; Rabi owns pairing, tray operation and execution authorization.
+
 English | [中文](README.zh.md)
 
 This is the [vb2250158 maintenance fork](https://github.com/vb2250158/DeepSeek-Bot) of [Fei2411/DeepSeek-Bot](https://github.com/Fei2411/DeepSeek-Bot). For a dedicated execution host with computer and phone browser clients, see [Host deployment](host/README.md).

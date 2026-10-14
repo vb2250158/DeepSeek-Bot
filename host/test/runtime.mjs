@@ -5,7 +5,7 @@ import { mkdtempSync } from 'node:fs'
 import { createServer } from 'node:net'
 import { request } from 'node:https'
 import { join, resolve } from 'node:path'
-import { HOST_ROOT } from '../config.mjs'
+import { HOST_ROOT, dshBin } from '../config.mjs'
 
 const root = resolve(HOST_ROOT, '..')
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms))
@@ -21,7 +21,7 @@ async function freePort() {
 }
 
 /** Start the public host launcher, mock model and real TLS proxy in an isolated data directory. */
-export async function startFixture({ caddyBin, npmCli, onProgress = () => {} }) {
+export async function startFixture({ caddyBin, npmCli, onProgress = () => {}, pluginPaths = [] }) {
   const home = mkdtempSync(join(root, '.dsh-test-host-'))
   const ports = []
   while (ports.length < 3) {
@@ -79,7 +79,7 @@ export async function startFixture({ caddyBin, npmCli, onProgress = () => {} }) 
   let loginUrl
   const startHost = async () => {
     host = launch(process.execPath, [join(HOST_ROOT, 'start.mjs')])
-    await ready(host, text => /dsh web: https:\/\/ds-bot\.test:\d+\/\?token=/.test(text), 'DS Bot host')
+    await ready(host, text => /dsh web: https:\/\/ds-bot\.test:\d+\/\?token=/.test(text), 'DS Bot host', 300000)
     loginUrl = host.output().match(/https:\/\/ds-bot\.test:\d+\/\?token=[^\s]+/)[0]
   }
   try {
@@ -87,6 +87,15 @@ export async function startFixture({ caddyBin, npmCli, onProgress = () => {} }) 
     const setup = launch(process.execPath, [join(HOST_ROOT, 'setup.mjs')])
     const [code] = await once(setup.child, 'close')
     if (code !== 0) throw new Error(`Host setup failed: ${clean(setup.output()).slice(-5000)}`)
+    for (const path of pluginPaths) {
+      const pack = launch(process.execPath, [npmCli, 'pack', path, '--json', '--ignore-scripts', '--pack-destination', home])
+      const [packed] = await once(pack.child, 'close')
+      if (packed !== 0) throw new Error(`Fixture plugin pack failed: ${clean(pack.output()).slice(-3000)}`)
+      const [archive] = JSON.parse(pack.output())
+      const add = launch(process.execPath, [dshBin(), 'plugin', '--profile', 'web', 'add', join(home, archive.filename)], { DSH_HOME: home })
+      const [added] = await once(add.child, 'close')
+      if (added !== 0) throw new Error(`Fixture plugin install failed: ${clean(add.output()).slice(-3000)}`)
+    }
     onProgress('Host profile installed; starting mock model and Web host')
     const mock = launch(process.execPath, [join(root, 'ds-bot', 'dev', 'mock-llm.mjs')])
     await ready(mock, text => text.includes('ds-bot mock on'), 'Mock model')

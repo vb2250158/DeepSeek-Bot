@@ -2,6 +2,13 @@
 
 All notable changes to DS Bot are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the versions follow [Semantic Versioning](https://semver.org/). Before 1.0, a minor version can contain breaking changes.
 
+## [0.1.6-rabi.2] - 2026-10-14
+
+### Added
+
+- Settings → Computers provides an optional Rabi computer panel using the installed `dsh-rabiroute-agent` tool pipeline. It displays Rabi's remote computers and original terminals, sends sequenced input, observes output and explicitly closes terminals. The panel stores only its enable preference; Rabi owns pairing, clients, authorization and execution.
+- Uncertain terminal input blocks further input until the operator queries the original session. Opening or closing the panel never replaces a terminal or replays a command. Isolated browser tests cover the switch, original-session reuse and uncertain-input readback with synthetic Rabi receipts.
+
 ## [0.1.6-rabi.1] - 2026-10-14
 
 ### Added

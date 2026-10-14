@@ -1,0 +1,10 @@
+{
+  "name": "ds-bot-test-rabi-fixture",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "index.js",
+  "files": ["index.js", "cordis.patch.yml"],
+  "peerDependencies": { "@deepseek-ai/dsh-tools": "*" },
+  "dsh": { "bundle": { "patch": "./cordis.patch.yml" } }
+}

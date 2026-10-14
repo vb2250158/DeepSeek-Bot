@@ -468,6 +468,11 @@ body[data-ds-dark-theme] .bt-scrim{background:rgba(0,0,0,.5)}
 .bt-settings-form{display:flex;flex-direction:column;gap:16px}
 .bt-set-section h3{font-size:13px;line-height:18px;font-weight:600;margin:0 0 8px;padding:0 4px}
 .bt-set-card{border:1px solid var(--bt-line);border-radius:12px;background:var(--bt-card);display:flex;flex-direction:column}
+.bt-rabi-actions{display:flex;gap:6px;flex-wrap:wrap}
+.bt-rabi-actions button[aria-pressed=true]{outline:1px solid var(--bt-line)}
+.bt-rabi-terminal{padding:12px;gap:12px}
+.bt-rabi-terminal label{display:flex;flex-direction:column;gap:6px;font-size:12px}
+.bt-rabi-output{white-space:pre-wrap;overflow-wrap:anywhere;min-height:160px;max-height:320px;overflow:auto;margin:0;padding:10px;background:var(--bt-card);border:1px solid var(--bt-line);border-radius:6px;font-size:12px}
 .bt-set-card>*+*{border-top:.5px solid var(--bt-line)}
 .bt-set-row{display:flex;align-items:center;gap:12px;padding:10px 12px;border:0;background:none;color:var(--bt-ink);font:inherit;font-size:13px;line-height:18px;text-align:left;width:100%;box-sizing:border-box;border-radius:0}
 button.bt-set-row{cursor:pointer}
