@@ -1,0 +1,15 @@
+# DS_BOT_PUBLIC_ADDRESS is a hostname or LAN IP plus optional port, without https://.
+# Use the same authority in DS_BOT_PUBLIC_URL when starting DSH.
+{
+	admin off
+	skip_install_trust
+	auto_https disable_redirects
+}
+
+{$DS_BOT_PUBLIC_ADDRESS} {
+	tls internal
+	reverse_proxy 127.0.0.1:{$DS_BOT_HOST_PORT:3097} {
+		header_up Host {http.request.hostport}
+		header_down Set-Cookie "(.*)" "$1; Secure"
+	}
+}

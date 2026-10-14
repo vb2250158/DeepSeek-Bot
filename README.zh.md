@@ -7,6 +7,8 @@
 
 # DeepSeek Bot
 
+这是 [vb2250158 维护的 fork](https://github.com/vb2250158/DeepSeek-Bot)，上游为 [Fei2411/DeepSeek-Bot](https://github.com/Fei2411/DeepSeek-Bot)。独立执行主机及电脑、手机浏览器客户端见[主机部署](host/README.zh.md)。
+
 [English](README.md) | 中文
 
 ![版本](https://img.shields.io/badge/版本-v0.1_预览-blue) ![DSH](https://img.shields.io/badge/DSH-0.2.0--rc.2-4D6BFE) ![许可](https://img.shields.io/badge/许可-Apache_2.0-green)
@@ -16,6 +18,8 @@ DeepSeek Bot（简称 DS Bot）是一个基于 [DeepSeek Harness](https://github
 ![和 Chief 说一句话，它就把 bot 和群聊建好](docs/images/team.zh.png)
 
 ## 安装
+
+安装本 fork 的主机和浏览器客户端，请按[主机部署](host/README.zh.md)操作。下文保留上游原插件的安装方法。
 
 先装好 dsh，并在 dsh 里配好至少一个模型。ds bot 直接使用 dsh 里的模型。
 

@@ -39,3 +39,5 @@ jobs:
       - run: npm test
       - run: node scripts/build-client.mjs --check
       - run: npm run lint
+      - name: Host deployment configuration
+        run: npm --prefix ../host test

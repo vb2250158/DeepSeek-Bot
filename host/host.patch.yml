@@ -1,0 +1,12 @@
+# Remote clients must browse the host's filesystem rather than open an OS picker.
+- id: directory-picker
+  disabled: true
+- insert:
+    - id: directory-picker-browse
+      name: '@deepseek-ai/dsh-host-directory-picker-browse'
+    - id: ui-directory-picker-browse
+      name: '@deepseek-ai/dsh-client-ui-directory-picker-browse'
+# The fork is installed as a fixed local archive; updates are installed by the host operator.
+- id: bot
+  config:
+    updateCheck: false

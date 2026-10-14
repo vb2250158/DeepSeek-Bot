@@ -63,7 +63,7 @@ test('warnings are kept, cleaned, written to the log, and read back after a rest
   assert.equal(second.code, 'RATE_LIMIT')
 
   const report = await rt.diagnostics.report({ client: { surface: 'Web', language: 'zh-CN', userAgent: 'Test/1' }, clientErrors: [{ time: 1, text: 'state: HTTP 502' }] })
-  assert.match(report.markdown, /\| DS Bot \| \d+\.\d+\.\d+ \|/)
+  assert.match(report.markdown, /\| DS Bot \| \d+\.\d+\.\d+(?:-[\w.]+)? \|/)
   assert.match(report.markdown, /\| Surface \| Web \|/)
   assert.match(report.markdown, /\| Models \| deepseek\/deepseek-chat \|/)
   assert.match(report.markdown, /WARN host \[EACCES\] state write failed/)
@@ -73,7 +73,15 @@ test('warnings are kept, cleaned, written to the log, and read back after a rest
   assert.equal(report.entries[0].code, 'RATE_LIMIT', 'newest first')
 
   // Written as JSON lines; a new host reads them back.
-  await new Promise(resolve => setTimeout(resolve, 50))
+  const deadline = Date.now() + 5000
+  while (Date.now() < deadline) {
+    const written = await fsp.readFile(join(home, 'logs', 'diagnostics.jsonl'), 'utf8').catch(error => {
+      if (error.code === 'ENOENT') return ''
+      throw error
+    })
+    if (written.trim().split('\n').length === 2) break
+    await new Promise(resolve => setTimeout(resolve, 20))
+  }
   assert.equal(readFileSync(join(home, 'logs', 'diagnostics.jsonl'), 'utf8').trim().split('\n').length, 2)
   const again = host(home)
   assert.deepEqual((await again.diagnostics.entries()).map(entry => entry.code), ['EACCES', 'RATE_LIMIT'])

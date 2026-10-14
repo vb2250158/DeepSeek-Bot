@@ -2,6 +2,23 @@
 
 All notable changes to DS Bot are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the versions follow [Semantic Versioning](https://semver.org/). Before 1.0, a minor version can contain breaking changes.
 
+## [0.1.6-rabi.1] - 2026-10-14
+
+### Added
+
+- Dedicated DSH Web host deployment in the vb2250158 fork. Computer and phone browsers use the same host-owned Bot team, conversations, tools and model configuration. The host has an isolated data directory, an in-browser host directory picker, and an HTTPS reverse-proxy configuration that retains DSH authentication and request-origin checks.
+- Host configuration tests and bilingual deployment, backup and upgrade instructions. Rabi remains responsible for external routing, business plans and delivery receipts; installing this host does not create a Rabi binding.
+
+### Changed
+
+- Package support and repository metadata point to the maintenance fork. The host installs a versioned archive built from this checkout and disables the upstream update checker for that deployment.
+
+### Fixed
+
+- Failed Bot creation waits for the saved roster cleanup before returning, so another client cannot reload a rolled-back Bot from a queued snapshot. Diagnostic persistence tests wait for the actual file writes and accept the fork's prerelease version.
+- State writes retry transient Windows file-sharing errors within the configurable `stateWriteRetryMs` budget (1000 ms by default), retaining atomic replacement and the original state on failure.
+- Browser navigation refreshes the host session catalog before opening a Bot that is not listed yet, and a late refresh cannot replace a newer selection.
+
 ## [Unreleased]
 
 ### Changed

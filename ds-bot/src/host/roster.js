@@ -132,7 +132,7 @@ export function install(rt) {
       rt.chatOwners.delete(id)
       // A save that another change queued meanwhile still carries this Bot; a later
       // one writes the team without it.
-      void rt.save().catch(() => {})
+      await rt.save().catch(() => {})
       await ctx.workspaceRegistry.archiveSession(id)
         .catch(archiveError => rt.warn('ds-bot: archiving the Session for %s failed: %s', cleanName, archiveError))
       throw error

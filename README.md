@@ -9,6 +9,8 @@
 
 English | [中文](README.zh.md)
 
+This is the [vb2250158 maintenance fork](https://github.com/vb2250158/DeepSeek-Bot) of [Fei2411/DeepSeek-Bot](https://github.com/Fei2411/DeepSeek-Bot). For a dedicated execution host with computer and phone browser clients, see [Host deployment](host/README.md).
+
 ![version](https://img.shields.io/badge/version-v0.1_preview-blue) ![DSH](https://img.shields.io/badge/DSH-0.2.0--rc.2-4D6BFE) ![license](https://img.shields.io/badge/license-Apache_2.0-green)
 
 DeepSeek Bot (DS Bot) is a bot plugin for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH). It turns DSH into bots. You create your own bots, then talk and work with them.
@@ -16,6 +18,8 @@ DeepSeek Bot (DS Bot) is a bot plugin for [DeepSeek Harness](https://github.com/
 ![Say one sentence to Chief, and it sets up the bots and the group chat](docs/images/team.png)
 
 ## Install
+
+For this fork's host and browser clients, follow [Host deployment](host/README.md). The instructions below install the original upstream plugin.
 
 First install DSH and set up at least one model in it. DS Bot uses the models from DSH.
 

@@ -1,0 +1,15 @@
+{
+  "name": "ds-bot-host",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Dedicated DS Bot host with browser clients, using the supported DSH Web profile",
+  "engines": { "node": "^22.19.0 || >=24.0.0" },
+  "scripts": {
+    "setup": "node setup.mjs",
+    "start": "node start.mjs",
+    "test": "node --test test/*.test.mjs",
+    "test:browser": "node test/browser-smoke.mjs"
+  },
+  "dependencies": { "@deepseek-ai/dsh": "0.2.0-rc.2" }
+}

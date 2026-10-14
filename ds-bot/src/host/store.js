@@ -4,12 +4,17 @@
 import { mkdirSync, statSync } from 'node:fs'
 import { copyFile, mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { setTimeout as delay } from 'node:timers/promises'
 import { LEGACY_THEMES, MAX_EXCHANGES, ROOM_MODES } from './constants.js'
 import { homeLock } from './home-lock.js'
 import { currentColor, normalize, unquote } from './text.js'
 
 export function install(rt) {
   const { ctx, home, statePath } = rt
+  const stateWriteRetryMs = rt.config?.stateWriteRetryMs ?? 1000
+  if (!Number.isInteger(stateWriteRetryMs) || stateWriteRetryMs < 0 || stateWriteRetryMs > 60000) {
+    throw new Error('stateWriteRetryMs must be an integer from 0 to 60000')
+  }
 
   /** @type {{version:1, workspaceId?:string, mainBotIds:string[], bots:Record<string,any>, rooms:Record<string,any>, agents:Record<string,any>, capabilities:{items:Record<string,any>}, exchanges:any[], exchangeTurns:Record<string,number[]>, revision:number}} */
   const state = { version: 1, mainBotIds: [], bots: {}, rooms: {}, agents: {}, capabilities: { items: {} }, exchanges: [], exchangeTurns: {}, questions: {}, prefs: {}, revision: 0 }
@@ -257,8 +262,19 @@ export function install(rt) {
         }
         ensureLock()
         await writeFile(temp, snapshot, 'utf8')
-        ensureLock()
-        await rename(temp, statePath)
+        // Windows scanners can briefly deny replacing an otherwise writable file.
+        const deadline = Date.now() + stateWriteRetryMs
+        for (;;) {
+          ensureLock()
+          try {
+            await rename(temp, statePath)
+            break
+          } catch (error) {
+            const remaining = deadline - Date.now()
+            if (process.platform !== 'win32' || !['EACCES', 'EPERM', 'EBUSY'].includes(error.code) || remaining <= 0) throw error
+            await delay(Math.min(25, remaining))
+          }
+        }
         seen = stamp()
         rt.capabilitiesStateSaved?.()
       } catch (error) {

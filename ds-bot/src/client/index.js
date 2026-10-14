@@ -33,6 +33,7 @@ import { ABOUT_CSS } from './about.js'
 import { MEMBER_CSS, MemberDock } from './member-status.js'
 import { USER_MESSAGE_CSS, UserMessageCell, canDrawUserMessages } from './user-message.js'
 import { noticeApprovals } from './approval-notices.js'
+import { createSessionNavigator } from './navigation.js'
 
 export const inject = ['sessions', 'uiWorkspace', 'uiConversation', 'slots', 'theme', 'layout']
 
@@ -348,7 +349,7 @@ export function apply(ctx) {
       setPlain(false)
       const target = partFor(id)
       expected = target
-      ctx.uiWorkspace.openSession(target)
+      return navigateTo(target)
     },
     // The conversation replacements withdraw for a plain Session; set the surface
     // before the navigation so the Bot skin never flashes.
@@ -356,7 +357,7 @@ export function apply(ctx) {
       ui.set(state => ({ ...state, newChat: null, exchange: null, menu: null, palette: null, details: null, view: 'details', renaming: false, tab: null }))
       setPlain(true)
       expected = sessionId
-      ctx.uiWorkspace.openSession(sessionId)
+      return navigateTo(sessionId)
     },
     addAgent: async () => {
       const agent = await after(call('add-agent'))
@@ -415,7 +416,7 @@ export function apply(ctx) {
       setPlain(false)
       const target = bot && currentPart(bot) !== last.sessionId ? currentPart(bot) : partFor(id)
       expected = target
-      ctx.uiWorkspace.openSession(target)
+      return navigateTo(target)
     },
     selectPanel: (id) => { ctx.layout.selectPanel(id) },
     openNewChat: (mode) => { ui.set(state => ({ ...state, newChat: mode, menu: null, palette: null })) },
@@ -568,6 +569,11 @@ export function apply(ctx) {
     },
     dismissToast: token => ui.set(state => (state.toast && (token === undefined || state.toast.token === token) ? { ...state, toast: null } : state)),
   }
+  const navigateTo = createSessionNavigator({
+    sessions: ctx.sessions,
+    openSession: id => ctx.uiWorkspace.openSession(id),
+    onError: error => actions.reportError(error, 'open-session'),
+  })
   // Without the Desktop bridge these stay undefined, and no browser control renders.
   if (browsers) {
     Object.assign(actions, {

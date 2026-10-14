@@ -27,7 +27,7 @@ function patchSync(method, replace) {
   }
 }
 
-function runtime(t, saved) {
+function runtime(t, saved, config) {
   const home = fs.mkdtempSync(join(tmpdir(), 'ds-bot-store-'))
   const statePath = join(home, 'state.json')
   if (saved !== undefined) fs.writeFileSync(statePath, typeof saved === 'string' ? saved : JSON.stringify(saved))
@@ -43,6 +43,7 @@ function runtime(t, saved) {
   }
   const rt = {
     ctx,
+    config,
     home,
     statePath,
     autoRoomName: () => 'Room',
@@ -102,6 +103,45 @@ test('a failed state rename rejects and preserves the saved file', async (t) => 
     assert.deepEqual(fs.readFileSync(statePath), original)
   } finally {
     restore()
+  }
+})
+
+test('a Windows sharing violation retries the same atomic replacement', { skip: process.platform !== 'win32' }, async (t) => {
+  const { rt, statePath } = runtime(t)
+  await rt.load()
+  await rt.save()
+  let attempts = 0
+  const restore = patch('rename', original => async (from, to) => {
+    if (to === statePath && ++attempts <= 2) throw Object.assign(new Error('temporary sharing violation'), { code: 'EPERM' })
+    return original(from, to)
+  })
+  try {
+    rt.state.prefs.marker = 'saved after sharing violation'
+    await rt.save()
+    assert.equal(attempts, 3)
+    assert.equal(JSON.parse(fs.readFileSync(statePath, 'utf8')).prefs.marker, 'saved after sharing violation')
+  } finally { restore() }
+})
+
+test('a disabled sharing retry preserves the saved file and reports the failure', { skip: process.platform !== 'win32' }, async (t) => {
+  const { rt, statePath } = runtime(t, undefined, { stateWriteRetryMs: 0 })
+  await rt.load()
+  await rt.save()
+  const saved = fs.readFileSync(statePath)
+  const restore = patch('rename', original => async (from, to) => {
+    if (to === statePath) throw Object.assign(new Error('sharing violation'), { code: 'EPERM' })
+    return original(from, to)
+  })
+  try {
+    rt.state.prefs.marker = 'not saved'
+    await assert.rejects(rt.save(), { code: 'EPERM' })
+    assert.deepEqual(fs.readFileSync(statePath), saved)
+  } finally { restore() }
+})
+
+test('invalid state write retry settings fail at load', () => {
+  for (const value of [-1, 60001, 1.5, '1000']) {
+    assert.throws(() => install({ config: { stateWriteRetryMs: value } }), /stateWriteRetryMs/)
   }
 })
 

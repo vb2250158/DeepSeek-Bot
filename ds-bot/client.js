@@ -13267,6 +13267,22 @@ function noticeApprovals({ work, roster, shownSession, openSession, since: since
   return work.subscribe(notify);
 }
 
+// src/client/navigation.js
+function createSessionNavigator({ sessions, openSession, onError }) {
+  let request = 0;
+  return async (id) => {
+    const current = ++request;
+    try {
+      const catalog = sessions.list.getSnapshot();
+      if (catalog.phase === "pending" || catalog.byId[id] === void 0) await sessions.refresh();
+      if (current !== request) return;
+      await openSession(id);
+    } catch (error) {
+      if (current === request) onError(error);
+    }
+  };
+}
+
 // src/client/index.js
 var inject = ["sessions", "uiWorkspace", "uiConversation", "slots", "theme", "layout"];
 function apply(ctx) {
@@ -13613,7 +13629,7 @@ function apply(ctx) {
       setPlain(false);
       const target = partFor(id);
       expected = target;
-      ctx.uiWorkspace.openSession(target);
+      return navigateTo(target);
     },
     // The conversation replacements withdraw for a plain Session; set the surface
     // before the navigation so the Bot skin never flashes.
@@ -13621,7 +13637,7 @@ function apply(ctx) {
       ui2.set((state) => ({ ...state, newChat: null, exchange: null, menu: null, palette: null, details: null, view: "details", renaming: false, tab: null }));
       setPlain(true);
       expected = sessionId;
-      ctx.uiWorkspace.openSession(sessionId);
+      return navigateTo(sessionId);
     },
     addAgent: async () => {
       const agent = await after(call("add-agent"));
@@ -13680,7 +13696,7 @@ function apply(ctx) {
       setPlain(false);
       const target = bot && currentPart(bot) !== last.sessionId ? currentPart(bot) : partFor(id);
       expected = target;
-      ctx.uiWorkspace.openSession(target);
+      return navigateTo(target);
     },
     selectPanel: (id) => {
       ctx.layout.selectPanel(id);
@@ -13868,6 +13884,11 @@ function apply(ctx) {
     },
     dismissToast: (token) => ui2.set((state) => state.toast && (token === void 0 || state.toast.token === token) ? { ...state, toast: null } : state)
   };
+  const navigateTo = createSessionNavigator({
+    sessions: ctx.sessions,
+    openSession: (id) => ctx.uiWorkspace.openSession(id),
+    onError: (error) => actions.reportError(error, "open-session")
+  });
   if (browsers) {
     Object.assign(actions, {
       // The globe button: the Bot's active tab in the browser view, or a new tab.
