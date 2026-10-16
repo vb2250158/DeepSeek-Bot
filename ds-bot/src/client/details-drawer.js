@@ -14,6 +14,7 @@ import { ScheduleSummary } from './schedules.js'
 import { Segmented, useGlide, useMorph } from './motion.js'
 import { MemberWork, useMemberWork } from './member-status.js'
 import { t } from './i18n.js'
+import { RabiComputersPage } from './rabi-computers.js'
 
 function transcriptOf(list, id, name, hiddenTurns = []) {
   const outline = list.projectionsBySession?.[id]?.values?.turnOutline ?? list.byId[id]?.projectionValues?.turnOutline
@@ -27,7 +28,7 @@ function transcriptOf(list, id, name, hiddenTurns = []) {
   return lines.join('\n\n')
 }
 
-const TAB_LABELS = { details: 'Details', browser: 'Browser' }
+const TAB_LABELS = { details: 'Details', browser: 'Browser', library: 'Library', computers: 'Computers' }
 
 const hostOf = (url) => { try { return new URL(url).hostname.replace(/^www\./, '') } catch { return '' } }
 const shortUrl = url => String(url ?? '').replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/$/, '')
@@ -139,7 +140,7 @@ function GroupOverview({ room, roster, actions, usage, useWork, openSettings }) 
   ]
 }
 
-export function DetailsDrawer({ sessionId, startRenaming, startTab, hasStrip, roster, actions, useSessions, useSessionStatus, useActivity, useWork, useBrowserTabs, useBrowserPages }) {
+export function DetailsDrawer({ sessionId, startRenaming, startTab, hasStrip, compact = false, roster, actions, useSessions, useSessionStatus, useActivity, useWork, useBrowserTabs, useBrowserPages }) {
   const owner = roster.byId[sessionId]
   const part = owner ? currentPart(owner) : sessionId
   const isMainBot = isMainOf(roster, owner?.id)
@@ -208,7 +209,7 @@ export function DetailsDrawer({ sessionId, startRenaming, startTab, hasStrip, ro
   }
   const subtitle = bot ? bot.role : roomSubtitle(room, roster)
   // Tab sets: a 1:1 Bot has Details and Browser; a group has Details.
-  const tabs = bot ? ['details', 'browser'] : ['details']
+  const tabs = bot ? (compact ? ['details', 'library', 'computers'] : ['details', 'browser']) : ['details']
   return [h(Fragment, { key: 'top' }, top),
     h('div', { key: 'id', className: 'bt-drawer-id', 'data-move': side },
       bot ? h(BotAvatar, { bot, size: 64, state: botState(running, doing, roster.questions?.[part] !== undefined), main: isMainBot, badge: false, gaze: true, pokeable: true })
@@ -228,7 +229,7 @@ export function DetailsDrawer({ sessionId, startRenaming, startTab, hasStrip, ro
     h('div', { key: `body:${tab}`, className: 'bt-drawer-body', 'data-move': move },
       errorLine,
       room && tab === 'details' ? h(GroupOverview, { room, roster, actions, usage, useWork, openSettings: () => setView('settings') }) : null,
-      bot && tab === 'details' ? [
+      bot && tab === 'details' && !compact ? [
         h('div', { key: 'model', className: 'bt-drawer-model' },
           h('div', { className: 'bt-section-title' }, t('Model')),
           h(ModelMenu, { bot, roster, actions, run, wide: true }),
@@ -245,5 +246,8 @@ export function DetailsDrawer({ sessionId, startRenaming, startTab, hasStrip, ro
           h('div', { className: 'bt-kv' }, h('span', null, bot.name), h('span', null, usage))) : null,
         h(ScheduleSummary, { key: 'routines', bot, actions }),
       ] : null,
+      bot && compact && tab === 'details' ? h(ScheduleSummary, { bot, actions }) : null,
+      bot && tab === 'library' ? [h(MemoryRow, { key: 'memory', bot, actions }), h(BrowserCards, { key: 'browser', bot, sessionId, roster, actions, useBrowserTabs, useBrowserPages })] : null,
+      bot && tab === 'computers' ? h(RabiComputersPage, { roster, actions }) : null,
       bot && tab === 'browser' ? h(BrowserCards, { bot, sessionId, roster, actions, useBrowserTabs, useBrowserPages }) : null)]
 }

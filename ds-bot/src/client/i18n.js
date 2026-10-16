@@ -603,6 +603,7 @@ const ZH = {
   'Checking memory': '正在查看记忆',
   'Reuses Rabi connections and permissions. This switch only controls the DS Bot panel. Manager is contacted only after you turn this on.': '复用 Rabi 连接与权限。此开关仅控制 DS Bot 面板，开启后才连接 Manager。',
   'Refresh computers': '刷新电脑列表',
+  'Library': '资料库',
   'Memory updated': '记忆已更新',
   'Team memory updated': '团队记忆已更新',
   "Updated {name}'s memory": '已更新 {name} 的记忆',

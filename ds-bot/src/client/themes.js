@@ -11,7 +11,7 @@ const THEMES = {
   deepseek: {
     label: 'DeepSeek',
     light: { bg: '#fcfcfc', sidebar: '#f7f7f7', bubble: '#eeeeee', card: '#ffffff', text: '#141414', user: '#070707', userText: '#fcfcfc', accent: '#4d6bfe' },
-    dark: { bg: '#141414', sidebar: '#1b1b1b', bubble: '#262626', card: '#1f1f1f', text: '#f2f2f2', user: '#f2f2f2', userText: '#141414', accent: '#5b7bff' },
+    dark: { bg: '#111111', sidebar: '#0d0d0d', bubble: '#1b1b1b', card: '#1b1b1b', text: '#f2f2f2', user: '#f2f2f2', userText: '#141414', accent: '#5b7bff' },
   },
   mono: {
     label: 'Mono',

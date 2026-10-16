@@ -36,14 +36,21 @@ export function surfaceGroups(install) {
       pending = wanted
       if (reconciling) return
       reconciling = true
+      const failed = new Set()
       try {
         while (pending !== null) {
           const next = pending
           pending = null
           for (const group of [...GROUPS].reverse()) if (!next[group]) withdraw(group)
           for (const group of GROUPS) {
-            if (!next[group] || mounted[group].length > 0) continue
-            try { mounted[group] = install[group]() } catch (error) { console.warn(`[ds-bot] install ${group}`, error) }
+            if (!next[group] || mounted[group].length > 0 || failed.has(group)) continue
+            try {
+              for (const dispose of install[group]()) mounted[group].push(dispose)
+            } catch (error) {
+              failed.add(group)
+              withdraw(group)
+              console.warn(`[ds-bot] install ${group}`, error)
+            }
           }
         }
       } finally {

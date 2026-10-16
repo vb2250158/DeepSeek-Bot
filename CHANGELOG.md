@@ -2,11 +2,13 @@
 
 All notable changes to DS Bot are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the versions follow [Semantic Versioning](https://semver.org/). Before 1.0, a minor version can contain breaking changes.
 
-## [0.1.6-rabi.7] - 2026-10-17
+## [0.1.6-rabi.8] - 2026-10-17
 
 ### Changed
 
+- Bot conversation renderers use a distinct priority from Markdown enhancement. Incremental surface mounts release completed registrations on failure.
 - Embedded conversation content keeps its input at the bottom. Surface reconciliation serializes synchronous mode updates to avoid duplicate slot registrations.
+- The team lists its Main Bot as a conversation row. The compact details column shows routines, with Library and Computers tabs reusing the existing memory, browser and Rabi panels. Default dark colors follow the supplied reference.
 - DS Bot opens from a native sidebar panel entry below automation. Its panel contains a team list, the shared DSH Conversation content and a right-hand details column; native navigation remains available.
 - The floating conversation-title and memory-update pill is removed. Team styling is released when another native panel opens, and theme tokens no longer replace native sidebar, brand or settings controls.
 

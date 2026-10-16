@@ -108,3 +108,24 @@ test('a synchronous surface update during installation reconciles after the curr
   groups.dispose()
   assert.deepEqual(log, ['shell', 'conversation', 'off conversation', 'off shell'])
 })
+
+test('a failed incremental mount releases partial registrations and styles before retry', (t) => {
+  t.mock.method(console, 'warn', () => {})
+  const log = []
+  let attempts = 0
+  const groups = surfaceGroups({
+    shell: () => [() => {}],
+    conversation: function* () {
+      attempts++
+      log.push('style')
+      yield () => log.push('off style')
+      if (attempts === 1) throw new Error('slot conflict')
+      yield () => log.push('off slot')
+    },
+  })
+  groups.reconcile(groupsFor({ mode: 'bot' }))
+  assert.deepEqual(log, ['style', 'off style'])
+  groups.reconcile(groupsFor({ mode: 'bot' }))
+  groups.dispose()
+  assert.deepEqual(log, ['style', 'off style', 'style', 'off slot', 'off style'])
+})

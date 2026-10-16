@@ -18,7 +18,7 @@ export function BotWorkbench({ renderSlot }) {
 
 export function BotTeam(props) {
   return h('aside', { className: 'bt-team-column', 'aria-label': t('DS Bot') },
-    h(TeamSidebar, { ...props, wide: true }),
+    h(TeamSidebar, { ...props, wide: true, compactMain: true, groupTiles: true }),
     h('div', { className: 'bt-team-footer' },
       h(AccountLauncher, { ...props, seat: false }), h(ConnectPlugins, { ...props, wide: true })))
 }
@@ -34,7 +34,7 @@ export function BotConversation(props) {
     h('section', { className: 'bt-chat-column', 'aria-label': t('Message') },
       renderFactorySlot('conversation.content', { variant: 'embedded', phase: 'active', hero: false })),
     known ? h('aside', { className: 'bt-info-column', 'aria-label': t('View conversation details') },
-      h(DetailsDrawer, { ...props, sessionId: id, roster, hasStrip: true,
+      h(DetailsDrawer, { ...props, sessionId: id, roster, hasStrip: true, compact: true,
         startRenaming: ui.details === id && ui.renaming, startTab: ui.details === id ? ui.tab : null,
         actions: { ...actions, closeDetails: () => actions.closeDetails() } })) : null)
 }
@@ -46,6 +46,10 @@ export const WORKBENCH_CSS = `
 .bt-team-column .bt-side-top{padding:4px 2px 12px;min-height:36px}
 .bt-team-column .bt-side-top>.bt-brand{display:none}
 .bt-team-column .bt-round{width:36px;height:36px;background:var(--bt-hover)}
+.bt-group-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px 4px;padding:8px 0 18px;max-height:240px;overflow:auto}
+.bt-group-tile{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0;border:0;border-radius:10px;background:transparent;color:inherit;padding:6px;cursor:pointer}
+.bt-group-tile:hover{background:var(--bt-hover)}
+.bt-group-tile>span:last-child{font-size:12px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bt-team-column .bt-row{min-height:58px}
 .bt-team-footer{display:flex;align-items:center;gap:8px;padding:8px 12px 12px}
 .bt-team-footer>.bt-connect-wrap{flex:1;min-width:0}

@@ -754,58 +754,58 @@ export function apply(ctx) {
   // The shell group paints the team surface around the session; the conversation
   // group re-skins the session itself. Every disposer comes from slots.inject, so a
   // surface change withdraws the whole group and the outlets re-render.
-  const installShell = () => [
-    installCompiledStyles(SHELL_CSS, 'shell'),
-    installCompiledStyles(SIDEBAR_CSS, 'sidebar'),
-    installCompiledStyles(SECRET_CSS, 'secrets'),
-    installCompiledStyles(MODEL_CSS + FOLDER_CSS + BOT_SETTINGS_CSS + GROUP_SETTINGS_CSS, 'models'),
-    installCompiledStyles(USAGE_CSS, 'usage'),
-    installCompiledStyles(SCHEDULE_CSS, 'schedules'),
-    installCompiledStyles(FEEDBACK_CSS, 'feedback'),
-    installCompiledStyles(ABOUT_CSS, 'about'),
-    installCompiledStyles(MEMBER_CSS, 'members'),
-    installCompiledStyles(USER_MESSAGE_CSS, 'user-messages'),
-    browsers ? installCompiledStyles(BROWSER_CSS, 'browser') : null,
-    installTheme(),
-    (() => { const style = installStyles(WORKBENCH_CSS, 'workbench'); return () => style.remove() })(),
-    shadow('shell.overlay', { id: 'bot', order: 50, inject: face }, Overlays),
-    shadow('shell.overlay', { id: 'bot-signin', order: 55, inject: face }, DeepSeekSignIn),
-    shadow('shell.overlay', { id: 'bot-toast', order: 60, inject: face }, ErrorToast),
-  ]
-  const installConversation = () => [
-    installCompiledStyles(CONVERSATION_CSS, 'conversation'),
-    installMentions(),
-    installAtMenu(),
-    shadow('conversation.chat.node', { key: 'assistant-step', priority: -10, locale: 'chat', inject: assistantFace }, AssistantCell),
-    shadow('conversation.chat.node', { key: 'turn-trigger', priority: -10, locale: 'chat', inject: face }, TriggerCell),
-    shadow('conversation.chat.node', { key: 'tool-call', priority: -10, locale: 'chat', inject: face }, ToolCell),
-    shadow('conversation.chat.node', { key: 'turn-process', priority: -10, locale: 'chat', inject: face }, TurnProcessCell),
+  const installShell = function* () {
+    yield installCompiledStyles(SHELL_CSS, 'shell')
+    yield installCompiledStyles(SIDEBAR_CSS, 'sidebar')
+    yield installCompiledStyles(SECRET_CSS, 'secrets')
+    yield installCompiledStyles(MODEL_CSS + FOLDER_CSS + BOT_SETTINGS_CSS + GROUP_SETTINGS_CSS, 'models')
+    yield installCompiledStyles(USAGE_CSS, 'usage')
+    yield installCompiledStyles(SCHEDULE_CSS, 'schedules')
+    yield installCompiledStyles(FEEDBACK_CSS, 'feedback')
+    yield installCompiledStyles(ABOUT_CSS, 'about')
+    yield installCompiledStyles(MEMBER_CSS, 'members')
+    yield installCompiledStyles(USER_MESSAGE_CSS, 'user-messages')
+    yield browsers ? installCompiledStyles(BROWSER_CSS, 'browser') : null
+    yield installTheme()
+    yield (() => { const style = installStyles(WORKBENCH_CSS, 'workbench'); return () => style.remove() })()
+    yield shadow('shell.overlay', { id: 'bot', order: 50, inject: face }, Overlays)
+    yield shadow('shell.overlay', { id: 'bot-signin', order: 55, inject: face }, DeepSeekSignIn)
+    yield shadow('shell.overlay', { id: 'bot-toast', order: 60, inject: face }, ErrorToast)
+  }
+  const installConversation = function* () {
+    yield installCompiledStyles(CONVERSATION_CSS, 'conversation')
+    yield installMentions()
+    yield installAtMenu()
+    yield shadow('conversation.chat.node', { key: 'assistant-step', priority: -20, locale: 'chat', inject: assistantFace }, AssistantCell)
+    yield shadow('conversation.chat.node', { key: 'turn-trigger', priority: -20, locale: 'chat', inject: face }, TriggerCell)
+    yield shadow('conversation.chat.node', { key: 'tool-call', priority: -20, locale: 'chat', inject: face }, ToolCell)
+    yield shadow('conversation.chat.node', { key: 'turn-process', priority: -20, locale: 'chat', inject: face }, TurnProcessCell)
     // DSH's own turn tail stays, so what other plugins add there shows, such as the
     // cards of the files a turn delivered; its copy and branch row is hidden.
-    shadow('conversation.chat.turnTail', { id: 'bot-turn-separators', order: 1000, inject: face }, TurnTailCell),
+    yield shadow('conversation.chat.turnTail', { id: 'bot-turn-separators', order: 1000, inject: face }, TurnTailCell)
     // A Bot condenses its conversation without telling anyone; the chat keeps showing
     // every message.
-    shadow('conversation.chat.node', { key: 'question-reply', priority: -10, locale: 'chat' }, AnsweredCell),
-    shadow('conversation.chat.node', { key: 'compaction', priority: -10, locale: 'chat' }, Nothing),
-    ...(canDrawUserMessages() ? ['user', 'steering'].map(key => shadow('conversation.chat.node', { key, priority: -10, locale: 'chat', inject: face }, UserMessageCell)) : []),
-    shadow('conversation.input.permission', { priority: -10 }, Nothing),
-    shadow('conversation.input.plan', { priority: -10 }, Nothing),
+    yield shadow('conversation.chat.node', { key: 'question-reply', priority: -20, locale: 'chat' }, AnsweredCell)
+    yield shadow('conversation.chat.node', { key: 'compaction', priority: -20, locale: 'chat' }, Nothing)
+    if (canDrawUserMessages()) for (const key of ['user', 'steering']) yield shadow('conversation.chat.node', { key, priority: -20, locale: 'chat', inject: face }, UserMessageCell)
+    yield shadow('conversation.input.permission', { priority: -20 }, Nothing)
+    yield shadow('conversation.input.plan', { priority: -20 }, Nothing)
     // The composer carries no model picker or run statistics; a Bot's model lives
     // in its details panel.
-    shadow('conversation.input.model', { priority: -10 }, Nothing),
-    shadow('conversation.composer.dock', { id: 'activity', order: 0, priority: -10 }, Nothing),
-    shadow('conversation.composer.dock', { id: 'usage', order: 1, priority: -10 }, Nothing),
-    shadow('conversation.input.left', { id: 'bot-plus', order: -100, inject: face }, ComposerPlus),
-    shadow('conversation.input.right', { id: 'bot-voice', order: 100, inject: face }, ComposerVoice),
-    shadow('conversation.composer', {
-      priority: -10,
-      select: owner => (owner.pendingInteraction?.kind === 'question' ? owner.pendingInteraction : null),
-    }, QuestionCard),
-    shadow('conversation.input.dock', { id: 'bot-members', order: -120, inject: face }, MemberDock),
-    shadow('conversation.input.dock', { id: 'bot-model', order: -110, inject: face }, ModelChoiceDock),
-    shadow('conversation.input.dock', { id: 'bot-question', order: -100, inject: face }, QuestionDock),
-    shadow('conversation.input.dock', { id: 'bot-secret', order: -90, inject: face }, SecretDock),
-  ]
+    yield shadow('conversation.input.model', { priority: -20 }, Nothing)
+    yield shadow('conversation.composer.dock', { id: 'activity', order: 0, priority: -20 }, Nothing)
+    yield shadow('conversation.composer.dock', { id: 'usage', order: 1, priority: -20 }, Nothing)
+    yield shadow('conversation.input.left', { id: 'bot-plus', order: -100, inject: face }, ComposerPlus)
+    yield shadow('conversation.input.right', { id: 'bot-voice', order: 100, inject: face }, ComposerVoice)
+    yield shadow('conversation.composer', {
+      priority: -20,
+      select: owner => (owner.pendingInteraction?.kind === 'question' ? owner.pendingInteraction : null)
+    }, QuestionCard)
+    yield shadow('conversation.input.dock', { id: 'bot-members', order: -120, inject: face }, MemberDock)
+    yield shadow('conversation.input.dock', { id: 'bot-model', order: -110, inject: face }, ModelChoiceDock)
+    yield shadow('conversation.input.dock', { id: 'bot-question', order: -100, inject: face }, QuestionDock)
+    yield shadow('conversation.input.dock', { id: 'bot-secret', order: -90, inject: face }, SecretDock)
+  }
   shadow('main', { key: BOT_PANEL, children: {
     'bot.team': { kind: 'single', scope: 'root' },
     'bot.conversation': { kind: 'single', scope: 'session-maybe' },
