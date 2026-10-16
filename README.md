@@ -19,6 +19,8 @@ DeepSeek Bot (DS Bot) is a bot plugin for [DeepSeek Harness](https://github.com/
 
 ![Say one sentence to Chief, and it sets up the bots and the group chat](docs/images/team.png)
 
+**Harness integration:** DS Bot opens below automation in the native DSH sidebar. Its panel keeps the team list, shared conversation and details in separate columns. Native navigation stays available, and the floating title/memory-update pill is removed.
+
 ## Install
 
 For this fork's host and browser clients, follow [Host deployment](host/README.md). The instructions below install the original upstream plugin.

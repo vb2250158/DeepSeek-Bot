@@ -19,6 +19,8 @@ DeepSeek Bot（简称 DS Bot）是一个基于 [DeepSeek Harness](https://github
 
 ![和 Chief 说一句话，它就把 bot 和群聊建好](docs/images/team.zh.png)
 
+**Harness 集成：** 原生 DSH 侧栏的自动化下方提供 DS Bot 入口。面板内依次排列团队会话列表、共享聊天组件和详情栏，保留原生 DSH 导航，并移除旧的浮动标题与记忆更新提示。
+
 ## 安装
 
 安装本 fork 的主机和浏览器客户端，请按[主机部署](host/README.zh.md)操作。下文保留上游原插件的安装方法。

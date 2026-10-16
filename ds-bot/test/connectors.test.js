@@ -66,7 +66,7 @@ function setup({ fail = false, github = { api: 'https://gh.test' } } = {}) {
 
 function capture(ctx) {
   const register = ctx.connection.fetch.register
-  ctx.connection.fetch.register = (route) => { ctx.route = route; return register(route) }
+  ctx.connection.fetch.register = (route) => { if (route.path === '/api/bot') ctx.route = route; return register(route) }
 }
 
 // Calls the /api/bot route the way the client does.

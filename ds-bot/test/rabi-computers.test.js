@@ -86,5 +86,7 @@ test('output observation preserves terminal identity and output cursor', async (
 test('DSH tool guards can refuse a Rabi GUI operation', async () => {
   const { rt } = fixture()
   rt.ctx.tools.execute = async () => ({ isError: true, error: { message: 'Operation denied by policy' } })
-  await assert.rejects(rt.rabiComputerEndpoint('rabi-computers-list'), /denied by policy/)
+  const result = await rt.rabiComputerEndpoint('rabi-computers-list')
+  assert.match(result.error, /denied by policy/)
+  assert.deepEqual(result.computers, [])
 })

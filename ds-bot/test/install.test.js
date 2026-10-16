@@ -13,7 +13,7 @@ function start(state, { config = {}, services } = {}) {
   let route
   const register = ctx.connection.fetch.register
   ctx.connection.fetch.register = (options) => {
-    route = options
+    if (options.path === '/api/bot') route = options
     return register(options)
   }
   const applyResult = apply(ctx, { home, ...config })
@@ -101,6 +101,8 @@ test('apply registers listeners, tools, and effects in a fixed order', (t) => {
     'effect ds-bot: dsh update install',
     'effect ds-bot: api route',
     'route POST /api/bot',
+    'effect ds-bot: client-app',
+    'route GET /api/ds-bot-client-app',
     'effect ds-bot: load state',
   ])
 })

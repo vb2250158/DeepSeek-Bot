@@ -6,7 +6,7 @@ import { allThemes, shellTokens, themeCss } from '../src/client/themes.js'
 
 // The browser bundle holds every style sheet ds-bot installs; the bundle test
 // keeps it in step with src/client.
-const bundle = readFileSync(new URL('../client.js', import.meta.url), 'utf8')
+const bundle = readFileSync(new URL('../client-app.js', import.meta.url), 'utf8')
 
 // CSS declaration blocks hold no braces, so a declaration's rule runs from the
 // nearest `{` before it to the nearest `}` after it.

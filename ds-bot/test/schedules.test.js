@@ -49,7 +49,7 @@ function setup(services = {}) {
   writeFileSync(join(home, 'state.json'), JSON.stringify(TEAM))
   const ctx = fakeContext({ services })
   const register = ctx.connection.fetch.register
-  ctx.connection.fetch.register = (route) => { ctx.route = route; return register(route) }
+  ctx.connection.fetch.register = (route) => { if (route.path === '/api/bot') ctx.route = route; return register(route) }
   apply(ctx, { home })
   const call = async (endpoint, payload) => (await ctx.route.fetch(new Request('http://localhost/api/bot', { method: 'POST', body: JSON.stringify({ endpoint, payload }) }))).json()
   return { ctx, home, call }

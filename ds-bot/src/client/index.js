@@ -6,8 +6,8 @@ import { themeCss, shellTokens, registry, registerShape, registerTheme, allTheme
 import { MENTION_ORIGIN, currentPart } from './text.js'
 import { SHELL_CSS, CONVERSATION_CSS, installStyles, installCompiledStyles } from './styles.js'
 import { lookOf } from './mark.js'
-import { TeamSidebar, ConnectPlugins, YouAvatar, AccountLauncher, FooterAccount, BrandMark, BrandName, BotReturn, SIDEBAR_CSS, RETURN_CSS, holdShellShortcuts } from './sidebar.js'
-import { HeaderPill } from './header.js'
+import { SIDEBAR_CSS, holdShellShortcuts } from './sidebar.js'
+import { BOT_PANEL, BotPanelIcon, BotWorkbench, BotTeam, BotConversation, WORKBENCH_CSS } from './workbench.js'
 import { ComposerPlus, ComposerVoice, menuIcons } from './composer.js'
 import { CHATS_SOURCE, atSources } from './at-menu.js'
 import { VOICE_BUNDLE } from './speech.js'
@@ -277,7 +277,6 @@ export function apply(ctx) {
   const installTheme = () => {
     const style = installStyles('', 'theme')
     let key = ''
-    let releaseTokens = null
     const render = () => {
       const snapshot = roster.getSnapshot()
       const prefs = snapshot.ready ? snapshot.prefs ?? {} : savedPrefs
@@ -290,9 +289,8 @@ export function apply(ctx) {
       if (next === key) return
       key = next
       style.textContent = themeCss(themes[id], accent)
-      const release = releaseTokens
-      releaseTokens = ctx.theme.overrideTokens('ds-bot', shellTokens(themes[id]))
-      if (typeof release === 'function') release()
+      const tokens = shellTokens(themes[id])
+      style.textContent += ['light', 'dark'].map(mode => `${mode === 'dark' ? 'body[data-ds-dark-theme] ' : ''}.bt-workbench{${Object.entries(tokens).map(([name, values]) => `${name}:${values[mode]}`).join(';')}}`).join('\n')
       if (snapshot.ready) {
         try { localStorage.setItem(PREFS_KEY, JSON.stringify({ theme: prefs.theme, accent: prefs.accent, motion: prefs.motion })) } catch { /* storage unavailable */ }
       }
@@ -303,12 +301,8 @@ export function apply(ctx) {
     return () => {
       offRoster()
       offRegistry()
-      try {
-        if (typeof releaseTokens === 'function') releaseTokens()
-      } finally {
-        delete document.body.dataset.btMotion
-        style.remove()
-      }
+      delete document.body.dataset.btMotion
+      style.remove()
     }
   }
 
@@ -454,6 +448,7 @@ export function apply(ctx) {
     // surface closes first so nothing stale reopens on the way back.
     setSurface: (mode) => {
       if (mode !== 'bot' && mode !== 'agent') return
+      if (mode === 'bot' && ctx.layout.panelInfo.getSnapshot().activePanelId !== BOT_PANEL) ctx.layout.selectPanel(BOT_PANEL)
       if (surface.getSnapshot().mode === mode) return
       if (mode === 'agent') {
         ui.set(state => ({ ...state, details: null, view: 'details', settings: null, palette: null, newChat: null, menu: null, voice: null, exchange: null, memory: null, toast: null }))
@@ -572,7 +567,11 @@ export function apply(ctx) {
   }
   const navigateTo = createSessionNavigator({
     sessions: ctx.sessions,
-    openSession: id => ctx.uiWorkspace.openSession(id),
+    openSession: async id => {
+      const botMode = surface.getSnapshot().mode === 'bot'
+      await ctx.uiWorkspace.openSession(id)
+      if (botMode) ctx.layout.selectPanel(BOT_PANEL)
+    },
     onError: error => actions.reportError(error, 'open-session'),
   })
   // Without the Desktop bridge these stay undefined, and no browser control renders.
@@ -768,15 +767,7 @@ export function apply(ctx) {
     installCompiledStyles(USER_MESSAGE_CSS, 'user-messages'),
     browsers ? installCompiledStyles(BROWSER_CSS, 'browser') : null,
     installTheme(),
-    shadow('sidebar.workspaces', { priority: -10, inject: face }, TeamSidebar),
-    shadow('sidebar.brand.mark', { priority: -10 }, BrandMark),
-    shadow('sidebar.brand.name', { priority: -10 }, BrandName),
-    shadow('sidebar.footer.action', { id: 'bot-account', order: -200, inject: face }, FooterAccount),
-    shadow('sidebar.footer.action', { id: 'bot-connect', order: -100, inject: face }, ConnectPlugins),
-    shadow('settings.trigger', { priority: -10 }, YouAvatar),
-    // At priority -10 the whale wins the seat over a shell account plugin's own
-    // launcher (the Desktop's "··· More"), which comes back in Agent mode.
-    shadow('settings.launcher', { priority: -10, inject: face }, AccountLauncher),
+    (() => { const style = installStyles(WORKBENCH_CSS, 'workbench'); return () => style.remove() })(),
     shadow('shell.overlay', { id: 'bot', order: 50, inject: face }, Overlays),
     shadow('shell.overlay', { id: 'bot-signin', order: 55, inject: face }, DeepSeekSignIn),
     shadow('shell.overlay', { id: 'bot-toast', order: 60, inject: face }, ErrorToast),
@@ -785,7 +776,6 @@ export function apply(ctx) {
     installCompiledStyles(CONVERSATION_CSS, 'conversation'),
     installMentions(),
     installAtMenu(),
-    shadow('conversation.session.header', { priority: -10, inject: face }, HeaderPill),
     shadow('conversation.chat.node', { key: 'assistant-step', priority: -10, locale: 'chat', inject: assistantFace }, AssistantCell),
     shadow('conversation.chat.node', { key: 'turn-trigger', priority: -10, locale: 'chat', inject: face }, TriggerCell),
     shadow('conversation.chat.node', { key: 'tool-call', priority: -10, locale: 'chat', inject: face }, ToolCell),
@@ -816,12 +806,23 @@ export function apply(ctx) {
     shadow('conversation.input.dock', { id: 'bot-question', order: -100, inject: face }, QuestionDock),
     shadow('conversation.input.dock', { id: 'bot-secret', order: -90, inject: face }, SecretDock),
   ]
-  // The return button belongs to neither group: it renders only in Agent mode.
+  shadow('main', { key: BOT_PANEL, children: {
+    'bot.team': { kind: 'single', scope: 'root' },
+    'bot.conversation': { kind: 'single', scope: 'session-maybe' },
+  } }, BotWorkbench)
+  shadow('bot.team', { inject: face }, BotTeam)
+  shadow('bot.conversation', { inject: face }, BotConversation)
+  shadow('sidebar.panellist', { id: BOT_PANEL, order: 30, label: () => 'DS Bot' }, BotPanelIcon)
   ctx.effect(() => {
-    const style = installStyles(RETURN_CSS, 'return')
-    return () => style.remove()
-  }, 'ds-bot: return styles')
-  shadow('sidebar.footer.action', { id: 'bot-return', order: -300, inject: face }, BotReturn)
+    const sync = () => {
+      const mode = ctx.layout.panelInfo.getSnapshot().activePanelId === BOT_PANEL ? 'bot' : 'agent'
+      actions.setSurface(mode)
+    }
+    if (surface.getSnapshot().mode === 'bot') ctx.layout.selectPanel(BOT_PANEL)
+    const off = ctx.layout.panelInfo.subscribe(sync)
+    sync()
+    return off
+  }, 'ds-bot: panel navigation')
 
   // The main view decides `plain`: a DSH Agent Session keeps the Bot shell but
   // withdraws the conversation replacements, so the native dsh page shows. A jump
