@@ -1,6 +1,6 @@
 {
   "name": "ds-bot",
-  "version": "0.1.6-rabi.2",
+  "version": "0.1.6-rabi.5",
   "description": "DS Bot: a team of long-lived Bots for DeepSeek Harness, with Main Bots, Bot-to-Bot messages and group chats",
   "keywords": [
     "dsh-plugin",
@@ -37,7 +37,8 @@
     "web-search.js",
     "cordis.patch.yml",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "client-app.js"
   ],
   "scripts": {
     "build": "node scripts/build-client.mjs",

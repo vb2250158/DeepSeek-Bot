@@ -20,6 +20,18 @@ import { AboutPage } from './about.js'
 import { t } from './i18n.js'
 import { RabiComputersPage } from './rabi-computers.js'
 
+/** Defer Rabi panel mount one frame so opening Settings never sync-blocks on Manager work. */
+function LazyRabiComputersPage(props) {
+  const [ready, setReady] = useState(false)
+  useEffect(() => {
+    let alive = true
+    const id = requestAnimationFrame(() => { if (alive) setReady(true) })
+    return () => { alive = false; cancelAnimationFrame(id) }
+  }, [])
+  if (!ready) return h('p', { className: 'bt-set-hint' }, t('Loading…'))
+  return h(RabiComputersPage, props)
+}
+
 const capitalize = word => word[0].toUpperCase() + word.slice(1)
 
 // Settings dialog: a 198px page list beside the page. Bots and group chats each list
@@ -203,7 +215,7 @@ export function SettingsDialog({ page, id, roster, actions, useUpdate, leaving =
           shown === 'bots' && !bot ? h(BotsPage, { roster, actions, run }) : null,
           room ? h('div', { className: 'bt-settings-form' }, h(GroupSettingsForm, { key: room.id, room, roster, actions, run })) : null,
           shown === 'groups' && !room ? h(GroupsPage, { roster, actions, run }) : null,
-          shown === 'computers' ? h(RabiComputersPage, { roster, actions }) : null,
+          shown === 'computers' ? h(LazyRabiComputersPage, { roster, actions }) : null,
           shown === 'connectors' ? h(ConnectorsPage, { roster, actions }) : null,
           shown === 'capabilities' ? h(CapabilitiesPage, { roster, actions, run }) : null,
           shown === 'schedules' ? h(SchedulesPage, { roster, actions, start: id ?? undefined }) : null,

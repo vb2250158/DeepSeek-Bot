@@ -1,4 +1,4 @@
-import { createElement as h, useEffect, useRef, useState } from 'react'
+import { createElement as h, useCallback, useEffect, useRef, useState } from 'react'
 import { Button, Input, Switch } from '@deepseek-ai/dsh-client-ui-primitives'
 import { t } from './i18n.js'
 
@@ -100,33 +100,59 @@ function RemoteTerminal({ computer, call }) {
           }) }, t('Exit terminal and stop child processes')))) : null))
 }
 
-/** Thin presentation over Rabi's computer catalog; stores only the panel preference. */
+/** Thin presentation over Rabi's computer catalog; stores only the panel preference.
+ *  Manager is contacted only after the panel is open and enabled — never during plugin apply / web boot. */
 export function RabiComputersPage({ roster, actions }) {
   const [status, setStatus] = useState(null)
   const [computers, setComputers] = useState([])
   const [target, setTarget] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [listing, setListing] = useState(false)
   const enabled = roster.prefs?.rabiComputers === true
   const call = actions.rabiComputers
+  // Local status only (tool presence). Never hits Manager; safe to poll.
   useEffect(() => {
     const abort = new AbortController()
     let timer
     const refresh = async () => {
       try {
         const current = await call('rabi-computers-status', {}, abort.signal)
-        if (abort.signal.aborted) return
-        setStatus(current)
-        if (enabled && current.available) {
-          const value = await call('rabi-computers-list', {}, abort.signal)
-          if (!abort.signal.aborted) { setComputers(value.computers); setError('') }
-        }
-      } catch (failure) { if (!abort.signal.aborted) setError(failure.message) }
+        if (!abort.signal.aborted) setStatus(current)
+      } catch (failure) {
+        if (!abort.signal.aborted) setError(failure.message)
+      }
       if (!abort.signal.aborted) timer = setTimeout(refresh, 5000)
     }
     void refresh()
     return () => { abort.abort(); clearTimeout(timer) }
-  }, [enabled, call])
+  }, [call])
+  // Manager list: only when the panel preference is on. Soft failure stays in the panel.
+  const loadComputers = useCallback(async (signal) => {
+    if (!enabled) { setComputers([]); return }
+    setListing(true)
+    try {
+      const value = await call('rabi-computers-list', {}, signal)
+      if (signal?.aborted) return
+      setComputers(Array.isArray(value?.computers) ? value.computers : [])
+      if (value?.error) setError(value.error)
+      else setError('')
+    } catch (failure) {
+      if (!signal?.aborted) {
+        setComputers([])
+        setError(failure.message)
+      }
+    } finally {
+      if (!signal?.aborted) setListing(false)
+    }
+  }, [call, enabled])
+  useEffect(() => {
+    if (!enabled) { setComputers([]); setTarget(''); return }
+    const abort = new AbortController()
+    // Defer one tick so settings / plugin activation paint first.
+    const idle = setTimeout(() => { void loadComputers(abort.signal) }, 0)
+    return () => { clearTimeout(idle); abort.abort() }
+  }, [enabled, loadComputers])
   const selected = computers.find(item => item.instanceId === target && item.connected && !item.local)
   const toggle = async value => {
     setBusy(true); setError('')
@@ -138,11 +164,13 @@ export function RabiComputersPage({ roster, actions }) {
     h('section', { className: 'bt-set-section' }, h('h3', null, t('Rabi remote computers')),
       h('div', { className: 'bt-set-card' }, h('div', { className: 'bt-set-row' },
         h('div', { className: 'bt-set-copy' }, h('span', null, t('Use Rabi computer panel')),
-          h('span', { className: 'bt-set-hint' }, t('Reuses Rabi connections and permissions. This switch only controls the DS Bot panel.'))),
+          h('span', { className: 'bt-set-hint' }, t('Reuses Rabi connections and permissions. This switch only controls the DS Bot panel. Manager is contacted only after you turn this on.'))),
         h(Switch, { label: t('Use Rabi computer panel'), checked: enabled, disabled: busy || !status?.available, onChange: value => void toggle(value) })))),
     status && !status.available ? h('p', { className: 'bt-set-hint' }, t('Install and configure dsh-rabiroute-agent on the controller first.')) : null,
     error ? h('p', { className: 'bt-error', role: 'alert' }, error) : null,
     enabled ? h('section', { className: 'bt-set-section' }, h('h3', null, t('Connected computers')),
+      h('div', { className: 'bt-rabi-actions', style: { marginBottom: 8 } },
+        h(Button, { disabled: listing || busy, onClick: () => void loadComputers() }, listing ? t('Loading…') : t('Refresh computers'))),
       h('div', { className: 'bt-set-card' }, computers.filter(item => !item.local).map(item => h('div', { key: item.instanceId, className: 'bt-set-row' },
         h('div', { className: 'bt-set-copy' }, h('span', null, item.name ?? item.instanceId), h('span', { className: 'bt-set-hint' }, `${item.connected ? t('Online') : t('Offline')} · ${item.instanceId}`)),
         h(Button, { disabled: !item.connected, onClick: () => setTarget(item.instanceId) }, t('Remote terminal')))),

@@ -1,19 +1,21 @@
 import { randomUUID } from 'node:crypto'
 
 const TOOL = 'rabiroute_manager_api'
+const UI_TIMEOUT_MS = 8000
 const refuse = message => { throw Object.assign(new Error(message), { code: 'bot/refused' }) }
 const segment = value => {
   if (typeof value !== 'string' || !value || value.length > 200 || [...value].some(char => char.charCodeAt(0) < 32)) refuse('Invalid remote computer identity')
   return encodeURIComponent(value)
 }
 
-/** GUI adapter over the existing Rabi tool pipeline; Rabi owns connections and terminals. */
+/** GUI adapter over the existing Rabi tool pipeline; Rabi owns connections and terminals.
+ *  Manager / WebGUI traffic is request-local and never runs during install() / plugin activation. */
 export function install(rt) {
   const { ctx, state } = rt
   const available = () => Boolean(ctx.tools.get?.(TOOL))
   const request = async (path, method, body, signal, headers) => {
     const result = await ctx.tools.execute({
-      name: TOOL, callId: `ds-bot-ui-${randomUUID()}`, signal: signal ?? AbortSignal.timeout(30000),
+      name: TOOL, callId: `ds-bot-ui-${randomUUID()}`, signal: signal ?? AbortSignal.timeout(UI_TIMEOUT_MS),
       arguments: { method, path, ...(body ? { bodyJson: JSON.stringify(body) } : {}), ...(headers ? { requestHeadersJson: JSON.stringify(headers) } : {}) },
     })
     if (result.isError) refuse(result.error?.message ?? 'Rabi request failed')
@@ -31,18 +33,29 @@ export function install(rt) {
     if (typeof access.data?.token !== 'string' || !access.data.token) refuse('Rabi WebGUI access is unavailable')
     return { 'x-rabiroute-webgui-token': access.data.token }
   }
+  /** Soft Manager call: connection / auth failures become { error } instead of throwing, so the panel never blocks plugin activation. */
+  const softManager = async (fn) => {
+    try { return { ok: true, value: await fn() } }
+    catch (error) { return { ok: false, error: error?.message ?? String(error) } }
+  }
   rt.rabiComputerEndpoint = async (endpoint, body = {}, signal) => {
     await rt.load()
     const enabled = state.prefs.rabiComputers === true
+    // Status is local tool presence only — never touches Manager.
     if (endpoint === 'rabi-computers-status') return { available: available(), enabled }
     if (!enabled) refuse('Enable the Rabi computer panel first')
     if (!available()) refuse('Install and configure dsh-rabiroute-agent on the controller first')
-    const headers = await auth(signal)
     if (endpoint === 'rabi-computers-list') {
-      const result = await request('/api/lan-agent/instances', 'GET', undefined, signal, headers)
-      if (!Array.isArray(result.instances)) refuse('Rabi returned an invalid computer list')
-      return { computers: result.instances.map(item => ({ instanceId: item.instanceId, name: item.name, platform: item.platform, connected: item.connected, local: item.local })) }
+      const outcome = await softManager(async () => {
+        const headers = await auth(signal)
+        const result = await request('/api/lan-agent/instances', 'GET', undefined, signal, headers)
+        if (!Array.isArray(result.instances)) refuse('Rabi returned an invalid computer list')
+        return result.instances.map(item => ({ instanceId: item.instanceId, name: item.name, platform: item.platform, connected: item.connected, local: item.local }))
+      })
+      if (!outcome.ok) return { computers: [], error: outcome.error, available: available(), enabled }
+      return { computers: outcome.value, available: available(), enabled }
     }
+    const headers = await auth(signal)
     const base = `/api/lan-agent/instances/${segment(body.instanceId)}`
     if (endpoint === 'rabi-computer-terminals') {
       const result = await request(`${base}/terminals`, 'GET', undefined, signal, headers)

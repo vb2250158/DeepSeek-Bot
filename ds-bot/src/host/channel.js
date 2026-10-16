@@ -1,5 +1,8 @@
 // Client channel: the team view the browser renders, and the POST /api/bot endpoints.
 import { randomUUID } from 'node:crypto'
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { questionReply } from './parts.js'
 import { COLORS, EXTRA_COLORS, ROUTE } from './constants.js'
@@ -352,6 +355,29 @@ export function install(rt) {
       return new Response(JSON.stringify(result), { status: 200, headers: { 'content-type': 'application/json' } })
     },
   }), 'ds-bot: api route')
+
+  // Heavy browser UI stays out of the ModuleLoader combo (full client.js blocked markdown/unity).
+  // Served on demand after activation; load failures must not block plugin activation.
+  ctx.effect(() => ctx.connection.fetch.register({
+    path: '/api/ds-bot-client-app',
+    methods: ['GET'],
+    requestBody: 'buffered',
+    fetch: async () => {
+      try {
+        const file = join(dirname(fileURLToPath(import.meta.url)), '../../client-app.js')
+        const body = readFileSync(file)
+        return new Response(body, {
+          status: 200,
+          headers: {
+            'content-type': 'application/javascript; charset=utf-8',
+            'cache-control': 'no-cache',
+          },
+        })
+      } catch (error) {
+        return new Response(String(error?.message ?? error), { status: 404, headers: { 'content-type': 'text/plain; charset=utf-8' } })
+      }
+    },
+  }), 'ds-bot: client-app')
 
   ctx.effect(() => {
     void rt.load()
