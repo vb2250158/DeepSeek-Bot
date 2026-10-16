@@ -1,4 +1,4 @@
-import { createElement as h, Fragment } from 'react'
+import { createElement as h, Fragment, useEffect } from 'react'
 import { TeamSidebar, AccountLauncher, ConnectPlugins } from './sidebar.js'
 import { DetailsDrawer } from './details-drawer.js'
 import { BotMark } from './mark.js'
@@ -29,9 +29,16 @@ export function BotConversation(props) {
   const ui = useUi(value => value)
   const owner = roster.byId[sessionId] ?? Object.values(roster.byId).find(bot => bot.sessionId === sessionId)
   const id = owner?.id ?? sessionId
-  const known = owner !== undefined || roster.roomsById[id] !== undefined
+  const room = roster.roomsById[id]
+  const known = owner !== undefined || room !== undefined
+  const name = owner?.name ?? room?.name
+  useEffect(() => {
+    if (sessionId === undefined) return undefined
+    actions.beginVisit(sessionId)
+    return () => actions.endVisit(sessionId)
+  }, [sessionId, actions])
   return h(Fragment, null,
-    h('section', { className: 'bt-chat-column', 'aria-label': t('Message') },
+    h('section', { className: 'bt-chat-column', 'aria-label': t('Message'), style: { '--bt-placeholder': JSON.stringify(name ? t('Message {name}', { name }) : t('Message')) } },
       renderFactorySlot('conversation.content', { variant: 'embedded', phase: 'active', hero: false })),
     known ? h('aside', { className: 'bt-info-column', 'aria-label': t('View conversation details') },
       h(DetailsDrawer, { ...props, sessionId: id, roster, hasStrip: true, compact: true,
@@ -50,6 +57,7 @@ export const WORKBENCH_CSS = `
 .bt-group-tile{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0;border:0;border-radius:10px;background:transparent;color:inherit;padding:6px;cursor:pointer}
 .bt-group-tile:hover{background:var(--bt-hover)}
 .bt-group-tile>span:last-child{font-size:12px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bt-team-column .bt-row-role{min-width:0;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;line-height:16px;color:var(--bt-ink-2);background:var(--bt-tag-bg);border-radius:4px;padding:0 4px}
 .bt-team-column .bt-row{min-height:58px}
 .bt-team-footer{display:flex;align-items:center;gap:8px;padding:8px 12px 12px}
 .bt-team-footer>.bt-connect-wrap{flex:1;min-width:0}

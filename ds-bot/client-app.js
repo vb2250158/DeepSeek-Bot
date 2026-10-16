@@ -4841,7 +4841,7 @@ function BotRow({ bot, roster, actions, useSessions, useSessionStatus, useSessio
     wide ? (0, import_react8.createElement)(
       "span",
       { className: "bt-row-body" },
-      (0, import_react8.createElement)("span", { className: "bt-row-name" }, (0, import_react8.createElement)("span", { className: "bt-row-title" }, bot.name), pinned ? (0, import_react8.createElement)(PinMark) : null),
+      (0, import_react8.createElement)("span", { className: "bt-row-name" }, (0, import_react8.createElement)("span", { className: "bt-row-title" }, bot.name), compactMain && bot.role ? (0, import_react8.createElement)("span", { className: "bt-row-role" }, bot.role) : null, pinned ? (0, import_react8.createElement)(PinMark) : null),
       awayLine ? (0, import_react8.createElement)("span", { className: "bt-row-preview" }, awayLine) : preview ? (0, import_react8.createElement)("span", { className: "bt-row-preview" }, preview) : null
     ) : null,
     wide && unread && !active ? (0, import_react8.createElement)("span", { className: "bt-unread", "aria-hidden": true }) : null
@@ -9170,13 +9170,20 @@ function BotConversation(props) {
   const ui2 = useUi((value) => value);
   const owner = roster.byId[sessionId] ?? Object.values(roster.byId).find((bot) => bot.sessionId === sessionId);
   const id = owner?.id ?? sessionId;
-  const known = owner !== void 0 || roster.roomsById[id] !== void 0;
+  const room2 = roster.roomsById[id];
+  const known = owner !== void 0 || room2 !== void 0;
+  const name = owner?.name ?? room2?.name;
+  (0, import_react21.useEffect)(() => {
+    if (sessionId === void 0) return void 0;
+    actions.beginVisit(sessionId);
+    return () => actions.endVisit(sessionId);
+  }, [sessionId, actions]);
   return (0, import_react21.createElement)(
     import_react21.Fragment,
     null,
     (0, import_react21.createElement)(
       "section",
-      { className: "bt-chat-column", "aria-label": t("Message") },
+      { className: "bt-chat-column", "aria-label": t("Message"), style: { "--bt-placeholder": JSON.stringify(name ? t("Message {name}", { name }) : t("Message")) } },
       renderFactorySlot("conversation.content", { variant: "embedded", phase: "active", hero: false })
     ),
     known ? (0, import_react21.createElement)(
@@ -9206,6 +9213,7 @@ var WORKBENCH_CSS = `
 .bt-group-tile{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0;border:0;border-radius:10px;background:transparent;color:inherit;padding:6px;cursor:pointer}
 .bt-group-tile:hover{background:var(--bt-hover)}
 .bt-group-tile>span:last-child{font-size:12px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bt-team-column .bt-row-role{min-width:0;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;line-height:16px;color:var(--bt-ink-2);background:var(--bt-tag-bg);border-radius:4px;padding:0 4px}
 .bt-team-column .bt-row{min-height:58px}
 .bt-team-footer{display:flex;align-items:center;gap:8px;padding:8px 12px 12px}
 .bt-team-footer>.bt-connect-wrap{flex:1;min-width:0}

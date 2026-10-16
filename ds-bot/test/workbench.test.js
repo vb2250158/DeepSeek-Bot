@@ -9,11 +9,12 @@ const { outputFiles } = await build({
   bundle: true, format: 'cjs', platform: 'browser', write: false, logLevel: 'silent',
   external: ['react', 'react-dom', '@deepseek-ai/dsh-client-ui-primitives'],
 })
+const effects = []
 const h = (type, props, ...children) => ({ type, props: { ...props, children } })
 const module = { exports: {} }
 runInNewContext(outputFiles[0].text, {
   module, exports: module.exports,
-  require: name => name === 'react' ? { createElement: h, Fragment: 'fragment' }
+  require: name => name === 'react' ? { createElement: h, Fragment: 'fragment', useEffect: effect => effects.push(effect) }
     : name === 'react-dom' ? { createPortal: node => node } : {},
 })
 const { BotWorkbench, BotConversation } = module.exports
@@ -46,4 +47,20 @@ test('the selected Bot uses the shared conversation factory and its existing det
 test('an unowned session has no misleading Bot details', () => {
   const tree = BotConversation({ sessionId: 'outside', useRoster: select => select({ byId: {}, roomsById: {} }), useUi: select => select({}), actions: {}, renderFactorySlot: () => 'chat' })
   assert.equal(tree.props.children[1], null)
+})
+
+
+test('the panel keeps visit readback and the selected Bot input hint without a floating header', () => {
+  effects.length = 0
+  const log = []
+  const tree = BotConversation({
+    sessionId: 'chief', useRoster: select => select({ byId: { chief: { id: 'chief', name: 'Chief' } }, roomsById: {} }),
+    useUi: select => select({}), renderFactorySlot: () => 'chat',
+    actions: { beginVisit: id => log.push(['begin', id]), endVisit: id => log.push(['end', id]) },
+  })
+  const cleanups = effects.map(effect => effect()).filter(Boolean)
+  assert.deepEqual(log, [['begin', 'chief']])
+  assert.match(tree.props.children[0].props.style['--bt-placeholder'], /Chief/)
+  for (const dispose of cleanups) dispose()
+  assert.deepEqual(log, [['begin', 'chief'], ['end', 'chief']])
 })
