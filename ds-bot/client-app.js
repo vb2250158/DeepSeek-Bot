@@ -9192,6 +9192,7 @@ function BotConversation(props) {
       { className: "bt-info-column", "aria-label": t("View conversation details") },
       (0, import_react21.createElement)(DetailsDrawer, {
         ...props,
+        key: `${id}:${ui2.details === id && ui2.renaming ? "rename" : ""}:${ui2.details === id ? ui2.tab ?? "" : ""}`,
         sessionId: id,
         roster,
         hasStrip: true,

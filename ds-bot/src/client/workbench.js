@@ -40,7 +40,7 @@ export function BotConversation(props) {
     h('section', { className: 'bt-chat-column', 'aria-label': t('Message'), style: { '--bt-placeholder': JSON.stringify(name ? t('Message {name}', { name }) : t('Message')) } },
       renderFactorySlot('conversation.content', { variant: 'embedded', phase: 'active', hero: false })),
     known ? h('aside', { className: 'bt-info-column', 'aria-label': t('View conversation details') },
-      h(DetailsDrawer, { ...props, sessionId: id, roster, hasStrip: true, compact: true,
+      h(DetailsDrawer, { ...props, key: `${id}:${ui.details === id && ui.renaming ? 'rename' : ''}:${ui.details === id ? ui.tab ?? '' : ''}`, sessionId: id, roster, hasStrip: true, compact: true,
         startRenaming: ui.details === id && ui.renaming, startTab: ui.details === id ? ui.tab : null,
         actions: { ...actions, closeDetails: () => actions.closeDetails() } })) : null)
 }

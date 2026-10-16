@@ -2,10 +2,11 @@
 
 All notable changes to DS Bot are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the versions follow [Semantic Versioning](https://semver.org/). Before 1.0, a minor version can contain breaking changes.
 
-## [0.1.6-rabi.10] - 2026-10-17
+## [0.1.6-rabi.11] - 2026-10-17
 
 ### Changed
 
+- Details editors reset when switching Bots or entering a requested rename/settings view.
 - The permanent native sidebar entry uses the standard sized fish icon and stays independent of team styles.
 - Visit tracking and the selected conversation input hint stay active after removing the floating header. Compact conversation rows retain their role labels.
 - Bot conversation renderers use a distinct priority from Markdown enhancement. Incremental surface mounts release completed registrations on failure.

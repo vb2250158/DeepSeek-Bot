@@ -64,3 +64,12 @@ test('the panel keeps visit readback and the selected Bot input hint without a f
   for (const dispose of cleanups) dispose()
   assert.deepEqual(log, [['begin', 'chief'], ['end', 'chief']])
 })
+
+
+test('switching the selected Bot gives its details editor a separate lifecycle', () => {
+  const roster = { byId: { first: { id: 'first', name: 'First' }, second: { id: 'second', name: 'Second' } }, roomsById: {} }
+  const render = sessionId => BotConversation({ sessionId, useRoster: select => select(roster), useUi: select => select({}), actions: {}, renderFactorySlot: () => 'chat' })
+  const first = render('first').props.children[1].props.children[0]
+  const second = render('second').props.children[1].props.children[0]
+  assert.notEqual(first.props.key, second.props.key)
+})
