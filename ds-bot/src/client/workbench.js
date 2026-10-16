@@ -1,14 +1,13 @@
 import { createElement as h, Fragment, useEffect } from 'react'
 import { TeamSidebar, AccountLauncher, ConnectPlugins } from './sidebar.js'
 import { DetailsDrawer } from './details-drawer.js'
-import { BotMark } from './mark.js'
-import { MAIN_LOOK } from './characters.js'
+import { FishLogo } from '@deepseek-ai/dsh-client-ui-primitives'
 import { t } from './i18n.js'
 
 export const BOT_PANEL = 'ds-bot'
 
 export function BotPanelIcon({ size = 18 }) {
-  return h(BotMark, { look: MAIN_LOOK, size })
+  return h(FishLogo, { size })
 }
 
 export function BotWorkbench({ renderSlot }) {

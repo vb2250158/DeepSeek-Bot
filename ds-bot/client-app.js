@@ -9139,9 +9139,10 @@ function DetailsDrawer({ sessionId, startRenaming, startTab, hasStrip, compact: 
 
 // src/client/workbench.js
 var import_react21 = require("react");
+var import_dsh_client_ui_primitives4 = require("@deepseek-ai/dsh-client-ui-primitives");
 var BOT_PANEL = "ds-bot";
 function BotPanelIcon({ size = 18 }) {
-  return (0, import_react21.createElement)(BotMark, { look: MAIN_LOOK, size });
+  return (0, import_react21.createElement)(import_dsh_client_ui_primitives4.FishLogo, { size });
 }
 function BotWorkbench({ renderSlot }) {
   return (0, import_react21.createElement)(
@@ -9637,7 +9638,7 @@ function turnDetector({ loud = 0.12, quiet = 0.06, quietMs = 1200 } = {}) {
 
 // src/client/palette.js
 var import_react23 = require("react");
-var import_dsh_client_ui_primitives4 = require("@deepseek-ai/dsh-client-ui-primitives");
+var import_dsh_client_ui_primitives5 = require("@deepseek-ai/dsh-client-ui-primitives");
 var PALETTE_EXIT_MS = 160;
 function CommandPalette({ start, token, roster, actions, useSessions }) {
   const [query, setQuery] = (0, import_react23.useState)(start ?? "");
@@ -9702,7 +9703,7 @@ function CommandPalette({ start, token, roster, actions, useSessions }) {
   if (people.length) sections.push([t("Bots"), people]);
   const agents = (roster.agents ?? []).filter(() => matchesName("DSH Agent")).map((agent) => ({
     key: agent.id,
-    avatar: (0, import_react23.createElement)("span", { className: "bt-palette-agent" }, (0, import_react23.createElement)(import_dsh_client_ui_primitives4.FishLogo, { size: 18 })),
+    avatar: (0, import_react23.createElement)("span", { className: "bt-palette-agent" }, (0, import_react23.createElement)(import_dsh_client_ui_primitives5.FishLogo, { size: 18 })),
     title: "DSH Agent",
     subtitle: t("Plain dsh session"),
     run: () => actions.openAgent(agent.id)
@@ -9998,7 +9999,7 @@ function CreateBot({ roster, actions, start, brief = "", onBack, canGoBack, onCr
 
 // src/client/new-chat.js
 var import_react25 = require("react");
-var import_dsh_client_ui_primitives5 = require("@deepseek-ai/dsh-client-ui-primitives");
+var import_dsh_client_ui_primitives6 = require("@deepseek-ai/dsh-client-ui-primitives");
 function NewChat({ mode, roster, actions }) {
   const [query, setQuery] = (0, import_react25.useState)("");
   const [picked, setPicked] = (0, import_react25.useState)([]);
@@ -10102,7 +10103,7 @@ function NewChat({ mode, roster, actions }) {
       inputRef.current?.focus();
     } });
     if ((roster.agents ?? []).length === 0) {
-      options.push({ key: "agent", icon: (0, import_react25.createElement)(import_dsh_client_ui_primitives5.FishLogo, { size: 16 }), label: t("Add DSH Agent"), run: () => run(async () => {
+      options.push({ key: "agent", icon: (0, import_react25.createElement)(import_dsh_client_ui_primitives6.FishLogo, { size: 16 }), label: t("Add DSH Agent"), run: () => run(async () => {
         await actions.addAgent();
         close();
       }) });
