@@ -32,7 +32,7 @@ export function BotConversation(props) {
   const known = owner !== undefined || roster.roomsById[id] !== undefined
   return h(Fragment, null,
     h('section', { className: 'bt-chat-column', 'aria-label': t('Message') },
-      renderFactorySlot('conversation.content', { variant: 'main', phase: 'active', hero: false })),
+      renderFactorySlot('conversation.content', { variant: 'embedded', phase: 'active', hero: false })),
     known ? h('aside', { className: 'bt-info-column', 'aria-label': t('View conversation details') },
       h(DetailsDrawer, { ...props, sessionId: id, roster, hasStrip: true,
         startRenaming: ui.details === id && ui.renaming, startTab: ui.details === id ? ui.tab : null,
@@ -50,6 +50,7 @@ export const WORKBENCH_CSS = `
 .bt-team-footer{display:flex;align-items:center;gap:8px;padding:8px 12px 12px}
 .bt-team-footer>.bt-connect-wrap{flex:1;min-width:0}
 .bt-chat-column{display:flex;flex:1;flex-direction:column;position:relative;min-width:0;min-height:0;background:var(--bt-main)}
+.bt-chat-column [class*="_composerSeat"]{margin-top:auto}
 .bt-chat-column [data-conversation-scroll]{padding-top:32px!important}
 .bt-info-column{display:flex;flex:0 0 320px;flex-direction:column;min-height:0;overflow:auto;border-left:.5px solid var(--bt-line);background:var(--bt-main)}
 .bt-info-column>.bt-drawer-top{min-height:44px;box-sizing:border-box}

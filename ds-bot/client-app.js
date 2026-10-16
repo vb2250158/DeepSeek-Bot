@@ -8891,7 +8891,7 @@ function BotConversation(props) {
     (0, import_react20.createElement)(
       "section",
       { className: "bt-chat-column", "aria-label": t("Message") },
-      renderFactorySlot("conversation.content", { variant: "main", phase: "active", hero: false })
+      renderFactorySlot("conversation.content", { variant: "embedded", phase: "active", hero: false })
     ),
     known ? (0, import_react20.createElement)(
       "aside",
@@ -8919,6 +8919,7 @@ var WORKBENCH_CSS = `
 .bt-team-footer{display:flex;align-items:center;gap:8px;padding:8px 12px 12px}
 .bt-team-footer>.bt-connect-wrap{flex:1;min-width:0}
 .bt-chat-column{display:flex;flex:1;flex-direction:column;position:relative;min-width:0;min-height:0;background:var(--bt-main)}
+.bt-chat-column [class*="_composerSeat"]{margin-top:auto}
 .bt-chat-column [data-conversation-scroll]{padding-top:32px!important}
 .bt-info-column{display:flex;flex:0 0 320px;flex-direction:column;min-height:0;overflow:auto;border-left:.5px solid var(--bt-line);background:var(--bt-main)}
 .bt-info-column>.bt-drawer-top{min-height:44px;box-sizing:border-box}
@@ -13240,6 +13241,8 @@ function disposeAll(disposers, label) {
 }
 function surfaceGroups(install) {
   const mounted = { shell: [], conversation: [] };
+  let reconciling = false;
+  let pending = null;
   const withdraw = (group) => {
     const disposers = mounted[group];
     mounted[group] = [];
@@ -13247,14 +13250,25 @@ function surfaceGroups(install) {
   };
   return {
     reconcile(wanted) {
-      for (const group of [...GROUPS].reverse()) if (!wanted[group]) withdraw(group);
-      for (const group of GROUPS) {
-        if (!wanted[group] || mounted[group].length > 0) continue;
-        try {
-          mounted[group] = install[group]();
-        } catch (error) {
-          console.warn(`[ds-bot] install ${group}`, error);
+      pending = wanted;
+      if (reconciling) return;
+      reconciling = true;
+      try {
+        while (pending !== null) {
+          const next = pending;
+          pending = null;
+          for (const group of [...GROUPS].reverse()) if (!next[group]) withdraw(group);
+          for (const group of GROUPS) {
+            if (!next[group] || mounted[group].length > 0) continue;
+            try {
+              mounted[group] = install[group]();
+            } catch (error) {
+              console.warn(`[ds-bot] install ${group}`, error);
+            }
+          }
         }
+      } finally {
+        reconciling = false;
       }
     },
     dispose() {

@@ -24,6 +24,8 @@ function disposeAll(disposers, label) {
 // empty, so a throw never makes a later reconcile believe the group is mounted.
 export function surfaceGroups(install) {
   const mounted = { shell: [], conversation: [] }
+  let reconciling = false
+  let pending = null
   const withdraw = (group) => {
     const disposers = mounted[group]
     mounted[group] = []
@@ -31,10 +33,21 @@ export function surfaceGroups(install) {
   }
   return {
     reconcile(wanted) {
-      for (const group of [...GROUPS].reverse()) if (!wanted[group]) withdraw(group)
-      for (const group of GROUPS) {
-        if (!wanted[group] || mounted[group].length > 0) continue
-        try { mounted[group] = install[group]() } catch (error) { console.warn(`[ds-bot] install ${group}`, error) }
+      pending = wanted
+      if (reconciling) return
+      reconciling = true
+      try {
+        while (pending !== null) {
+          const next = pending
+          pending = null
+          for (const group of [...GROUPS].reverse()) if (!next[group]) withdraw(group)
+          for (const group of GROUPS) {
+            if (!next[group] || mounted[group].length > 0) continue
+            try { mounted[group] = install[group]() } catch (error) { console.warn(`[ds-bot] install ${group}`, error) }
+          }
+        }
+      } finally {
+        reconciling = false
       }
     },
     dispose() { for (const group of [...GROUPS].reverse()) withdraw(group) },

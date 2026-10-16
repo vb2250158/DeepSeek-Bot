@@ -95,3 +95,16 @@ test('a group whose install throws stays unmounted and is tried again', (t) => {
 test('readMode falls back to bot when storage throws', () => {
   assert.equal(readMode({ getItem: () => { throw new Error('denied') } }), 'bot')
 })
+
+test('a synchronous surface update during installation reconciles after the current mount', () => {
+  const log = []
+  let groups
+  groups = surfaceGroups({
+    shell: () => { log.push('shell'); groups.reconcile(groupsFor({ mode: 'bot' })); return [() => log.push('off shell')] },
+    conversation: () => { log.push('conversation'); return [() => log.push('off conversation')] },
+  })
+  groups.reconcile(groupsFor({ mode: 'bot' }))
+  assert.deepEqual(log, ['shell', 'conversation'])
+  groups.dispose()
+  assert.deepEqual(log, ['shell', 'conversation', 'off conversation', 'off shell'])
+})
