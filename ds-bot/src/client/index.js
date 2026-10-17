@@ -523,6 +523,8 @@ export function apply(ctx) {
     duplicateBot: id => after(call('duplicate-bot', { id })),
     setPrefs: prefs => after(call('set-prefs', prefs)),
     rabiComputers: (endpoint, payload, signal) => call(endpoint, payload, signal),
+    rabiConnection: (endpoint, payload, signal) => endpoint === 'rabi-persona-import' || endpoint === 'rabi-personas-import-all' || endpoint === 'rabi-persona-unlink'
+      ? after(call(endpoint, payload, signal)) : call(endpoint, payload, signal),
     setMain: (id, main = true, options = {}) => after(call('set-main', { id, main, ...options })),
     updateRoom: (id, patch) => after(call('update-room', { id, ...patch })),
     send: (sessionId, text) => after(call('send', { sessionId: partFor(sessionId), text })),

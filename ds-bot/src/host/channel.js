@@ -83,7 +83,7 @@ export function install(rt) {
   })
   // What a host that only reads the team may still answer.
   // Updates change the dsh profile, not the team, so a reading host may run them too.
-  const READS = new Set(['state', 'models', 'efforts', 'earlier', 'room-progress', 'exchange', 'usage', 'schedules', 'memory-view', 'browser-wait', 'browser-result', 'diagnostics', 'diagnostics-log', 'diagnostics-clear', 'update-check', 'update-install', 'dsh-update-install', 'repo-stars', 'approval-answer'])
+  const READS = new Set(['state', 'models', 'efforts', 'earlier', 'room-progress', 'exchange', 'usage', 'schedules', 'memory-view', 'browser-wait', 'browser-result', 'diagnostics', 'diagnostics-log', 'diagnostics-clear', 'update-check', 'update-install', 'dsh-update-install', 'repo-stars', 'approval-answer', 'rabi-connection-status', 'rabi-personas-list'])
 
   function setPrefs(body) {
     if (body.rabiComputers !== undefined) {
@@ -114,6 +114,12 @@ export function install(rt) {
       const readOnly = rt.readOnly()
       if (readOnly !== undefined && !READS.has(endpoint)) return fail(readOnly, 'bot/read-only')
       switch (endpoint) {
+        case 'rabi-connection-status':
+        case 'rabi-personas-list':
+        case 'rabi-persona-import':
+        case 'rabi-personas-import-all':
+        case 'rabi-persona-unlink':
+          return ok(await rt.rabiPersonaEndpoint(endpoint, body, signal))
         case 'rabi-computers-status':
         case 'rabi-computers-list':
         case 'rabi-computer-terminals':

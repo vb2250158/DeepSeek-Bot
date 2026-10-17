@@ -62,6 +62,8 @@ The first time the team opens, the plugin creates a Main Bot called Chief.
 
 ## Configuration
 
+**Bot settings → Rabi connection** imports one or all local Rabi personas as Bots through the installed `dsh-rabiroute-agent`. Rabi owns the live document and session bindings; DS Bot stores its source role ID and records the retrieved document through DSH's durable runtime context. New conversation and group parts inherit the verified source binding. Failed reads stop the linked request, and uncertain writes are read back before another explicit attempt. Import waits for the user's model choice; unlink keeps the Bot and its data.
+
 Options go in the profile's `cordis.patch.yml`, under the `bot` entry. All of them are optional.
 
 ```yaml
@@ -70,6 +72,8 @@ Options go in the profile's `cordis.patch.yml`, under the `bot` entry. All of th
   config:
     workspace: /path/to/workspace   # where the Bots work; default <home>/workspace
     home: /path/to/bot-data         # where the team is saved; default $DSH_HOME/bot
+    rabiRequestTimeoutMs: 8000      # each Rabi request, 1000-120000 ms
+    rabiPersonaMaxBytes: 262144     # persona document limit, 1024-2097152 bytes
     checkRatio: 0.8                 # share of the model's usable window where the steward decides
     browser: true                   # force the Bot browser on or off; default on in Desktop only
     memory: true                    # false turns memory off: no memory tools, section or panel

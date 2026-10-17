@@ -2,6 +2,13 @@
 
 All notable changes to DS Bot are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the versions follow [Semantic Versioning](https://semver.org/). Before 1.0, a minor version can contain breaking changes.
 
+## [0.1.6-rabi.15] - 2026-10-17
+
+### Added
+
+- Bot settings provides Rabi connection: discover the local Manager through the existing Rabi adapter, list personas and import one or all as Bots awaiting model selection. Bulk imports report individual failures without duplicating existing Bots. Repeated or interrupted imports reuse the saved Bot and read back the original binding.
+- Linked Bots read the live Rabi persona into DSH's durable runtime context. New conversation and group parts inherit its verified binding. Failed reads, changed bindings and uncertain writes remain visible; no cached persona or automatic write replay replaces them. Unlinking preserves the Bot and supports relinking.
+
 ## [0.1.6-rabi.14] - 2026-10-17
 
 ### Removed

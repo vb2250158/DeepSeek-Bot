@@ -1,32 +1,12 @@
-import { randomUUID } from 'node:crypto'
+import { rabiClient, rabiRefuse as refuse, rabiSegment as segment } from './rabi-client.js'
 
-const TOOL = 'rabiroute_manager_api'
 const UI_TIMEOUT_MS = 8000
-const refuse = message => { throw Object.assign(new Error(message), { code: 'bot/refused' }) }
-const segment = value => {
-  if (typeof value !== 'string' || !value || value.length > 200 || [...value].some(char => char.charCodeAt(0) < 32)) refuse('Invalid remote computer identity')
-  return encodeURIComponent(value)
-}
 
 /** GUI adapter over the existing Rabi tool pipeline; Rabi owns connections and terminals.
  *  Manager / WebGUI traffic is request-local and never runs during install() / plugin activation. */
 export function install(rt) {
   const { ctx, state } = rt
-  const available = () => Boolean(ctx.tools.get?.(TOOL))
-  const request = async (path, method, body, signal, headers) => {
-    const result = await ctx.tools.execute({
-      name: TOOL, callId: `ds-bot-ui-${randomUUID()}`, signal: signal ?? AbortSignal.timeout(UI_TIMEOUT_MS),
-      arguments: { method, path, ...(body ? { bodyJson: JSON.stringify(body) } : {}), ...(headers ? { requestHeadersJson: JSON.stringify(headers) } : {}) },
-    })
-    if (result.isError) refuse(result.error?.message ?? 'Rabi request failed')
-    const receipt = result.value
-    if (receipt?.uncertain) refuse('Rabi operation outcome is uncertain. Query the original terminal before retrying; input was not replayed.')
-    if (!receipt?.ok) refuse(receipt?.error?.message ?? `Rabi HTTP ${receipt?.statusCode ?? 0}`)
-    let parsed
-    try { parsed = JSON.parse(receipt.body) } catch { refuse('Rabi returned invalid JSON') }
-    if (parsed.code !== undefined && parsed.code !== 0) refuse(parsed.message ?? 'Rabi refused the operation')
-    return parsed
-  }
+  const { available, json: request } = rabiClient(ctx, UI_TIMEOUT_MS)
   // Access credentials are request-local and never returned to the DS Bot browser or state.
   const auth = async signal => {
     const access = await request('/api/webgui-access', 'GET', undefined, signal)

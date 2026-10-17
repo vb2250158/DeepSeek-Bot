@@ -25,6 +25,8 @@ DS Bot follows the active DSH skin by default, including light and dark mode. **
 
 Manage plugins through the native **Plugins** entry. The team footer opens **Bot settings** directly, where Bot usage, connectors and tasks remain available. Bot usage includes Bots and group chats; global usage stays in Harness settings.
 
+**Rabi personas:** open **Bot settings → Rabi connection → Connect local Rabi**, then choose **Import as Bot** or **Import all personas**. Bulk import reports individual failures and reuses existing Bots. The installed `dsh-rabiroute-agent` discovers the local Manager. Import creates a Bot awaiting model selection and verifies its Rabi session binding; repeating an import reuses that Bot. Rabi keeps the persona document, memories and chat history. Each linked Bot reads the current persona when it runs; failed reads or conflicting bindings stop that request. Unlinking keeps the Bot, and relinking reuses it.
+
 Drag either column divider to resize the conversation list or details. Widths stay on this browser; double-click resets a column, and the focused divider accepts arrow keys. Narrow panels hide details and then compact the list to keep the chat usable.
 
 ## Install

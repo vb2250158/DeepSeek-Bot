@@ -8,12 +8,14 @@ export function fakeContext({ services = {} } = {}) {
   // Listeners by event name, in registration order.
   const listeners = new Map()
   const sections = new Map()
+  const contexts = new Map()
   const ctx = {
     calls,
     registeredTools,
     guards,
     listeners,
     sections,
+    contexts,
     logger: { warn() {}, info() {} },
     get: name => services[name],
     on(name, listener, options) {
@@ -50,6 +52,11 @@ export function fakeContext({ services = {} } = {}) {
       schemas: () => [],
     },
     systemPrompt: {
+      context(context) {
+        calls.push(`context ${context.name} ${context.order}`)
+        contexts.set(context.name, context)
+        return () => { contexts.delete(context.name) }
+      },
       section(section) {
         calls.push(`prompt ${section.name} ${section.order}`)
         sections.set(section.name, section)
