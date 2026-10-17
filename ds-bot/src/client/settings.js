@@ -51,7 +51,7 @@ function SetRow({ label, hint, children }) {
 function GeneralPage({ roster, actions, run }) {
   const prefs = roster.prefs ?? {}
   const themes = allThemes()
-  const current = themes[prefs.theme] ? prefs.theme : 'deepseek'
+  const current = themes[prefs.theme] ? prefs.theme : 'harness'
   const [custom, setCustom] = useState(prefs.accent ?? '#4d6bfe')
   const timer = useRef(0)
   useEffect(() => () => clearTimeout(timer.current), [])

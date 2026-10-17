@@ -366,6 +366,7 @@ var ZH = {
   Tangerine: "橘",
   Cobalt: "钴蓝",
   // Themes
+  "Follow DSH": "跟随 DSH",
   DeepSeek: "DeepSeek",
   Mono: "黑白",
   Paper: "纸张",
@@ -1320,6 +1321,7 @@ function countCards(state, sessionId, callIds, delta) {
 // src/client/themes.js
 var THEME_KEYS = ["bg", "sidebar", "bubble", "card", "text", "user", "userText", "accent"];
 var THEMES = {
+  harness: { label: "Follow DSH", native: true },
   deepseek: {
     label: "DeepSeek",
     light: { bg: "#fcfcfc", sidebar: "#f7f7f7", bubble: "#eeeeee", card: "#ffffff", text: "#141414", user: "#070707", userText: "#fcfcfc", accent: "#4d6bfe" },
@@ -1364,17 +1366,39 @@ function themeVars(mode, dark, accent = mode.accent) {
   };
 }
 var declarations = (vars) => Object.entries(vars).map(([name, value]) => `${name}:${value}`).join(";");
-var themeCss = (theme, accent) => `html body{${declarations(themeVars(theme.light, false, accent ?? theme.light.accent))}}
+var harnessVars = {
+  "--bt-ink": "var(--dsw-alias-label-primary)",
+  "--bt-ink-2": "var(--dsw-alias-label-secondary)",
+  "--bt-ink-3": "var(--dsw-alias-label-tertiary)",
+  "--bt-main": "var(--dsw-alias-bg-base)",
+  "--bt-sidebar": "var(--dsw-specific-sidebar-fill)",
+  "--bt-bubble": "var(--dsw-alias-bg-layer-2)",
+  "--bt-card": "var(--dsw-alias-bg-layer-1)",
+  "--bt-line": "var(--dsw-alias-border-l1)",
+  "--bt-line-2": "var(--dsw-alias-border-l3)",
+  "--bt-line-weak": "var(--dsw-alias-border-l2)",
+  "--bt-hover": "var(--dsw-alias-interactive-bg-hover)",
+  "--bt-active": "var(--dsw-alias-interactive-bg-active)",
+  "--bt-accent": "var(--dsw-alias-state-business-primary)",
+  "--bt-accent-ink": "var(--dsw-alias-label-primary-foreground)",
+  "--bt-user": "var(--dsw-alias-button-primary-fill)",
+  "--bt-user-ink": "var(--dsw-alias-label-primary-foreground)",
+  "--bt-tag-bg": "var(--dsw-alias-interactive-bg-hover)",
+  "--bt-tag-ink": "var(--dsw-alias-label-secondary)",
+  "--bt-green": "var(--dsw-alias-state-success-primary)",
+  "--bt-star": "var(--dsw-alias-state-warn-primary)"
+};
+var themeCss = (theme, accent) => theme.native ? `html body,html body[data-ds-dark-theme]{${declarations({ ...harnessVars, ...accent ? { "--bt-accent": accent, "--bt-accent-ink": luminance(accent) > 0.45 ? "#141414" : "#ffffff" } : {} })}}` : `html body{${declarations(themeVars(theme.light, false, accent ?? theme.light.accent))}}
 html body[data-ds-dark-theme]{${declarations(themeVars(theme.dark, true, accent ?? theme.dark.accent))}}
 ${theme.css ?? ""}`;
-var shellTokens = ({ light, dark }) => ({
+var shellTokens = ({ light, dark, native }) => native ? {} : {
   "--dsw-alias-bg-base": { light: light.bg, dark: dark.bg },
   "--dsw-specific-sidebar-fill": { light: light.sidebar, dark: dark.sidebar },
   "--dsw-specific-input-major": { light: light.bg, dark: dark.sidebar },
   "--dsw-alias-label-primary": { light: light.text, dark: dark.text },
   "--dsw-alias-label-secondary": { light: rgba(light.text, 0.74), dark: rgba(dark.text, 0.74) },
   "--dsw-alias-label-tertiary": { light: rgba(light.text, 0.6), dark: rgba(dark.text, 0.6) }
-});
+};
 var customThemes = {};
 var registry = createSource(0);
 var isPoint = (point) => Array.isArray(point) && point.length === 2 && point.every(Number.isFinite);
@@ -12037,7 +12061,7 @@ function SetRow({ label, hint, children }) {
 function GeneralPage({ roster, actions, run }) {
   const prefs = roster.prefs ?? {};
   const themes = allThemes();
-  const current = themes[prefs.theme] ? prefs.theme : "deepseek";
+  const current = themes[prefs.theme] ? prefs.theme : "harness";
   const [custom, setCustom] = (0, import_react32.useState)(prefs.accent ?? "#4d6bfe");
   const timer = (0, import_react32.useRef)(0);
   (0, import_react32.useEffect)(() => () => clearTimeout(timer.current), []);
@@ -13754,7 +13778,7 @@ function apply(ctx) {
       const snapshot = roster.getSnapshot();
       const prefs = snapshot.ready ? snapshot.prefs ?? {} : savedPrefs;
       const themes = allThemes();
-      const id = themes[prefs.theme] ? prefs.theme : "deepseek";
+      const id = themes[prefs.theme] ? prefs.theme : "harness";
       const accent = isHex(prefs.accent) ? prefs.accent : void 0;
       const motion = prefs.motion === "quiet" || prefs.motion === "lively" ? prefs.motion : "normal";
       document.body.dataset.btMotion = motion;

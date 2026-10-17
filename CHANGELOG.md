@@ -2,6 +2,12 @@
 
 All notable changes to DS Bot are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the versions follow [Semantic Versioning](https://semver.org/). Before 1.0, a minor version can contain breaking changes.
 
+## [0.1.6-rabi.12] - 2026-10-17
+
+### Fixed
+
+- Follow the active Harness skin by default. Team columns, messages and portaled dialogs inherit its surface, text and interaction tokens in both modes, without replacing native UI tokens. Explicit DS Bot palettes and custom accents remain available.
+
 ## [0.1.6-rabi.11] - 2026-10-17
 
 ### Changed

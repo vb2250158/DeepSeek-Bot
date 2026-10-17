@@ -281,7 +281,7 @@ export function apply(ctx) {
       const snapshot = roster.getSnapshot()
       const prefs = snapshot.ready ? snapshot.prefs ?? {} : savedPrefs
       const themes = allThemes()
-      const id = themes[prefs.theme] ? prefs.theme : 'deepseek'
+      const id = themes[prefs.theme] ? prefs.theme : 'harness'
       const accent = isHex(prefs.accent) ? prefs.accent : undefined
       const motion = prefs.motion === 'quiet' || prefs.motion === 'lively' ? prefs.motion : 'normal'
       document.body.dataset.btMotion = motion

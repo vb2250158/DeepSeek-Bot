@@ -8,6 +8,7 @@ import { createSource } from './sources.js'
 
 const THEME_KEYS = ['bg', 'sidebar', 'bubble', 'card', 'text', 'user', 'userText', 'accent']
 const THEMES = {
+  harness: { label: 'Follow DSH', native: true },
   deepseek: {
     label: 'DeepSeek',
     light: { bg: '#fcfcfc', sidebar: '#f7f7f7', bubble: '#eeeeee', card: '#ffffff', text: '#141414', user: '#070707', userText: '#fcfcfc', accent: '#4d6bfe' },
@@ -43,11 +44,36 @@ function themeVars(mode, dark, accent = mode.accent) {
   }
 }
 const declarations = vars => Object.entries(vars).map(([name, value]) => `${name}:${value}`).join(';')
+// Keep portal content on the same tokens as the workbench, including live skin changes.
+const harnessVars = {
+  '--bt-ink': 'var(--dsw-alias-label-primary)',
+  '--bt-ink-2': 'var(--dsw-alias-label-secondary)',
+  '--bt-ink-3': 'var(--dsw-alias-label-tertiary)',
+  '--bt-main': 'var(--dsw-alias-bg-base)',
+  '--bt-sidebar': 'var(--dsw-specific-sidebar-fill)',
+  '--bt-bubble': 'var(--dsw-alias-bg-layer-2)',
+  '--bt-card': 'var(--dsw-alias-bg-layer-1)',
+  '--bt-line': 'var(--dsw-alias-border-l1)',
+  '--bt-line-2': 'var(--dsw-alias-border-l3)',
+  '--bt-line-weak': 'var(--dsw-alias-border-l2)',
+  '--bt-hover': 'var(--dsw-alias-interactive-bg-hover)',
+  '--bt-active': 'var(--dsw-alias-interactive-bg-active)',
+  '--bt-accent': 'var(--dsw-alias-state-business-primary)',
+  '--bt-accent-ink': 'var(--dsw-alias-label-primary-foreground)',
+  '--bt-user': 'var(--dsw-alias-button-primary-fill)',
+  '--bt-user-ink': 'var(--dsw-alias-label-primary-foreground)',
+  '--bt-tag-bg': 'var(--dsw-alias-interactive-bg-hover)',
+  '--bt-tag-ink': 'var(--dsw-alias-label-secondary)',
+  '--bt-green': 'var(--dsw-alias-state-success-primary)',
+  '--bt-star': 'var(--dsw-alias-state-warn-primary)',
+}
 // `html body` outranks the base sheet's `body` rules without !important.
-export const themeCss = (theme, accent) => `html body{${declarations(themeVars(theme.light, false, accent ?? theme.light.accent))}}
+export const themeCss = (theme, accent) => theme.native
+  ? `html body,html body[data-ds-dark-theme]{${declarations({ ...harnessVars, ...(accent ? { '--bt-accent': accent, '--bt-accent-ink': luminance(accent) > 0.45 ? '#141414' : '#ffffff' } : {}) })}}`
+  : `html body{${declarations(themeVars(theme.light, false, accent ?? theme.light.accent))}}
 html body[data-ds-dark-theme]{${declarations(themeVars(theme.dark, true, accent ?? theme.dark.accent))}}
 ${theme.css ?? ''}`
-export const shellTokens = ({ light, dark }) => ({
+export const shellTokens = ({ light, dark, native }) => native ? {} : ({
   '--dsw-alias-bg-base': { light: light.bg, dark: dark.bg },
   '--dsw-specific-sidebar-fill': { light: light.sidebar, dark: dark.sidebar },
   '--dsw-specific-input-major': { light: light.bg, dark: dark.sidebar },
