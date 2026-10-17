@@ -180,7 +180,7 @@ function AvatarEditor({ bot, actions, run, onClose }) {
 
 function MemoryCard({ bot, actions }) {
   const count = useMemoryCount(bot.id, actions)
-  const label = count === null ? t('Loading…') : count === 0 ? t('Nothing saved yet') : count === 1 ? t('1 entry') : t('{count} entries', { count })
+  const label = bot.rabiPersona && bot.rabiPersona.enabled !== false ? t('Managed by Rabi') : count === null ? t('Loading…') : count === 0 ? t('Nothing saved yet') : count === 1 ? t('1 entry') : t('{count} entries', { count })
   return h(Card, { title: t('Memory') },
     h('button', { type: 'button', className: 'bt-set-row bt-bs-row', 'aria-label': t("Manage {name}'s memory", { name: bot.name }), onClick: () => actions.openMemory(bot.id) },
       h('span', { className: 'bt-set-copy' }, h('span', { className: 'bt-bs-label' }, label)),
@@ -210,7 +210,7 @@ export function BotSettingsForm({ bot, roster, actions, run }) {
   return h('div', { className: 'bt-bs' },
     h('div', { className: 'bt-bs-hero' },
       h('div', { className: 'bt-avatar-anchor' },
-        h('button', { type: 'button', className: 'bt-avatar-trigger', 'aria-label': t('Edit Bot avatar'), 'aria-expanded': editing, onClick: () => setEditing(value => !value) },
+        h('button', { type: 'button', className: 'bt-avatar-trigger', 'aria-label': t('Edit Bot avatar'), 'aria-expanded': editing, onClick: () => bot.rabiPersona && bot.rabiPersona.enabled !== false ? actions.openMemory(bot.id) : setEditing(value => !value) },
           h(BotMark, { bot, size: 64, live: true }),
           h('span', { className: 'bt-avatar-pencil', 'aria-hidden': true }, h(PencilIcon))),
         editing ? h(AvatarEditor, { bot, actions, run, onClose: closeEditor }) : null),

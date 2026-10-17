@@ -62,7 +62,7 @@ The first time the team opens, the plugin creates a Main Bot called Chief.
 
 ## Configuration
 
-**Bot settings → Rabi connection** imports one or all local Rabi personas as Bots through the installed `dsh-rabiroute-agent`. Rabi owns the live document and session bindings; DS Bot stores its source role ID and records the retrieved document through DSH's durable runtime context. New conversation and group parts inherit the verified source binding. Failed reads stop the linked request, and uncertain writes are read back before another explicit attempt. Import waits for the user's model choice; unlink keeps the Bot and its data.
+**Bot settings → Rabi connection** binds one or all local personas through `dsh-rabiroute-agent` 0.13.32 or newer with Agent Hooks enabled. DS Bot verifies the original role binding and registers a required lifecycle subscription for each own or group conversation part. The adapter owns full persona, memory, plan, skill, tool and Stop context; DS Bot keeps only role references and a durable ownership notice. Native Hook failures stop required sessions. Bound Bots omit local memory tools, snapshots and automatic reviews. Avatar bytes and paged library views come from Rabi on demand and are not persisted in the Bot store. Unlink releases subscriptions, preserves the Bot and records that previous Rabi instructions no longer apply. Model execution and approvals remain with the original DSH owner.
 
 Options go in the profile's `cordis.patch.yml`, under the `bot` entry. All of them are optional.
 
@@ -73,7 +73,7 @@ Options go in the profile's `cordis.patch.yml`, under the `bot` entry. All of th
     workspace: /path/to/workspace   # where the Bots work; default <home>/workspace
     home: /path/to/bot-data         # where the team is saved; default $DSH_HOME/bot
     rabiRequestTimeoutMs: 8000      # each Rabi request, 1000-120000 ms
-    rabiPersonaMaxBytes: 262144     # persona document limit, 1024-2097152 bytes
+    rabiPersonaMaxBytes: 262144     # persona preview limit, 1024-2097152 bytes
     checkRatio: 0.8                 # share of the model's usable window where the steward decides
     browser: true                   # force the Bot browser on or off; default on in Desktop only
     memory: true                    # false turns memory off: no memory tools, section or panel

@@ -413,6 +413,8 @@ export function install(rt) {
   }
 
   const reviewOn = config.memoryReview !== false
+  const rabiOwned = bot => Boolean(rt.rabiRoleOf?.(bot))
+  const rabiNotice = 'Rabi owns this persona memory. Use rabiroute_manager_api and GET /api/agent/help for recall and changes; do not save a separate DS Bot memory.'
   const root = join(home, 'memory')
   const journalPath = join(root, 'journal.jsonl')
   const dayFormat = new Intl.DateTimeFormat('en-CA', { ...(config.timeZone ? { timeZone: config.timeZone } : {}), year: 'numeric', month: '2-digit', day: '2-digit' })
@@ -499,6 +501,7 @@ export function install(rt) {
     return { scope: ownScope(bot.id) }
   }
   function writeDenied(scope, botId) {
+    if (rabiOwned(rt.botOf(botId)) || (scope.kind === 'bot' && rabiOwned(rt.botOf(scope.botId)))) return rabiNotice
     if (scope.kind === 'team') return writesTeam(botId) ? undefined : 'Only Main Bots and group admins write the team memory. Tell a Main Bot with message_bot what the team should know.'
     if (scope.botId !== botId && !rt.isMain(botId)) return 'Only a Main Bot can change another Bot\'s memory. Use message_bot to tell that Bot instead.'
     return undefined
@@ -678,7 +681,7 @@ export function install(rt) {
   function sectionFor(sessionId) {
     if (sessionId === undefined) return ''
     const bot = rt.botOf(rt.selfOf(sessionId))
-    if (bot === undefined) return ''
+    if (bot === undefined || rabiOwned(bot)) return ''
     // A section frozen under another role (made a Main Bot or a group admin since, or no
     // longer one) is frozen again, so the rule it states matches what the tools allow.
     const rule = teamRule(rt.isMain(bot.id), writesTeam(bot.id))
@@ -848,9 +851,11 @@ export function install(rt) {
       await rt.load()
       const caller = callerOf(exec)
       if (caller === undefined) return 'Only Bots on the team keep a memory.'
+      if (rabiOwned(caller.bot)) return rabiNotice
       const self = caller.bot.id
       const { scopes, error } = readScopes(args.scope, self)
       if (error) return error
+      if (scopes.some(scope => scope.kind === 'bot' && rabiOwned(rt.botOf(scope.botId)))) return rabiNotice
       const loaded = scopes.map(scope => ({ scope, tag: tagOf(scope, self), label: labelOf(scope, self), files: loadScope(scope) }))
       if (args.topic !== undefined && String(args.topic).trim() !== '') {
         const topic = cleanTopic(args.topic)
@@ -995,6 +1000,7 @@ export function install(rt) {
   function memoryView(body) {
     const bot = rt.botOf(String(body.botId ?? ''))
     if (bot === undefined) throw new Error('Unknown Bot')
+    if (rabiOwned(bot)) return { botId: bot.id, source: 'rabi', entries: [], summary: null, fresh: true, summarizing: false, error: null }
     const own = loadScope(ownScope(bot.id))
     const team = loadScope(TEAM)
     const entries = [...panelEntries(own, 'own'), ...panelEntries(team, 'team')]
@@ -1223,7 +1229,7 @@ export function install(rt) {
     const owner = ownerOf(sessionId) ?? seen
     if (owner === undefined) return
     const bot = rt.botOf(owner.botId)
-    if (bot === undefined) return
+    if (bot === undefined || rabiOwned(bot)) return
     const live = owner.roomId === undefined ? undefined : rt.roomOf(owner.roomId)
     const kept = seen?.roomId === owner.roomId ? seen?.room : undefined
     const member = live?.members?.includes(bot.id) === true
@@ -1372,6 +1378,7 @@ export function install(rt) {
   }
 
   async function memoryEndpoint(endpoint, body) {
+    if (endpoint !== 'memory-view' && rabiOwned(rt.botOf(body.botId))) throw Object.assign(new Error(rabiNotice), { code: 'bot/refused' })
     if (endpoint === 'memory-view') return memoryView(body)
     if (endpoint === 'memory-ask') return memoryAsk(body)
     if (endpoint === 'memory-forget') return memoryForget(body)

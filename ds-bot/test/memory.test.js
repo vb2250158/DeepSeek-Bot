@@ -1076,3 +1076,17 @@ test('a memory call names the current part of the Bot chat', async (t) => {
   assert.equal(answer.ok, true)
   assert.equal(requests[0].sessionId, 'b2-part2')
 })
+
+test('Rabi bound Bots use no independent local memory or review requests', async t => {
+  const home=mkdtempSync(join(tmpdir(),'ds-bot-rabi-memory-'))
+  const state=structuredClone(TEAM);state.bots.b2.rabiPersona={roleId:'fixture'}
+  writeFileSync(join(home,'state.json'),JSON.stringify(state))
+  const f=start({home});t.after(()=>f.stop())
+  assert.equal(f.section('b2'),'')
+  for(const[name,args]of [['remember',{text:'Keep in Rabi'}],['forget',{entry:'old'}],['recall',{}]])assert.match(await f.tool(name,args,'b2'),/Rabi owns this persona memory/)
+  assert.equal((await f.call('memory-view',{botId:'b2'})).value.source,'rabi')
+  assert.equal((await f.call('memory-ask',{botId:'b2',text:'Save it'})).ok,false)
+  assert.equal(f.requests.length,0)
+  assert.equal(existsSync(join(home,'memory','bots','b2','MEMORY.md')),false)
+  assert.match(await f.tool('remember',{text:'Ordinary Bot memory'},'m1'),/Saved/)
+})

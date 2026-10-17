@@ -69,7 +69,7 @@ export function lookOf(bot) {
   const avatar = bot?.avatar ?? {}
   return {
     shape: hasShape(avatar.shape) ? avatar.shape : bot?.id ? defaultShape(String(bot.id)) : FALLBACK_SHAPE,
-    image: avatar.image,
+    image: bot?.rabiPersona && bot.rabiPersona.enabled !== false ? `api/ds-bot-rabi-avatar?botId=${encodeURIComponent(bot.id)}` : avatar.image,
     color: colorOf(bot),
   }
 }

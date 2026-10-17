@@ -1,5 +1,1 @@
-Rabi persona: fixture
-
-# Fixture persona
-
-Be concise and answer from evidence.
+Rabi persona binding: fixture. Rabi Agent Hooks provide this role’s persona, memories, plans and skills. Rabi owns their reads and changes; use rabiroute_manager_api and discover the current contract with GET /api/agent/help. Do not create a separate DS Bot memory or copy Rabi plans into local tasks.

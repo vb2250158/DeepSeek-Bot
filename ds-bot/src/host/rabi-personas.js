@@ -9,7 +9,15 @@ export function install(rt) {
   if (!Number.isInteger(maxBytes) || maxBytes < 1024 || maxBytes > 2097152) throw new TypeError('rabiPersonaMaxBytes must be 1024-2097152')
   const client = rabiClient(ctx, timeout)
   const shutdown = new AbortController()
-  const contexts = new Map()
+  const requirements = new Map()
+  const hooks = () => ctx.get?.('rabiAgentHooks')
+  const requireHooks = () => {
+    const service = hooks()
+    if (!service?.requireBinding) refuse('Update dsh-rabiroute-agent and enable Rabi Agent Hooks before binding a Bot')
+    return service
+  }
+  const roleOf = bot => bot?.rabiPersona && bot.rabiPersona.enabled !== false ? bot.rabiPersona.roleId : undefined
+  rt.rabiRoleOf = roleOf
   const pending = new Map()
   const signalOf = signal => signal ? AbortSignal.any([signal, shutdown.signal]) : shutdown.signal
   const pathOf = id => `/api/codex-hook/sessions/${segment(id)}`
@@ -35,6 +43,23 @@ export function install(rt) {
       return { id: item.personaId, name: item.name }
     })
   }
+  const linkedBot = async (botId, signal) => {
+    const bot = rt.botOf(botId)
+    const roleId = roleOf(bot)
+    if (!roleId) refuse('This Bot has no Rabi persona link')
+    if ((await binding(bot.id, signal))?.roleId !== roleId) refuse('Rabi persona binding changed. Check the Bot in Rabi connection before continuing.')
+    return { bot, roleId, base: `/api/roles/${segment(roleId)}` }
+  }
+  rt.rabiAvatar = async (botId, callerSignal) => {
+    await rt.load()
+    const signal = signalOf(callerSignal)
+    const { base } = await linkedBot(botId, signal)
+    const image = await client.json(`${base}/avatar`, 'GET', undefined, signal)
+    if (!/^image\/(png|jpeg|webp|gif)$/.test(image.contentType) || typeof image.contentBase64 !== 'string' || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(image.contentBase64)) refuse('Rabi returned an invalid avatar')
+    const bytes = Buffer.from(image.contentBase64, 'base64')
+    if (bytes.length > 5 * 1024 * 1024) refuse('Rabi avatar exceeds the image size limit')
+    return { bytes, contentType: image.contentType }
+  }
   const imported = roleId => Object.values(state.bots).find(bot => bot.rabiPersona?.roleId === roleId)
   const uniqueName = name => {
     const base = name.trim().slice(0, 34)
@@ -43,6 +68,7 @@ export function install(rt) {
     return value
   }
   const importRole = async (roleId, signal, selected) => {
+    requireHooks()
     const persona = selected ?? (await catalog(signal)).find(item => item.id === roleId)
     if (!persona) refuse('The selected Rabi persona is no longer available. Refresh the list.')
     let bot = imported(roleId)
@@ -69,14 +95,48 @@ export function install(rt) {
   }
   rt.rabiPersonaEndpoint = async (endpoint, body = {}, callerSignal) => {
     await rt.load()
-    if (endpoint === 'rabi-connection-status') return { available: client.available() }
+    if (endpoint === 'rabi-connection-status') return { available: client.available(), hooksReady: Boolean(hooks()?.requireBinding) }
     const signal = signalOf(callerSignal)
+    if (endpoint === 'rabi-bot-view') {
+      const { roleId, base } = await linkedBot(body.botId, signal)
+      const resources = { plans: 'plans', memory: 'memory', skills: 'skills', persona: 'persona-document' }
+      const resource = Object.hasOwn(resources, body.resource) ? resources[body.resource] : undefined
+      if (!resource) refuse('Unknown Rabi resource')
+      if (resource === 'persona-document') {
+        const value = await client.json(`${base}/${resource}`, 'GET', undefined, signal)
+        if (typeof value.text !== 'string' || Buffer.byteLength(value.text) > maxBytes) refuse('The Rabi persona document exceeds rabiPersonaMaxBytes')
+        return { roleId, text: value.text, items: [] }
+      }
+      const kind = body.kind ?? 'recent'
+      if (!['recent', 'consolidated', 'archived'].includes(kind)) refuse('Unknown Rabi memory kind')
+      let path = `${base}/${resource}`
+      if (body.itemId) path += `/${resource === 'memory' ? `${kind}/` : ''}${segment(body.itemId)}`
+      else if (resource !== 'skills') {
+        const query = new URLSearchParams({ limit: '20', ...(resource === 'memory' ? { kind } : { view: 'current', detail: 'summary' }) })
+        if (body.cursor) query.set('cursor', body.cursor)
+        path += `?${query}`
+      }
+      const value = await client.json(path, 'GET', undefined, signal)
+      if (body.itemId) {
+        const item = value.data
+        if (!item || typeof item !== 'object' || Array.isArray(item)) refuse('Rabi returned an invalid resource')
+        const text = key => typeof item[key] === 'string' ? item[key] : undefined
+        return { roleId, detail: { title: text('title'), content: text('content'), description: text('description'), text: text('text'),
+          ...(Array.isArray(item.steps) ? { steps: item.steps.map(step => ({ id: step.id, title: step.title, description: step.description, content: step.content, status: step.status })) } : {}) } }
+      }
+      const items = Array.isArray(value.data) ? value.data : value.data?.items
+      if (!Array.isArray(items)) refuse('Rabi returned an invalid resource list')
+      return { roleId, items: items.map(item => {
+        segment(item.id)
+        return { id: item.id, title: typeof item.title === 'string' ? item.title : item.id, summary: typeof item.summary === 'string' ? item.summary : undefined, status: typeof item.presentation?.label === 'string' ? item.presentation.label : typeof item.status === 'string' ? item.status : undefined }
+      }), nextCursor: value.data?.nextCursor ?? null, total: value.data?.total ?? items.length }
+    }
     if (endpoint === 'rabi-personas-list') {
       const personas = await catalog(signal)
       const result = await client.json('/api/codex-hook/sessions', 'GET', undefined, signal)
       if (!Array.isArray(result.data?.sessions)) refuse('Rabi returned an invalid binding list')
       const bindings = new Map(result.data.sessions.map(item => [item.sessionId, item.roleId]))
-      return { available: true, connected: true, personas: personas.map(persona => {
+      return { available: true, connected: true, hooksReady: Boolean(hooks()?.requireBinding), personas: personas.map(persona => {
         const bot = imported(persona.id)
         return { ...persona, ...(bot ? { botId: bot.id, botName: bot.name, linked: bindings.get(bot.id) === persona.id } : {}) }
       }) }
@@ -117,7 +177,7 @@ export function install(rt) {
       }
       bot.rabiPersona.enabled = false
       await rt.save()
-      for (const id of sessions) contexts.delete(id)
+      for (const id of sessions) { requirements.get(id)?.dispose(); requirements.delete(id) }
       return { botId: bot.id, linked: false }
     }
     refuse('Unknown Rabi connection operation')
@@ -126,29 +186,28 @@ export function install(rt) {
     name: 'ds-bot:rabi-persona', order: 630, interpolate: false, required: true,
     text: ({ agent }) => {
       const bot = rt.botOf(rt.selfOf(agent?.id))
-      const entry = contexts.get(agent?.id)
-      return bot?.rabiPersona?.enabled !== false && entry?.roleId === bot?.rabiPersona?.roleId ? entry?.text ?? '' : ''
+      if (!bot?.rabiPersona) return ''
+      if (!roleOf(bot)) return 'Rabi persona binding was removed. Earlier Rabi persona, memory, plan and skill instructions no longer apply. Use the ordinary Bot instructions.'
+      return 'Rabi persona binding: ' + bot.rabiPersona.roleId + '. Rabi Agent Hooks provide this role’s persona, memories, plans and skills. Rabi owns their reads and changes; use rabiroute_manager_api and discover the current contract with GET /api/agent/help. Do not create a separate DS Bot memory or copy Rabi plans into local tasks.'
     },
   }), 'ds-bot: Rabi persona context')
   ctx.on('system-prompt/assemble', async (assembly, payload, next) => {
     await rt.load()
     const bot = rt.botOf(rt.selfOf(payload.agent?.id))
-    if (!bot?.rabiPersona || bot.rabiPersona.enabled === false) return next()
-    contexts.delete(payload.agent.id)
+    const roleId = roleOf(bot)
+    if (!roleId) return next()
+    const service = requireHooks()
+    assembly.tools = assembly.tools.filter(tool => !['remember', 'forget', 'recall'].includes(tool.name))
     const signal = signalOf(payload.signal)
-    const roleId = bot.rabiPersona.roleId
     if ((await binding(bot.id, signal))?.roleId !== roleId) refuse('Rabi persona binding changed. Check the Bot in Rabi connection before continuing.')
-    if (payload.agent.id !== bot.id) await bind(payload.agent.id, roleId, signal)
-    const receipt = await client.request(`/api/roles/${segment(roleId)}/persona-document`, 'GET', undefined, signal)
-    if (typeof receipt.body !== 'string' || !receipt.body.trim()) refuse('The Rabi persona document is empty')
-    if (Buffer.byteLength(receipt.body) > maxBytes) refuse('The Rabi persona document exceeds rabiPersonaMaxBytes')
-    const text = `Rabi persona: ${roleId}\n\n${receipt.body}`
-    const contribution = assembly.contexts.find(entry => entry.name === 'ds-bot:rabi-persona')
-    if (!contribution) refuse('Rabi persona context is unavailable. Reload DSH before continuing.')
-    contribution.text = text
-    contexts.set(payload.agent.id, { roleId, text })
+    const id = payload.agent.id
+    if (id !== bot.id) await bind(id, roleId, signal)
+    const prior = requirements.get(id)
+    if (prior?.service !== service || prior?.roleId !== roleId) {
+      prior?.dispose()
+      requirements.set(id, { service, roleId, dispose: service.requireBinding(id, roleId) })
+    }
     return next()
   }, { prepend: true })
-  ctx.on('session/event', (session, event) => { if (event.type === 'turn/end') contexts.delete(session.id) })
-  ctx.effect(() => () => { shutdown.abort(); contexts.clear() }, 'ds-bot: Rabi connection lifetime')
+  ctx.effect(() => () => { shutdown.abort(); for (const entry of requirements.values()) entry.dispose(); requirements.clear() }, 'ds-bot: Rabi connection lifetime')
 }

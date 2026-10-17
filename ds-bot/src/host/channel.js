@@ -83,7 +83,7 @@ export function install(rt) {
   })
   // What a host that only reads the team may still answer.
   // Updates change the dsh profile, not the team, so a reading host may run them too.
-  const READS = new Set(['state', 'models', 'efforts', 'earlier', 'room-progress', 'exchange', 'usage', 'schedules', 'memory-view', 'browser-wait', 'browser-result', 'diagnostics', 'diagnostics-log', 'diagnostics-clear', 'update-check', 'update-install', 'dsh-update-install', 'repo-stars', 'approval-answer', 'rabi-connection-status', 'rabi-personas-list'])
+  const READS = new Set(['state', 'models', 'efforts', 'earlier', 'room-progress', 'exchange', 'usage', 'schedules', 'memory-view', 'browser-wait', 'browser-result', 'diagnostics', 'diagnostics-log', 'diagnostics-clear', 'update-check', 'update-install', 'dsh-update-install', 'repo-stars', 'approval-answer', 'rabi-connection-status', 'rabi-personas-list', 'rabi-bot-view'])
 
   function setPrefs(body) {
     if (body.rabiComputers !== undefined) {
@@ -114,6 +114,7 @@ export function install(rt) {
       const readOnly = rt.readOnly()
       if (readOnly !== undefined && !READS.has(endpoint)) return fail(readOnly, 'bot/read-only')
       switch (endpoint) {
+        case 'rabi-bot-view':
         case 'rabi-connection-status':
         case 'rabi-personas-list':
         case 'rabi-persona-import':
@@ -361,6 +362,19 @@ export function install(rt) {
       return new Response(JSON.stringify(result), { status: 200, headers: { 'content-type': 'application/json' } })
     },
   }), 'ds-bot: api route')
+
+  ctx.effect(() => ctx.connection.fetch.register({
+    path: '/api/ds-bot-rabi-avatar', methods: ['GET'], requestBody: 'buffered',
+    fetch: async request => {
+      try {
+        const botId = new URL(request.url).searchParams.get('botId')
+        const image = await rt.rabiAvatar(botId, request.signal)
+        return new Response(image.bytes, { headers: { 'content-type': image.contentType, 'cache-control': 'private, max-age=60', 'x-content-type-options': 'nosniff' } })
+      } catch (error) {
+        return new Response(null, { status: error.name === 'AbortError' ? 499 : 404, headers: { 'cache-control': 'no-store' } })
+      }
+    },
+  }), 'ds-bot: Rabi avatar')
 
   // Heavy browser UI stays out of the ModuleLoader combo (full client.js blocked markdown/unity).
   // Served on demand after activation; load failures must not block plugin activation.

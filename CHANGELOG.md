@@ -2,6 +2,13 @@
 
 All notable changes to DS Bot are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the versions follow [Semantic Versioning](https://semver.org/). Before 1.0, a minor version can contain breaking changes.
 
+## [0.1.6-rabi.16] - 2026-10-17
+
+### Changed
+
+- Rabi imports run as full persona bindings through the adapter’s native lifecycle. Rabi owns persona, memory, plans and role skills; required context or binding failures stop the dependent request. Requires dsh-rabiroute-agent 0.13.32 or newer with Agent Hooks enabled.
+- Bound Bots show Rabi avatars and paged memory, plan, skill and persona views. Local Bot memory tools and automatic reviews are disabled while bound; unlink preserves the Bot and restores ordinary mode.
+
 ## [0.1.6-rabi.15] - 2026-10-17
 
 ### Added

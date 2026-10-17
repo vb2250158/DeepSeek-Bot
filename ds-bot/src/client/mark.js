@@ -47,7 +47,9 @@ function useGaze(ref, enabled) {
 // of animations.
 const FIDGETS = ['hop', 'sway', 'stretch', 'look']
 export function BotMark({ bot, look: given, size = 36, state = 'idle', live = false, gaze = false, pokeable = false, label }) {
-  const look = given ?? lookOf(bot)
+  const sourceLook = given ?? lookOf(bot)
+  const [failedImage, setFailedImage] = useState('')
+  const look = sourceLook.image === failedImage ? { ...sourceLook, image: undefined } : sourceLook
   const ref = useRef(null)
   const maskId = useRef('')
   if (maskId.current === '') maskId.current = `bt-mark-${nextMarkSerial()}`
@@ -69,7 +71,7 @@ export function BotMark({ bot, look: given, size = 36, state = 'idle', live = fa
     onClick: pokeable ? () => setPoked(true) : undefined,
     onAnimationEnd: poked ? (event) => { if (/^bt-poke/.test(event.animationName)) setPoked(false) } : undefined,
   }
-  if (look.image) return h('span', common, h('img', { className: 'bt-mark-img', src: look.image, alt: '', draggable: false }))
+  if (look.image) return h('span', common, h('img', { className: 'bt-mark-img', src: look.image, alt: '', draggable: false, onError: () => setFailedImage(look.image) }))
   const box = shapeOf(look.shape).size
   return h('span', common, h('svg', { viewBox: `0 0 ${box} ${box}`, dangerouslySetInnerHTML: { __html: characterMarkup(look.shape, look.color).replaceAll(MASK_ID, maskId.current) } }))
 }

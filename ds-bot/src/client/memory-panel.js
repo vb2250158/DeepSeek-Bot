@@ -7,6 +7,7 @@ import { ArrowUpIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, CloseIcon, D
 import { dateLocale, hostText, t } from './i18n.js'
 import { summaryBlocks } from './text.js'
 import { useLinger } from './motion.js'
+import { RabiWorkspaceDialog } from './rabi-workspace.js'
 
 const POLL_MS = 1500
 const MENU_EXIT_MS = 120
@@ -36,7 +37,7 @@ export function useMemoryCount(botId, actions) {
 // The details pane's row: how much the Bot keeps, and the way into the dialog.
 export function MemoryRow({ bot, actions }) {
   const count = useMemoryCount(bot.id, actions)
-  const label = count === null ? t('Loading…') : count === 0 ? t('Nothing saved yet') : count === 1 ? t('1 entry') : t('{count} entries', { count })
+  const label = bot.rabiPersona && bot.rabiPersona.enabled !== false ? t('Managed by Rabi') : count === null ? t('Loading…') : count === 0 ? t('Nothing saved yet') : count === 1 ? t('1 entry') : t('{count} entries', { count })
   return h('div', null,
     h('div', { className: 'bt-section-title' }, t('Memory')),
     h('button', { type: 'button', className: 'bt-mem-row', 'aria-label': t("Manage {name}'s memory", { name: bot.name }), onClick: () => actions.openMemory(bot.id) },
@@ -202,6 +203,12 @@ function useNow(every) {
 }
 
 export function MemoryDialog({ bot, actions, leaving = false }) {
+  return bot.rabiPersona && bot.rabiPersona.enabled !== false
+    ? h(RabiWorkspaceDialog, { bot, actions })
+    : h(LocalMemoryDialog, { bot, actions, leaving })
+}
+
+function LocalMemoryDialog({ bot, actions, leaving = false }) {
   const { view, error, load, show } = useMemoryView(bot.id, actions)
   const [page, setPage] = useState('summary')
   const [menu, setMenu] = useState(false)

@@ -458,6 +458,8 @@ body[data-ds-dark-theme] .bt-scrim{background:rgba(0,0,0,.5)}
 .bt-set-section h3{font-size:13px;line-height:18px;font-weight:600;margin:0 0 8px;padding:0 4px}
 .bt-set-card{border:1px solid var(--bt-line);border-radius:12px;background:var(--bt-card);display:flex;flex-direction:column}
 .bt-rabi-actions{display:flex;gap:6px;flex-wrap:wrap}
+.bt-rabi-dialog{width:min(800px,calc(100vw - 32px))}
+.bt-rabi-document{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.6}
 .bt-rabi-actions button[aria-pressed=true]{outline:1px solid var(--bt-line)}
 .bt-rabi-terminal{padding:12px;gap:12px}
 .bt-rabi-terminal label{display:flex;flex-direction:column;gap:6px;font-size:12px}

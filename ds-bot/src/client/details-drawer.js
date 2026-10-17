@@ -15,6 +15,7 @@ import { Segmented, useGlide, useMorph } from './motion.js'
 import { MemberWork, useMemberWork } from './member-status.js'
 import { t } from './i18n.js'
 import { RabiComputersPage } from './rabi-computers.js'
+import { RabiWorkspace } from './rabi-workspace.js'
 
 function transcriptOf(list, id, name, hiddenTurns = []) {
   const outline = list.projectionsBySession?.[id]?.values?.turnOutline ?? list.byId[id]?.projectionValues?.turnOutline
@@ -246,8 +247,8 @@ export function DetailsDrawer({ sessionId, startRenaming, startTab, hasStrip, co
           h('div', { className: 'bt-kv' }, h('span', null, bot.name), h('span', null, usage))) : null,
         h(ScheduleSummary, { key: 'routines', bot, actions }),
       ] : null,
-      bot && compact && tab === 'details' ? h(ScheduleSummary, { bot, actions }) : null,
-      bot && tab === 'library' ? [h(MemoryRow, { key: 'memory', bot, actions }), h(BrowserCards, { key: 'browser', bot, sessionId, roster, actions, useBrowserTabs, useBrowserPages })] : null,
+      bot && compact && tab === 'details' ? bot.rabiPersona && bot.rabiPersona.enabled !== false ? h(RabiWorkspace, { bot, actions }) : h(ScheduleSummary, { bot, actions }) : null,
+      bot && tab === 'library' ? bot.rabiPersona && bot.rabiPersona.enabled !== false ? h(RabiWorkspace, { bot, actions }) : [h(MemoryRow, { key: 'memory', bot, actions }), h(BrowserCards, { key: 'browser', bot, sessionId, roster, actions, useBrowserTabs, useBrowserPages })] : null,
       bot && tab === 'computers' ? h(RabiComputersPage, { roster, actions }) : null,
       bot && tab === 'browser' ? h(BrowserCards, { bot, sessionId, roster, actions, useBrowserTabs, useBrowserPages }) : null)]
 }
