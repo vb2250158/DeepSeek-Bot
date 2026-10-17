@@ -2,6 +2,16 @@
 
 All notable changes to DS Bot are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the versions follow [Semantic Versioning](https://semver.org/). Before 1.0, a minor version can contain breaking changes.
 
+## [0.1.6-rabi.13] - 2026-10-17
+
+### Fixed
+
+- Long conversation previews no longer expand the list beyond its assigned width and squeeze the chat. Layout adapts to the panel's available width, including the native sidebar.
+
+### Added
+
+- Drag, keyboard and double-click controls for the list and details dividers. Column widths persist per browser and preserve space for the chat.
+
 ## [0.1.6-rabi.12] - 2026-10-17
 
 ### Fixed

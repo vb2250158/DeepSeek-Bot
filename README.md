@@ -23,6 +23,8 @@ DeepSeek Bot (DS Bot) is a bot plugin for [DeepSeek Harness](https://github.com/
 
 DS Bot follows the active DSH skin by default, including light and dark mode. **Settings → General → Theme** also keeps the standalone palettes and custom accents available.
 
+Drag either column divider to resize the conversation list or details. Widths stay on this browser; double-click resets a column, and the focused divider accepts arrow keys. Narrow panels hide details and then compact the list to keep the chat usable.
+
 ## Install
 
 For this fork's host and browser clients, follow [Host deployment](host/README.md). The instructions below install the original upstream plugin.

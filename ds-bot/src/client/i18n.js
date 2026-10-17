@@ -310,6 +310,8 @@ const ZH = {
 
   // Themes
   'Follow DSH': '跟随 DSH',
+  'Resize conversation list': '调整会话列表宽度',
+  'Resize conversation details': '调整对话详情宽度',
   DeepSeek: 'DeepSeek', Mono: '黑白', Paper: '纸张', Moonlight: '月光',
 
   // Settings dialog

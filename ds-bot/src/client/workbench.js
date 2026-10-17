@@ -3,6 +3,7 @@ import { TeamSidebar, AccountLauncher, ConnectPlugins } from './sidebar.js'
 import { DetailsDrawer } from './details-drawer.js'
 import { FishLogo } from '@deepseek-ai/dsh-client-ui-primitives'
 import { t } from './i18n.js'
+import { ColumnResizer, useColumnWidth } from './column-resizer.js'
 
 export const BOT_PANEL = 'ds-bot'
 
@@ -16,16 +17,19 @@ export function BotWorkbench({ renderSlot }) {
 }
 
 export function BotTeam(props) {
-  return h('aside', { className: 'bt-team-column', 'aria-label': t('DS Bot') },
+  const [width, onChange] = useColumnWidth('team')
+  return h('aside', { className: 'bt-team-column', 'aria-label': t('DS Bot'), style: { '--bt-team-width': `${width}px` } },
     h(TeamSidebar, { ...props, wide: true, compactMain: true, groupTiles: true }),
     h('div', { className: 'bt-team-footer' },
-      h(AccountLauncher, { ...props, seat: false }), h(ConnectPlugins, { ...props, wide: true })))
+      h(AccountLauncher, { ...props, seat: false }), h(ConnectPlugins, { ...props, wide: true })),
+    h(ColumnResizer, { side: 'team', width, onChange }))
 }
 
 export function BotConversation(props) {
   const { sessionId, renderFactorySlot, useRoster, useUi, actions } = props
   const roster = useRoster(value => value)
   const ui = useUi(value => value)
+  const [width, onChange] = useColumnWidth('details')
   const owner = roster.byId[sessionId] ?? Object.values(roster.byId).find(bot => bot.sessionId === sessionId)
   const id = owner?.id ?? sessionId
   const room = roster.roomsById[id]
@@ -39,15 +43,16 @@ export function BotConversation(props) {
   return h(Fragment, null,
     h('section', { className: 'bt-chat-column', 'aria-label': t('Message'), style: { '--bt-placeholder': JSON.stringify(name ? t('Message {name}', { name }) : t('Message')) } },
       renderFactorySlot('conversation.content', { variant: 'embedded', phase: 'active', hero: false })),
-    known ? h('aside', { className: 'bt-info-column', 'aria-label': t('View conversation details') },
+    known ? h('aside', { className: 'bt-info-column', 'aria-label': t('View conversation details'), style: { '--bt-details-width': `${width}px` } },
       h(DetailsDrawer, { ...props, key: `${id}:${ui.details === id && ui.renaming ? 'rename' : ''}:${ui.details === id ? ui.tab ?? '' : ''}`, sessionId: id, roster, hasStrip: true, compact: true,
         startRenaming: ui.details === id && ui.renaming, startTab: ui.details === id ? ui.tab : null,
-        actions: { ...actions, closeDetails: () => actions.closeDetails() } })) : null)
+        actions: { ...actions, closeDetails: () => actions.closeDetails() } }),
+      h(ColumnResizer, { side: 'details', width, onChange })) : null)
 }
 
 export const WORKBENCH_CSS = `
-.bt-workbench{display:flex;position:relative;height:100%;min-height:0;min-width:0;overflow:hidden;background:var(--bt-main);color:var(--bt-ink)}
-.bt-team-column{display:flex;flex-direction:column;flex:0 0 280px;min-height:0;border-right:.5px solid var(--bt-line);background:var(--bt-sidebar)}
+.bt-workbench{display:flex;position:relative;container-type:inline-size;height:100%;min-height:0;min-width:0;overflow:hidden;background:var(--bt-main);color:var(--bt-ink)}
+.bt-team-column{display:flex;position:relative;box-sizing:border-box;flex-direction:column;flex:0 1 var(--bt-team-width,280px);min-width:200px;max-width:520px;min-height:0;border-right:.5px solid var(--bt-line);background:var(--bt-sidebar)}
 .bt-team-column>.bt-side{padding:6px 10px 8px;min-width:0}
 .bt-team-column .bt-side-top{padding:4px 2px 12px;min-height:36px}
 .bt-team-column .bt-side-top>.bt-brand{display:none}
@@ -60,13 +65,15 @@ export const WORKBENCH_CSS = `
 .bt-team-column .bt-row{min-height:58px}
 .bt-team-footer{display:flex;align-items:center;gap:8px;padding:8px 12px 12px}
 .bt-team-footer>.bt-connect-wrap{flex:1;min-width:0}
-.bt-chat-column{display:flex;flex:1;flex-direction:column;position:relative;min-width:0;min-height:0;background:var(--bt-main)}
+.bt-chat-column{display:flex;flex:1;flex-direction:column;position:relative;min-width:320px;min-height:0;background:var(--bt-main)}
 .bt-chat-column [class*="_composerSeat"]{margin-top:auto}
 .bt-chat-column [data-conversation-scroll]{padding-top:32px!important}
-.bt-info-column{display:flex;flex:0 0 320px;flex-direction:column;min-height:0;overflow:auto;border-left:.5px solid var(--bt-line);background:var(--bt-main)}
+.bt-info-column{display:flex;position:relative;box-sizing:border-box;flex:0 1 var(--bt-details-width,320px);min-width:240px;max-width:520px;flex-direction:column;min-height:0;border-left:.5px solid var(--bt-line);background:var(--bt-main)}
+.bt-column-resizer{position:absolute;z-index:5;top:0;bottom:0;right:0;width:6px;cursor:col-resize;touch-action:none;user-select:none;outline:none}
+.bt-column-resizer[data-side=details]{left:0;right:auto}
+.bt-column-resizer:hover,.bt-column-resizer:focus-visible{background:var(--bt-accent)}
 .bt-info-column>.bt-drawer-top{min-height:44px;box-sizing:border-box}
 .bt-workbench [data-slot="conversation.input.permission"],.bt-workbench [data-slot="conversation.input.model"]{display:none}
-@media(max-width:1200px){.bt-team-column{flex-basis:250px}.bt-info-column{flex-basis:280px}}
-@media(max-width:900px){.bt-info-column{display:none}.bt-team-column{flex-basis:240px}}
-@media(max-width:600px){.bt-team-column{flex-basis:72px}.bt-team-column .bt-row-body,.bt-team-column .bt-tile-name,.bt-team-column .bt-side-top,.bt-team-footer{display:none}.bt-team-column .bt-row{justify-content:center;padding:8px 0}.bt-team-column .bt-tile{width:48px;padding:6px 0}.bt-team-column>.bt-side{padding:8px 4px}}
+@container(max-width:760px){.bt-info-column{display:none}}
+@container(max-width:600px){.bt-team-column{flex:0 0 72px;min-width:72px}.bt-chat-column{min-width:0}.bt-team-column .bt-row-body,.bt-team-column .bt-tile-name,.bt-team-column .bt-side-top,.bt-team-footer,.bt-column-resizer{display:none}.bt-team-column .bt-row{justify-content:center;padding:8px 0}.bt-team-column .bt-tile{width:48px;padding:6px 0}.bt-team-column>.bt-side{padding:8px 4px}}
 `
