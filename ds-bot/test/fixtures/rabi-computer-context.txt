@@ -1,0 +1,1 @@
+Remote computers: use the installed Rabi tools and GET /api/agent/help for current computer and terminal APIs. Rabi WebGUI owns pairing and computer authorization. Follow its permission decisions and operation receipts.

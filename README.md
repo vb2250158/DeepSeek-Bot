@@ -9,7 +9,7 @@
 
 The lower-left **Bot settings** button opens the Bot settings.
 
-**Remote computers:** with `dsh-rabiroute-agent` installed and configured on the controller, enable the Rabi computer panel in **Settings → Computers**. The panel reuses Rabi connections and remote terminals. Other computers run the Rabi client without a separate DSH runtime; Rabi owns pairing, tray operation and execution authorization.
+**Remote computers:** **Settings → Computers** contains one team-wide switch, enabled by default, and a read-only list of remote computers. Use **Manage computer access in Rabi** to open Rabi WebGUI for pairing and authorization. Disabling the switch blocks Bot calls to Rabi remote-computer APIs, including group parts; ordinary DSH sessions are unchanged. The old panel preference is ignored. Other computers need only the Rabi client, without a separate DSH runtime.
 
 English | [中文](README.zh.md)
 

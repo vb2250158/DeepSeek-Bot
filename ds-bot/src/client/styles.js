@@ -461,9 +461,6 @@ body[data-ds-dark-theme] .bt-scrim{background:rgba(0,0,0,.5)}
 .bt-rabi-dialog{width:min(800px,calc(100vw - 32px))}
 .bt-rabi-document{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.6}
 .bt-rabi-actions button[aria-pressed=true]{outline:1px solid var(--bt-line)}
-.bt-rabi-terminal{padding:12px;gap:12px}
-.bt-rabi-terminal label{display:flex;flex-direction:column;gap:6px;font-size:12px}
-.bt-rabi-output{white-space:pre-wrap;overflow-wrap:anywhere;min-height:160px;max-height:320px;overflow:auto;margin:0;padding:10px;background:var(--bt-card);border:1px solid var(--bt-line);border-radius:6px;font-size:12px}
 .bt-set-card>*+*{border-top:.5px solid var(--bt-line)}
 .bt-set-row{display:flex;align-items:center;gap:12px;padding:10px 12px;border:0;background:none;color:var(--bt-ink);font:inherit;font-size:13px;line-height:18px;text-align:left;width:100%;box-sizing:border-box;border-radius:0}
 button.bt-set-row{cursor:pointer}

@@ -83,12 +83,12 @@ export function install(rt) {
   })
   // What a host that only reads the team may still answer.
   // Updates change the dsh profile, not the team, so a reading host may run them too.
-  const READS = new Set(['state', 'models', 'efforts', 'earlier', 'room-progress', 'exchange', 'usage', 'schedules', 'memory-view', 'browser-wait', 'browser-result', 'diagnostics', 'diagnostics-log', 'diagnostics-clear', 'update-check', 'update-install', 'dsh-update-install', 'repo-stars', 'approval-answer', 'rabi-connection-status', 'rabi-personas-list', 'rabi-bot-view'])
+  const READS = new Set(['state', 'models', 'efforts', 'earlier', 'room-progress', 'exchange', 'usage', 'schedules', 'memory-view', 'browser-wait', 'browser-result', 'diagnostics', 'diagnostics-log', 'diagnostics-clear', 'update-check', 'update-install', 'dsh-update-install', 'repo-stars', 'approval-answer', 'rabi-connection-status', 'rabi-personas-list', 'rabi-bot-view', 'rabi-computers-status', 'rabi-computers-list'])
 
   function setPrefs(body) {
-    if (body.rabiComputers !== undefined) {
-      if (typeof body.rabiComputers !== 'boolean') throw invalid('Invalid Rabi computer panel setting')
-      state.prefs.rabiComputers = body.rabiComputers
+    if (body.rabiRemoteControl !== undefined) {
+      if (typeof body.rabiRemoteControl !== 'boolean') throw invalid('Invalid Rabi remote computer setting')
+      state.prefs.rabiRemoteControl = body.rabiRemoteControl
     }
     if (body.theme !== undefined) {
       if (typeof body.theme !== 'string' || !/^[a-z][\w-]{0,31}$/.test(body.theme)) throw invalid('Unknown theme')
@@ -123,9 +123,6 @@ export function install(rt) {
           return ok(await rt.rabiPersonaEndpoint(endpoint, body, signal))
         case 'rabi-computers-status':
         case 'rabi-computers-list':
-        case 'rabi-computer-terminals':
-        case 'rabi-computer-output':
-        case 'rabi-computer-terminal':
           return ok(await rt.rabiComputerEndpoint(endpoint, body, signal))
         case 'state':
           if (typeof body.locale === 'string' && /^[a-z]{2,3}(-[\w-]+)?$/i.test(body.locale)) uiLocale = body.locale

@@ -1,71 +1,59 @@
-import { rabiClient, rabiRefuse as refuse, rabiSegment as segment } from './rabi-client.js'
+import { rabiClient, rabiRefuse as refuse } from './rabi-client.js'
 
 const UI_TIMEOUT_MS = 8000
+const REMOTE_DISABLED = 'Remote computer access is disabled for all Bots in Bot settings.'
 
-/** GUI adapter over the existing Rabi tool pipeline; Rabi owns connections and terminals.
- *  Manager / WebGUI traffic is request-local and never runs during install() / plugin activation. */
+/** Only the Rabi remote-computer API is controlled here; Rabi owns device authorization. */
+function isRemoteComputerCall(exec) {
+  if (exec.name !== 'rabiroute_manager_api' || typeof exec.arguments?.path !== 'string') return false
+  try {
+    const decoded = decodeURIComponent(new URL(exec.arguments.path, 'http://rabi.invalid').pathname)
+    const path = new URL(decoded, 'http://rabi.invalid').pathname.toLowerCase()
+    return path === '/api/lan-agent' || path.startsWith('/api/lan-agent/')
+  } catch { return false } // Invalid paths are rejected by the Rabi adapter before dispatch.
+}
+
+/** Team-wide capability switch and read-only computer catalog. No remote session or credential is stored. */
 export function install(rt) {
   const { ctx, state } = rt
   const { available, json: request } = rabiClient(ctx, UI_TIMEOUT_MS)
-  // Access credentials are request-local and never returned to the DS Bot browser or state.
-  const auth = async signal => {
-    const access = await request('/api/webgui-access', 'GET', undefined, signal)
-    if (typeof access.data?.token !== 'string' || !access.data.token) refuse('Rabi WebGUI access is unavailable')
-    return { 'x-rabiroute-webgui-token': access.data.token }
-  }
-  /** Soft Manager call: connection / auth failures become { error } instead of throwing, so the panel never blocks plugin activation. */
-  const softManager = async (fn) => {
-    try { return { ok: true, value: await fn() } }
-    catch (error) { return { ok: false, error: error?.message ?? String(error) } }
-  }
-  rt.rabiComputerEndpoint = async (endpoint, body = {}, signal) => {
+  const enabled = () => state.prefs.rabiRemoteControl !== false
+  // Load saved policy before the registry's final synchronous guard checks it.
+  ctx.on('tools/pre-execute', async (exec, next) => {
+    if (isRemoteComputerCall(exec)) await rt.load()
+    return next()
+  })
+  ctx.tools.guard(exec => isRemoteComputerCall(exec) && rt.isBotSession(exec.agent?.id) && !enabled() ? REMOTE_DISABLED : undefined)
+  ctx.effect(() => ctx.systemPrompt.section({
+    name: 'bot-rabi-computers', order: 645, interpolate: false,
+    text: context => rt.isBotSession(context?.agent?.id)
+      ? enabled()
+        ? 'Remote computers: use the installed Rabi tools and GET /api/agent/help for current computer and terminal APIs. Rabi WebGUI owns pairing and computer authorization. Follow its permission decisions and operation receipts.'
+        : REMOTE_DISABLED
+      : '',
+  }), 'ds-bot: Rabi remote computers')
+
+  rt.rabiComputerEndpoint = async (endpoint, _body = {}, signal) => {
     await rt.load()
-    const enabled = state.prefs.rabiComputers === true
-    // Status is local tool presence only — never touches Manager.
-    if (endpoint === 'rabi-computers-status') return { available: available(), enabled }
-    if (!enabled) refuse('Enable the Rabi computer panel first')
+    if (endpoint === 'rabi-computers-status') return { available: available(), enabled: enabled() }
+    if (endpoint !== 'rabi-computers-list') refuse('Unknown computer settings operation')
+    if (!enabled()) refuse(REMOTE_DISABLED)
     if (!available()) refuse('Install and configure dsh-rabiroute-agent on the controller first')
-    if (endpoint === 'rabi-computers-list') {
-      const outcome = await softManager(async () => {
-        const headers = await auth(signal)
-        const result = await request('/api/lan-agent/instances', 'GET', undefined, signal, headers)
-        if (!Array.isArray(result.instances)) refuse('Rabi returned an invalid computer list')
-        return result.instances.map(item => ({ instanceId: item.instanceId, name: item.name, platform: item.platform, connected: item.connected, local: item.local }))
-      })
-      if (!outcome.ok) return { computers: [], error: outcome.error, available: available(), enabled }
-      return { computers: outcome.value, available: available(), enabled }
+    let managementUrl = ''
+    try {
+      const meta = await request('/meta', 'GET', undefined, signal)
+      const management = new URL(meta.managerBaseUrl)
+      if (!['http:', 'https:'].includes(management.protocol) || management.username || management.password || management.pathname !== '/' || management.search || management.hash) refuse('Rabi WebGUI address is unavailable')
+      management.hash = '/lan-agents'
+      managementUrl = management.href
+      const access = await request('/api/webgui-access', 'GET', undefined, signal)
+      if (typeof access.data?.token !== 'string' || !access.data.token) refuse('Rabi WebGUI access is unavailable')
+      const result = await request('/api/lan-agent/instances', 'GET', undefined, signal, { 'x-rabiroute-webgui-token': access.data.token })
+      if (!Array.isArray(result.instances)) refuse('Rabi returned an invalid computer list')
+      const computers = result.instances.filter(item => !item.local).map(item => ({ instanceId: item.instanceId, name: item.name, platform: item.platform, connected: item.connected }))
+      return { computers, managementUrl, available: available(), enabled: enabled() }
+    } catch (error) {
+      return { computers: [], managementUrl, error: error?.message ?? String(error), available: available(), enabled: enabled() }
     }
-    const headers = await auth(signal)
-    const base = `/api/lan-agent/instances/${segment(body.instanceId)}`
-    if (endpoint === 'rabi-computer-terminals') {
-      const result = await request(`${base}/terminals`, 'GET', undefined, signal, headers)
-      return result.data
-    }
-    if (endpoint === 'rabi-computer-output') {
-      const after = body.after ?? 0
-      if (!Number.isInteger(after) || after < 0) refuse('Invalid terminal output sequence')
-      const result = await request(`${base}/terminals/${segment(body.terminalId)}?after=${after}&waitMs=1000`, 'GET', undefined, signal, headers)
-      return result.data
-    }
-    if (endpoint === 'rabi-computer-terminal') {
-      const terminalId = body.terminalId
-      segment(terminalId)
-      let operation
-      switch (body.action) {
-        case 'open':
-          if (!['cmd', 'powershell'].includes(body.shell)) refuse('Choose a shell offered by the remote client')
-          operation = { action: 'open', terminalId, shell: body.shell, ...(body.cwd ? { cwd: body.cwd } : {}) }
-          break
-        case 'input':
-          if (!Number.isInteger(body.sequence) || body.sequence < 1 || typeof body.data !== 'string' || Buffer.byteLength(body.data) > 16384) refuse('Invalid terminal input')
-          operation = { action: 'input', terminalId, sequence: body.sequence, data: body.data }
-          break
-        case 'get': case 'close': operation = { action: body.action, terminalId }; break
-        default: refuse('Unknown terminal operation')
-      }
-      const result = await request(`${base}/terminals`, 'POST', operation, signal, headers)
-      return result.data
-    }
-    refuse('Unknown computer panel operation')
   }
 }

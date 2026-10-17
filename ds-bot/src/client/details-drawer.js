@@ -14,7 +14,6 @@ import { ScheduleSummary } from './schedules.js'
 import { Segmented, useGlide, useMorph } from './motion.js'
 import { MemberWork, useMemberWork } from './member-status.js'
 import { t } from './i18n.js'
-import { RabiComputersPage } from './rabi-computers.js'
 import { RabiWorkspace } from './rabi-workspace.js'
 
 function transcriptOf(list, id, name, hiddenTurns = []) {
@@ -29,7 +28,7 @@ function transcriptOf(list, id, name, hiddenTurns = []) {
   return lines.join('\n\n')
 }
 
-const TAB_LABELS = { details: 'Details', browser: 'Browser', library: 'Library', computers: 'Computers' }
+const TAB_LABELS = { details: 'Details', browser: 'Browser', library: 'Library' }
 
 const hostOf = (url) => { try { return new URL(url).hostname.replace(/^www\./, '') } catch { return '' } }
 const shortUrl = url => String(url ?? '').replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/$/, '')
@@ -210,7 +209,7 @@ export function DetailsDrawer({ sessionId, startRenaming, startTab, hasStrip, co
   }
   const subtitle = bot ? bot.role : roomSubtitle(room, roster)
   // Tab sets: a 1:1 Bot has Details and Browser; a group has Details.
-  const tabs = bot ? (compact ? ['details', 'library', 'computers'] : ['details', 'browser']) : ['details']
+  const tabs = bot ? (compact ? ['details', 'library'] : ['details', 'browser']) : ['details']
   return [h(Fragment, { key: 'top' }, top),
     h('div', { key: 'id', className: 'bt-drawer-id', 'data-move': side },
       bot ? h(BotAvatar, { bot, size: 64, state: botState(running, doing, roster.questions?.[part] !== undefined), main: isMainBot, badge: false, gaze: true, pokeable: true })
@@ -249,6 +248,5 @@ export function DetailsDrawer({ sessionId, startRenaming, startTab, hasStrip, co
       ] : null,
       bot && compact && tab === 'details' ? bot.rabiPersona && bot.rabiPersona.enabled !== false ? h(RabiWorkspace, { bot, actions }) : h(ScheduleSummary, { bot, actions }) : null,
       bot && tab === 'library' ? bot.rabiPersona && bot.rabiPersona.enabled !== false ? h(RabiWorkspace, { bot, actions }) : [h(MemoryRow, { key: 'memory', bot, actions }), h(BrowserCards, { key: 'browser', bot, sessionId, roster, actions, useBrowserTabs, useBrowserPages })] : null,
-      bot && tab === 'computers' ? h(RabiComputersPage, { roster, actions }) : null,
       bot && tab === 'browser' ? h(BrowserCards, { bot, sessionId, roster, actions, useBrowserTabs, useBrowserPages }) : null)]
 }

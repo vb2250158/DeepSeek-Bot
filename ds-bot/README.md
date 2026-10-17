@@ -64,6 +64,8 @@ The first time the team opens, the plugin creates a Main Bot called Chief.
 
 ## Configuration
 
+**Bot settings → Computers** has one team-wide remote-computer switch, enabled by default. The read-only catalog opens Rabi WebGUI for computer pairing and authorization. Disabling it denies Rabi remote-computer API calls in Bot chats and group parts. The old panel-only preference is ignored; ordinary DSH sessions are unchanged.
+
 **Bot settings → Rabi connection** binds one or all local personas through `dsh-rabiroute-agent` 0.13.32 or newer with Agent Hooks enabled. DS Bot verifies the original role binding and registers a required lifecycle subscription for each own or group conversation part. The adapter owns full persona, memory, plan, skill, tool and Stop context; DS Bot keeps only role references and a durable ownership notice. Native Hook failures stop required sessions. Bound Bots omit local memory tools, snapshots and automatic reviews. Avatar bytes and paged library views come from Rabi on demand and are not persisted in the Bot store. Unlink releases subscriptions, preserves the Bot and records that previous Rabi instructions no longer apply. Model execution and approvals remain with the original DSH owner.
 
 Options go in the profile's `cordis.patch.yml`, under the `bot` entry. All of them are optional.

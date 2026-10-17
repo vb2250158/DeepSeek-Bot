@@ -2,6 +2,13 @@
 
 All notable changes to DS Bot are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the versions follow [Semantic Versioning](https://semver.org/). Before 1.0, a minor version can contain breaking changes.
 
+## [0.1.6-rabi.19] - 2026-10-17
+
+### Changed
+
+- Replace the computer-panel preference with one team-wide remote-computer switch, enabled by default. The old panel preference no longer controls access. Disabling the new switch denies Rabi remote-computer API calls in Bot chats and group parts.
+- Computer settings show a read-only remote catalog and open Rabi WebGUI for pairing and authorization. Remove the conversation's Computer tab and the duplicate terminal controls; existing remote sessions stay in Rabi.
+
 ## [0.1.6-rabi.18] - 2026-10-17
 
 ### Changed
