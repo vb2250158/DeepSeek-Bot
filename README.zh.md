@@ -7,6 +7,8 @@
 
 # DeepSeek Bot
 
+左下角的 **Bold设置** 按钮打开 Bot 设置。
+
 这是 [vb2250158 维护的 fork](https://github.com/vb2250158/DeepSeek-Bot)，上游为 [Fei2411/DeepSeek-Bot](https://github.com/Fei2411/DeepSeek-Bot)。独立执行主机及电脑、手机浏览器客户端见[主机部署](host/README.zh.md)。
 
 **远端电脑**：主控安装并配置 `dsh-rabiroute-agent` 后，在 **设置 → 电脑** 开启 Rabi 电脑面板。面板复用 Rabi 的电脑连接与远端终端；其他电脑使用 Rabi 客户端，无需再运行一套 DSH。配对、托盘和执行授权由 Rabi 管理。

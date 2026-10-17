@@ -68,6 +68,7 @@ const ZH = {
   'Make Main Bot': '设为主 Bot',
   'Remove Main Bot role': '取消主 Bot',
   'Bot settings': 'Bot 设置',
+  'Bold settings': 'Bold设置',
   'Create group chat': '新建群聊',
   'Delete group': '删除群聊',
   "Open {name}'s chat": '打开 {name} 的对话',

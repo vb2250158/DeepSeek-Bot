@@ -7,6 +7,8 @@
 
 # DeepSeek Bot
 
+The lower-left **Bold settings** button opens the Bot settings.
+
 **Remote computers:** with `dsh-rabiroute-agent` installed and configured on the controller, enable the Rabi computer panel in **Settings → Computers**. The panel reuses Rabi connections and remote terminals. Other computers run the Rabi client without a separate DSH runtime; Rabi owns pairing, tray operation and execution authorization.
 
 English | [中文](README.zh.md)

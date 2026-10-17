@@ -2,6 +2,12 @@
 
 All notable changes to DS Bot are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the versions follow [Semantic Versioning](https://semver.org/). Before 1.0, a minor version can contain breaking changes.
 
+## [0.1.6-rabi.17] - 2026-10-17
+
+### Changed
+
+- Show “Bold设置” beside the lower-left settings icon in Chinese.
+
 ## [0.1.6-rabi.16] - 2026-10-17
 
 ### Changed

@@ -599,7 +599,7 @@ button:hover .bt-you{background:color-mix(in srgb,var(--bt-ink) 9%,var(--bt-side
 .bt-palette-empty-label{font-size:14px;font-weight:500;color:var(--bt-ink-2)}
 .bt-palette-empty-hint{font-size:13px;line-height:16px;color:var(--bt-ink-3)}
 @media (prefers-reduced-motion:reduce){.bt-palette{animation:bt-fade .1s ease-out}}
-.bt-account{flex:none;width:36px;height:36px;border:0;padding:0;background:none;border-radius:50%;cursor:pointer;display:inline-flex}
+.bt-account{flex:none;max-width:100%;height:36px;border:0;padding:0 8px 0 0;background:none;border-radius:8px;color:var(--bt-ink);font:inherit;cursor:pointer;display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
 .bt-account:hover .bt-you{background:color-mix(in srgb,var(--bt-ink) 9%,var(--bt-sidebar))}
 /* Popover keyframes move translate and scale, which compose with a transform the popover
    already has. */
