@@ -6,6 +6,12 @@ export const OWNER = 1
 export const MODEL = 2
 export const KIND = 3
 
+/** Keep the team's rows while preserving the host's owner and model indices. */
+export function teamUsage(view) {
+  const owners = new Set(view.owners.flatMap((owner, index) => owner.kind === 'bot' || owner.kind === 'room' ? [index] : []))
+  return { ...view, rows: view.rows.filter(row => owners.has(row[OWNER])) }
+}
+
 export const HOUR_MS = 3_600_000
 export const DAY_MS = 86_400_000
 

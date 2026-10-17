@@ -109,8 +109,6 @@ var ZH = {
   // Sidebar and account menu
   "Bot list": "Bot 列表",
   "Setting up your Main Bot…": "正在设置你的主 Bot…",
-  "Connect plugins": "连接插件",
-  "Plugin compatibility is not fully verified.": "插件兼容性未完全验证",
   "Automation tasks": "自动化任务",
   Connectors: "连接器",
   "Search connectors": "搜索连接器",
@@ -160,9 +158,7 @@ var ZH = {
   "GitHub addresses must start with https://": "GitHub 地址必须以 https:// 开头",
   "This DSH cannot load connectors": "这个 DSH 不能加载连接器",
   "No such connector": "没有这个连接器",
-  "Classic Agent mode": "经典 Agent 模式",
   "Switch": "切换",
-  "Switch to classic Agent mode": "切换经典 Agent 模式",
   "{model} is not available anymore. Pick another model for me.": "{model} 已经不可用了。给我换一个模型吧。",
   "Hi, I'm {name}. I don't have a model yet. How do you want to set one up?": "你好，我是 {name}。我还没有可用的模型。你想怎么配置？",
   "Hi, I'm {name}. Pick a model for me first. You can change it later in my details.": "你好，我是 {name}。先给我选一个模型吧，以后可以在我的详情里换。",
@@ -367,6 +363,9 @@ var ZH = {
   Cobalt: "钴蓝",
   // Themes
   "Follow DSH": "跟随 DSH",
+  "Bot usage": "Bot 用量",
+  "Bot connectors": "Bot 连接器",
+  "Bot tasks": "Bot 定时任务",
   "Resize conversation list": "调整会话列表宽度",
   "Resize conversation details": "调整对话详情宽度",
   DeepSeek: "DeepSeek",
@@ -399,7 +398,6 @@ var ZH = {
   "DS Bot settings": "DS Bot 设置",
   "Settings pages": "设置页面",
   "Models, providers, and the rest of DeepSeek Harness": "模型、服务商和 DeepSeek Harness 的其他设置",
-  "Harness settings": "Harness 设置",
   "Back to Bots": "返回 Bot 列表",
   "Close settings": "关闭设置",
   // Context menu
@@ -2005,15 +2003,6 @@ body[data-bt-motion=quiet] .bt-mark[data-poke]{cursor:default}
 .bt-unread-wait{background:var(--bt-star)}
 .bt-rail{align-items:center;padding:0 0 8px}
 .bt-rail .bt-row{justify-content:center;padding:6px 0;min-height:44px}
-.bt-side-foot{display:flex;padding-top:8px}
-.bt-connect{flex:1;height:36px;border-radius:999px;border:1px solid var(--bt-line);background:var(--bt-main);color:var(--bt-ink);font-family:inherit;font-size:14px;line-height:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:background-color .12s ease}
-.bt-connect:hover{background:var(--bt-hover)}
-.bt-connect svg{flex:none;width:15px;height:15px}
-.bt-connect-wrap{position:relative;display:flex;flex:1 1 auto;min-width:0}
-.bt-connect-warn{flex:none;width:16px;height:16px;border-radius:50%;background:#E5484D;color:#fff;font-size:11px;line-height:16px;font-weight:700;display:inline-flex;align-items:center;justify-content:center}
-.bt-connect-tip{position:fixed;box-sizing:border-box;width:max-content;max-width:260px;padding:8px 12px;border-radius:10px;background:var(--bt-main);border:.5px solid var(--bt-line-2);box-shadow:0 8px 24px -4px rgba(0,0,0,.14);color:var(--bt-ink);font-size:12px;line-height:17px;white-space:normal;text-align:center;z-index:70;transform-origin:bottom left;animation:bt-tip-in ${SPRING_SHAPE.duration}ms ${SPRING_SHAPE.easing}}
-@keyframes bt-tip-in{from{opacity:0;transform:scale(.96);filter:blur(4px)}}
-@media (prefers-reduced-motion:reduce){.bt-connect-tip{animation:none}}
 
 .bt-head{position:relative;display:flex;justify-content:center;align-items:center;height:40px;flex:none;pointer-events:none}
 .bt-pill{pointer-events:auto;display:inline-flex;align-items:center;gap:8px;height:40px;padding:7.5px 13.5px 7.5px 7.5px;border-radius:999px;background:var(--bt-main);border:.5px solid var(--bt-line-2);box-shadow:0 2px 8px -1px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);color:var(--bt-ink);font-family:inherit;font-size:14px;line-height:20px;cursor:pointer;max-width:70%;box-sizing:border-box;transition:background-color .12s ease,transform ${SPRING_TAP.duration}ms ${SPRING_TAP.easing}}
@@ -2303,7 +2292,6 @@ body[data-ds-dark-theme] .bt-scrim{background:rgba(0,0,0,.5)}
 .bt-settings-item[aria-current=page]{background:var(--bt-active);color:var(--bt-ink)}
 .bt-settings-nav>.bt-thumb{left:8px;right:8px;border-radius:8px;background:var(--bt-active)}
 .bt-settings-nav[data-glide] .bt-settings-item[aria-current=page]{background:transparent}
-.bt-settings-shell{margin-top:auto}
 /* Usage while another page is open: out of the flow at Usage's own width, so it keeps
    its layout, and not rendered. */
 .bt-settings-usage[data-off]{position:absolute;top:0;left:198px;width:calc(min(1100px,calc(100vw - 48px)) - 198px);height:100%;box-sizing:border-box;content-visibility:hidden;pointer-events:none}
@@ -2423,7 +2411,6 @@ button.bt-set-row:hover{background:var(--bt-hover)}
 .bt-you{width:36px;height:36px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--bt-ink) 5%,var(--bt-sidebar));color:var(--bt-ink-2);box-shadow:inset 0 0 0 1px var(--bt-line);transition:background-color .12s ease}
 button:hover .bt-you{background:color-mix(in srgb,var(--bt-ink) 9%,var(--bt-sidebar))}
 .bt-you-wrap{display:inline-flex;padding:0}
-.bt-connect-foot{width:100%;height:36px}
 
 .bt-menu{position:fixed;pointer-events:auto;z-index:60;min-width:200px;padding:6px;border-radius:12px;background:var(--bt-main);border:.5px solid var(--bt-line-2);box-shadow:0 10px 20px -3px rgba(0,0,0,.1),0 4px 6px -4px rgba(0,0,0,.1),0 0 0 1px rgba(228,228,228,.04);display:flex;flex-direction:column;gap:2px;transform-origin:var(--bt-origin,top left);animation:bt-pop-drop ${SPRING_TAP.duration}ms ${SPRING_TAP.easing},bt-veil-in .14s ease-out;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;box-sizing:border-box}
 .bt-menu button{display:flex;align-items:center;gap:4px;width:100%;min-height:30px;text-align:left;border:0;background:none;border-radius:6px;padding:6px 8px;font:inherit;font-size:13px;line-height:18px;color:var(--bt-ink);cursor:pointer;box-sizing:border-box}
@@ -2431,7 +2418,6 @@ button:hover .bt-you{background:color-mix(in srgb,var(--bt-ink) 9%,var(--bt-side
 .bt-menu button svg{flex:none;width:16px;height:16px;margin:0 1px}
 .bt-menu .bt-danger{color:#c21d2e}
 .bt-menu-sep{height:.5px;flex:none;background:var(--bt-line-2);margin:4px 8px}
-.bt-menu-up{--bt-origin:bottom left;animation-name:bt-pop-lift,bt-veil-in}
 .bt-menu[data-leaving]{pointer-events:none;animation:bt-pop-out .12s cubic-bezier(.4,0,1,1) forwards}
 .bt-menu-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bt-menu-hint{flex:none;color:var(--bt-ink-3);font-size:12px;font-variant-numeric:tabular-nums}
@@ -2472,9 +2458,8 @@ button:hover .bt-you{background:color-mix(in srgb,var(--bt-ink) 9%,var(--bt-side
 .bt-palette-empty-label{font-size:14px;font-weight:500;color:var(--bt-ink-2)}
 .bt-palette-empty-hint{font-size:13px;line-height:16px;color:var(--bt-ink-3)}
 @media (prefers-reduced-motion:reduce){.bt-palette{animation:bt-fade .1s ease-out}}
-.bt-account-menu{width:224px}
 .bt-account{flex:none;width:36px;height:36px;border:0;padding:0;background:none;border-radius:50%;cursor:pointer;display:inline-flex}
-.bt-account:hover .bt-you,.bt-account[aria-expanded=true] .bt-you{background:color-mix(in srgb,var(--bt-ink) 9%,var(--bt-sidebar))}
+.bt-account:hover .bt-you{background:color-mix(in srgb,var(--bt-ink) 9%,var(--bt-sidebar))}
 /* Popover keyframes move translate and scale, which compose with a transform the popover
    already has. */
 @keyframes bt-pop-drop{from{translate:0 -4px;scale:.96}}
@@ -5251,55 +5236,6 @@ function UpdateButton({ useUpdate, actions }) {
     ), document.body) : null
   );
 }
-function ConnectPlugins({ wide, actions }) {
-  const tipId = (0, import_react8.useId)();
-  const [tip, setTip] = (0, import_react8.useState)(false);
-  const timer = (0, import_react8.useRef)(0);
-  const button = (0, import_react8.useRef)(null);
-  const [box, setBox] = (0, import_react8.useState)(null);
-  (0, import_react8.useEffect)(() => () => clearTimeout(timer.current), []);
-  if (!wide) return null;
-  const show = () => {
-    clearTimeout(timer.current);
-    timer.current = setTimeout(() => {
-      const rect = button.current?.getBoundingClientRect();
-      if (!rect) return;
-      const left = Math.max(8, Math.min(rect.left, window.innerWidth - 268));
-      setBox({ left, bottom: window.innerHeight - rect.top + 10 });
-      setTip(true);
-    }, 250);
-  };
-  const hide = () => {
-    clearTimeout(timer.current);
-    setTip(false);
-  };
-  return (0, import_react8.createElement)(
-    "span",
-    { className: "bt-connect-wrap" },
-    (0, import_react8.createElement)(
-      "button",
-      {
-        ref: button,
-        type: "button",
-        className: "bt-connect bt-connect-foot",
-        "aria-describedby": tip ? tipId : void 0,
-        onMouseEnter: show,
-        onMouseLeave: hide,
-        onFocus: show,
-        onBlur: hide,
-        onClick: () => actions.selectPanel("plugins")
-      },
-      (0, import_react8.createElement)(PlugIcon),
-      t("Connect plugins"),
-      (0, import_react8.createElement)("span", { className: "bt-connect-warn", "aria-hidden": true }, "!")
-    ),
-    tip && box ? (0, import_react_dom3.createPortal)((0, import_react8.createElement)(
-      "span",
-      { role: "tooltip", id: tipId, className: "bt-connect-tip", style: box },
-      t("Plugin compatibility is not fully verified.")
-    ), document.body) : null
-  );
-}
 function YouAvatar() {
   return (0, import_react8.createElement)(
     "span",
@@ -5362,18 +5298,12 @@ function pressSettingsShortcut() {
     metaKey: held.has("meta")
   }));
 }
-function AccountLauncher({ seat = true, settingsOpen, openSettings, openOnboarding, actions }) {
-  const [open, setOpen] = (0, import_react8.useState)(false);
+function AccountLauncher({ seat = true, openSettings, openOnboarding, actions }) {
   (0, import_react8.useLayoutEffect)(() => {
     if (!seat) return void 0;
     actions.seatAccount(true);
     return () => actions.seatAccount(false);
   }, [seat]);
-  const [box, setBox] = (0, import_react8.useState)(null);
-  const button = (0, import_react8.useRef)(null);
-  (0, import_react8.useEffect)(() => {
-    if (settingsOpen) setOpen(false);
-  }, [settingsOpen]);
   (0, import_react8.useEffect)(() => {
     if (!openSettings) return void 0;
     openShellSettings = openSettings;
@@ -5388,68 +5318,10 @@ function AccountLauncher({ seat = true, settingsOpen, openSettings, openOnboardi
       if (openShellOnboarding === openOnboarding) openShellOnboarding = null;
     };
   }, [openOnboarding]);
-  (0, import_react8.useEffect)(() => {
-    if (!open) return void 0;
-    const onDown = (event) => {
-      if (event.target instanceof Element && (event.target.closest(".bt-account-menu") || button.current?.contains(event.target))) return;
-      setOpen(false);
-    };
-    const onKey = (event) => {
-      if (event.key === "Escape") {
-        event.stopPropagation();
-        setOpen(false);
-        button.current?.focus();
-      }
-    };
-    window.addEventListener("mousedown", onDown);
-    window.addEventListener("keydown", onKey, true);
-    return () => {
-      window.removeEventListener("mousedown", onDown);
-      window.removeEventListener("keydown", onKey, true);
-    };
-  }, [open]);
-  const toggle = () => {
-    const rect = button.current?.getBoundingClientRect();
-    if (rect) setBox({ left: rect.left, bottom: window.innerHeight - rect.top + 5 });
-    setOpen((value) => !value);
-  };
-  const groups = [
-    [
-      [t("Usage"), GaugeIcon, () => actions.openSettings("usage")],
-      [t("Connectors"), ConnectorIcon, () => actions.openConnectors()],
-      [t("Automation tasks"), ClockIcon, () => actions.selectPanel("schedules")],
-      [t("Bot settings"), GearIcon, () => actions.openSettings("general")]
-    ],
-    [
-      [t("Switch to classic Agent mode"), SwitchIcon, () => actions.setSurface("agent")]
-    ]
-  ];
   return (0, import_react8.createElement)(
-    import_react8.Fragment,
-    null,
-    (0, import_react8.createElement)(
-      "button",
-      { ref: button, type: "button", className: "bt-account", "aria-label": t("Account"), "aria-haspopup": "menu", "aria-expanded": open, onClick: toggle },
-      (0, import_react8.createElement)("span", { className: "bt-you", "aria-hidden": true }, (0, import_react8.createElement)(BotMark, { look: MAIN_LOOK, size: 24 }))
-    ),
-    open && box ? (0, import_react_dom3.createPortal)((0, import_react8.createElement)(
-      "div",
-      { className: "bt-menu bt-menu-up bt-account-menu", role: "menu", "aria-label": t("Account"), style: box },
-      groups.map((group, index) => (0, import_react8.createElement)(
-        import_react8.Fragment,
-        { key: index },
-        index > 0 ? (0, import_react8.createElement)("div", { className: "bt-menu-sep", role: "separator" }) : null,
-        group.map(([label, Icon, run, hint]) => (0, import_react8.createElement)("button", {
-          key: label,
-          type: "button",
-          role: "menuitem",
-          onClick: () => {
-            setOpen(false);
-            void Promise.resolve(run()).catch((error) => actions.reportError(error, "menu"));
-          }
-        }, (0, import_react8.createElement)(Icon), (0, import_react8.createElement)("span", { className: "bt-menu-label" }, label), hint ? (0, import_react8.createElement)("span", { className: "bt-menu-hint" }, hint) : null))
-      ))
-    ), document.body) : null
+    "button",
+    { type: "button", className: "bt-account", "aria-label": t("Bot settings"), title: t("Bot settings"), onClick: () => actions.openSettings("general") },
+    (0, import_react8.createElement)("span", { className: "bt-you", "aria-hidden": true }, (0, import_react8.createElement)(BotMark, { look: MAIN_LOOK, size: 24 }))
   );
 }
 function useLandOnMainBot(roster, useSessions, actions) {
@@ -5518,7 +5390,6 @@ var SIDEBAR_CSS = `
 [class*="_footArea"]:has(.bt-foot-account){display:flex!important;flex-direction:row!important;align-items:center;gap:6px}
 [class*="_footArea"]:has(.bt-foot-account)>[class*="_footerActions"],[class*="_footArea"]:has(.bt-foot-account)>[class*="_footerActions"]>div{display:contents!important}
 .bt-foot-account{order:-1;flex:none;display:inline-flex}
-[class*="_footArea"]:has(.bt-foot-account) .bt-connect-foot{order:0;flex:1 1 auto;min-width:0;width:auto}
 [class*="_footArea"]:has(.bt-foot-account)>[class*="_settingsArea"]{order:1;flex:none}
 [class*="_footArea"]:has(.bt-foot-account)>[class*="_settingsArea"] button[class*="_trigger"] [class*="_label"]{display:none!important}
 
@@ -9269,8 +9140,7 @@ function BotTeam(props) {
     (0, import_react22.createElement)(
       "div",
       { className: "bt-team-footer" },
-      (0, import_react22.createElement)(AccountLauncher, { ...props, seat: false }),
-      (0, import_react22.createElement)(ConnectPlugins, { ...props, wide: true })
+      (0, import_react22.createElement)(AccountLauncher, { ...props, seat: false })
     ),
     (0, import_react22.createElement)(ColumnResizer, { side: "team", width, onChange })
   );
@@ -9330,7 +9200,6 @@ var WORKBENCH_CSS = `
 .bt-team-column .bt-row-role{min-width:0;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;line-height:16px;color:var(--bt-ink-2);background:var(--bt-tag-bg);border-radius:4px;padding:0 4px}
 .bt-team-column .bt-row{min-height:58px}
 .bt-team-footer{display:flex;align-items:center;gap:8px;padding:8px 12px 12px}
-.bt-team-footer>.bt-connect-wrap{flex:1;min-width:0}
 .bt-chat-column{display:flex;flex:1;flex-direction:column;position:relative;min-width:320px;min-height:0;background:var(--bt-main)}
 .bt-chat-column [class*="_composerSeat"]{margin-top:auto}
 .bt-chat-column [data-conversation-scroll]{padding-top:32px!important}
@@ -10715,6 +10584,10 @@ var HOUR = 0;
 var OWNER = 1;
 var MODEL = 2;
 var KIND = 3;
+function teamUsage(view) {
+  const owners = new Set(view.owners.flatMap((owner, index) => owner.kind === "bot" || owner.kind === "room" ? [index] : []));
+  return { ...view, rows: view.rows.filter((row) => owners.has(row[OWNER])) };
+}
 var HOUR_MS = 36e5;
 var DAY_MS = 864e5;
 var RANGES = [
@@ -11346,7 +11219,7 @@ function UsagePage({ roster, actions, focusId }) {
         const value = await actions.usage();
         await resized;
         if (stopped) return;
-        (0, import_react29.startTransition)(() => setView(value));
+        (0, import_react29.startTransition)(() => setView(teamUsage(value)));
         setError("");
         timer = setTimeout(load, value.scanning ? 3e3 : 2e4);
       } catch (failure) {
@@ -12135,7 +12008,7 @@ function LazyRabiComputersPage(props) {
   return (0, import_react33.createElement)(RabiComputersPage, props);
 }
 var capitalize2 = (word) => word[0].toUpperCase() + word.slice(1);
-var SETTINGS_PAGES = [["general", "General"], ["bots", "Bots"], ["groups", "Group chats"], ["computers", "Computers"], ["connectors", "Connectors"], ["capabilities", "Capabilities"], ["schedules", "Scheduled tasks"], ["usage", "Usage"], ["secrets", "Secrets"], ["feedback", "Feedback"], ["about", "About DS Bot"]];
+var SETTINGS_PAGES = [["general", "General"], ["bots", "Bots"], ["groups", "Group chats"], ["computers", "Computers"], ["connectors", "Bot connectors"], ["capabilities", "Capabilities"], ["schedules", "Bot tasks"], ["usage", "Bot usage"], ["secrets", "Secrets"], ["feedback", "Feedback"], ["about", "About DS Bot"]];
 var PAGE_ICONS = { ...SETTINGS_ICONS, computers: SlidersIcon, connectors: ConnectorIcon, capabilities: PlugIcon, schedules: ClockIcon, secrets: KeyIcon, feedback: FeedbackIcon, about: InfoIcon };
 function SetSection({ title, children }) {
   return (0, import_react33.createElement)("section", { className: "bt-set-section" }, (0, import_react33.createElement)("h3", null, title), (0, import_react33.createElement)("div", { className: "bt-set-card" }, children));
@@ -12196,15 +12069,6 @@ function GeneralPage({ roster, actions, run }) {
             (0, import_react33.createElement)("input", { type: "color", value: custom, "aria-label": t("Custom accent"), onChange: (event) => pickCustom(event.target.value) })
           )
         )
-      )
-    ),
-    (0, import_react33.createElement)(
-      SetSection,
-      { key: "mode", title: t("Mode") },
-      (0, import_react33.createElement)(
-        SetRow,
-        { label: t("Classic Agent mode") },
-        (0, import_react33.createElement)("button", { type: "button", className: "bt-soft bt-soft-sm", onClick: () => actions.setSurface("agent") }, t("Switch"))
       )
     )
   ];
@@ -12374,16 +12238,7 @@ function SettingsDialog({ page, id, roster, actions, useUpdate, leaving = false 
           className: "bt-settings-item",
           "aria-current": shown === key ? "page" : void 0,
           onClick: () => actions.openSettings(key)
-        }, (0, import_react33.createElement)(PAGE_ICONS[key]), t(text))),
-        (0, import_react33.createElement)("button", {
-          type: "button",
-          className: "bt-settings-item bt-settings-shell",
-          title: t("Models, providers, and the rest of DeepSeek Harness"),
-          onClick: () => {
-            close();
-            openHarnessSettings();
-          }
-        }, (0, import_react33.createElement)(SlidersIcon), t("Harness settings"))
+        }, (0, import_react33.createElement)(PAGE_ICONS[key]), t(text)))
       ),
       (0, import_react33.createElement)(
         "div",

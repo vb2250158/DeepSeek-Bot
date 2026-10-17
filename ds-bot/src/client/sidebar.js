@@ -1,9 +1,9 @@
-import { createElement as h, Fragment, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createElement as h, Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { FishLogo } from '@deepseek-ai/dsh-client-ui-primitives'
 import { isMainOf } from './sources.js'
 import { currentPart, previewOf, relativeShort } from './text.js'
-import { PlusIcon, SearchIcon, GaugeIcon, PlugIcon, ClockIcon, GearIcon, PinMarkIcon, ConnectorIcon, SwitchIcon, CloudDownloadIcon } from './icons.js'
+import { PlusIcon, SearchIcon, PinMarkIcon, CloudDownloadIcon } from './icons.js'
 import { MAIN_LOOK } from './characters.js'
 import { botState, BotMark, BotAvatar, RoomAvatar } from './mark.js'
 import { reducedMotion } from './activity-row.js'
@@ -377,38 +377,6 @@ function UpdateButton({ useUpdate, actions }) {
                 }, dshPhase === 'installing' ? t('Updating…') : dshPhase === 'failed' ? t('Try again') : t('Update')))) : null), document.body) : null)
 }
 
-// The footer entry to the shell's plugin panel, marked as not yet adapted: the red
-// badge and a hover tip explain that plugin support lands step by step.
-export function ConnectPlugins({ wide, actions }) {
-  const tipId = useId()
-  const [tip, setTip] = useState(false)
-  const timer = useRef(0)
-  const button = useRef(null)
-  const [box, setBox] = useState(null)
-  useEffect(() => () => clearTimeout(timer.current), [])
-  if (!wide) return null
-  const show = () => {
-    clearTimeout(timer.current)
-    timer.current = setTimeout(() => {
-      const rect = button.current?.getBoundingClientRect()
-      if (!rect) return
-      const left = Math.max(8, Math.min(rect.left, window.innerWidth - 268))
-      setBox({ left, bottom: window.innerHeight - rect.top + 10 })
-      setTip(true)
-    }, 250)
-  }
-  const hide = () => { clearTimeout(timer.current); setTip(false) }
-  return h('span', { className: 'bt-connect-wrap' },
-    h('button', {
-      ref: button, type: 'button', className: 'bt-connect bt-connect-foot', 'aria-describedby': tip ? tipId : undefined,
-      onMouseEnter: show, onMouseLeave: hide, onFocus: show, onBlur: hide,
-      onClick: () => actions.selectPanel('plugins'),
-    },
-    h(PlugIcon), t('Connect plugins'), h('span', { className: 'bt-connect-warn', 'aria-hidden': true }, '!')),
-    tip && box ? createPortal(h('span', { role: 'tooltip', id: tipId, className: 'bt-connect-tip', style: box },
-      t('Plugin compatibility is not fully verified.')), document.body) : null)
-}
-
 // Account seat of the Settings trigger: the visible label stays for assistive tech only.
 export function YouAvatar() {
   return h('span', { className: 'bt-you-wrap' },
@@ -471,22 +439,13 @@ function pressSettingsShortcut() {
   }))
 }
 
-// The footer avatar opens an account menu above itself, with Bot settings as one
-// entry. Shell panels hidden from the Bot sidebar (plugins, automation) live here too.
-// `seat` is the shell's settings.launcher seat: at priority -10 the whale wins it
-// over a shell account plugin's own launcher (the Desktop's "··· More"), which comes
-// back in Agent mode; FooterAccount stands in while no seat exists at all.
-export function AccountLauncher({ seat = true, settingsOpen, openSettings, openOnboarding, actions }) {
-  const [open, setOpen] = useState(false)
+// The team footer opens Bot settings directly; global controls stay in native navigation.
+export function AccountLauncher({ seat = true, openSettings, openOnboarding, actions }) {
   useLayoutEffect(() => {
     if (!seat) return undefined
     actions.seatAccount(true)
     return () => actions.seatAccount(false)
   }, [seat])
-  const [box, setBox] = useState(null)
-  const button = useRef(null)
-  useEffect(() => { if (settingsOpen) setOpen(false) }, [settingsOpen])
-  // The settings dialog links back to the shell's own settings (models, providers).
   useEffect(() => {
     if (!openSettings) return undefined
     openShellSettings = openSettings
@@ -497,43 +456,8 @@ export function AccountLauncher({ seat = true, settingsOpen, openSettings, openO
     openShellOnboarding = openOnboarding
     return () => { if (openShellOnboarding === openOnboarding) openShellOnboarding = null }
   }, [openOnboarding])
-  useEffect(() => {
-    if (!open) return undefined
-    const onDown = (event) => {
-      if (event.target instanceof Element && (event.target.closest('.bt-account-menu') || button.current?.contains(event.target))) return
-      setOpen(false)
-    }
-    const onKey = (event) => { if (event.key === 'Escape') { event.stopPropagation(); setOpen(false); button.current?.focus() } }
-    window.addEventListener('mousedown', onDown)
-    window.addEventListener('keydown', onKey, true)
-    return () => { window.removeEventListener('mousedown', onDown); window.removeEventListener('keydown', onKey, true) }
-  }, [open])
-  const toggle = () => {
-    const rect = button.current?.getBoundingClientRect()
-    if (rect) setBox({ left: rect.left, bottom: window.innerHeight - rect.top + 5 })
-    setOpen(value => !value)
-  }
-  const groups = [
-    [
-      [t('Usage'), GaugeIcon, () => actions.openSettings('usage')],
-      [t('Connectors'), ConnectorIcon, () => actions.openConnectors()],
-      [t('Automation tasks'), ClockIcon, () => actions.selectPanel('schedules')],
-      [t('Bot settings'), GearIcon, () => actions.openSettings('general')],
-    ],
-    [
-      [t('Switch to classic Agent mode'), SwitchIcon, () => actions.setSurface('agent')],
-    ],
-  ]
-  return h(Fragment, null,
-    h('button', { ref: button, type: 'button', className: 'bt-account', 'aria-label': t('Account'), 'aria-haspopup': 'menu', 'aria-expanded': open, onClick: toggle },
-      h('span', { className: 'bt-you', 'aria-hidden': true }, h(BotMark, { look: MAIN_LOOK, size: 24 }))),
-    open && box ? createPortal(h('div', { className: 'bt-menu bt-menu-up bt-account-menu', role: 'menu', 'aria-label': t('Account'), style: box },
-      groups.map((group, index) => h(Fragment, { key: index },
-        index > 0 ? h('div', { className: 'bt-menu-sep', role: 'separator' }) : null,
-        group.map(([label, Icon, run, hint]) => h('button', {
-          key: label, type: 'button', role: 'menuitem',
-          onClick: () => { setOpen(false); void Promise.resolve(run()).catch(error => actions.reportError(error, 'menu')) },
-        }, h(Icon), h('span', { className: 'bt-menu-label' }, label), hint ? h('span', { className: 'bt-menu-hint' }, hint) : null))))), document.body) : null)
+  return h('button', { type: 'button', className: 'bt-account', 'aria-label': t('Bot settings'), title: t('Bot settings'), onClick: () => actions.openSettings('general') },
+    h('span', { className: 'bt-you', 'aria-hidden': true }, h(BotMark, { look: MAIN_LOOK, size: 24 })))
 }
 
 // Opens the Main Bot whenever the main view holds no Bot conversation, the way
@@ -615,7 +539,6 @@ export const SIDEBAR_CSS = `
 [class*="_footArea"]:has(.bt-foot-account){display:flex!important;flex-direction:row!important;align-items:center;gap:6px}
 [class*="_footArea"]:has(.bt-foot-account)>[class*="_footerActions"],[class*="_footArea"]:has(.bt-foot-account)>[class*="_footerActions"]>div{display:contents!important}
 .bt-foot-account{order:-1;flex:none;display:inline-flex}
-[class*="_footArea"]:has(.bt-foot-account) .bt-connect-foot{order:0;flex:1 1 auto;min-width:0;width:auto}
 [class*="_footArea"]:has(.bt-foot-account)>[class*="_settingsArea"]{order:1;flex:none}
 [class*="_footArea"]:has(.bt-foot-account)>[class*="_settingsArea"] button[class*="_trigger"] [class*="_label"]{display:none!important}
 

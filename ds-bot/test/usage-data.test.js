@@ -1,10 +1,22 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { RANGES, bucketsOf, compact, percent, spanOf, spanRange, summarize } from '../src/client/usage-data.js'
+import { RANGES, bucketsOf, compact, percent, spanOf, spanRange, summarize, teamUsage } from '../src/client/usage-data.js'
 
 const range = id => RANGES.find(item => item.id === id)
 // [hour, owner, model, kind, input, cacheRead, cacheWrite, output, calls]
 const row = (hour, owner, tokens, model = 0) => [hour, owner, model, 0, tokens, 0, 0, 0, 1]
+
+test('team usage excludes ordinary sessions from every total while retaining owner indices', () => {
+  const view = { now: '2026-10-09 22', owners: [{ kind: 'other' }, { kind: 'bot' }, { kind: 'agent' }, { kind: 'room' }],
+    models: [{ key: 'shared' }], rows: [row('2026-10-09 10', 0, 1000), row('2026-10-09 11', 1, 20), row('2026-10-09 12', 2, 200), row('2026-10-09 13', 3, 30)] }
+  const team = teamUsage(view)
+  assert.deepEqual(team.rows.map(item => item[1]), [1, 3])
+  assert.equal(summarize(team, range('7d')).total.total, 50)
+  assert.equal(team.owners, view.owners)
+  assert.equal(team.models, view.models)
+  assert.equal(view.rows.length, 4)
+  assert.equal(teamUsage({ ...view, rows: [view.rows[0], view.rows[2]] }).rows.length, 0)
+})
 
 test('buckets end at the current hour, day, week, or month, after as many before them', () => {
   const hours = bucketsOf(range('24h'), '2026-10-09 22')

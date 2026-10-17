@@ -2,6 +2,13 @@
 
 All notable changes to DS Bot are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the versions follow [Semantic Versioning](https://semver.org/). Before 1.0, a minor version can contain breaking changes.
 
+## [0.1.6-rabi.14] - 2026-10-17
+
+### Removed
+
+- Remove the duplicate Connect plugins footer button and its static compatibility warning. The native Plugins entry remains available.
+- Replace the footer shortcut menu with direct Bot settings. Remove duplicate usage/connector shortcuts, global automation navigation, classic-mode switches and the extra Harness settings link. Bot usage, connectors and tasks remain in Bot settings; usage charts include only Bots and group chats.
+
 ## [0.1.6-rabi.13] - 2026-10-17
 
 ### Fixed

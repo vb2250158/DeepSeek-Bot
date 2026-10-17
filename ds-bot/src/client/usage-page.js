@@ -5,11 +5,11 @@ import { BotAvatar, BotMark, RoomAvatar } from './mark.js'
 import { CalendarIcon, ChatsIcon, ChevronLeftIcon, ChevronRightIcon } from './icons.js'
 import { reducedMotion, useGlide } from './motion.js'
 import { dateLocale, t } from './i18n.js'
-import { DAY_MS, HOUR, HOUR_MS, MODEL, OWNER, RANGES, compact, dayKey, hourMs, mondayOf, percent, spanRange, summarize, tokensOf } from './usage-data.js'
+import { DAY_MS, HOUR, HOUR_MS, MODEL, OWNER, RANGES, compact, dayKey, hourMs, mondayOf, percent, spanRange, summarize, teamUsage, tokensOf } from './usage-data.js'
 
 // Usage page: the host's ledger as hourly rows, summed here by hour, day, week, or
 // month, over a preset range or days picked on a calendar. The overview stacks the
-// chart by Bot or by model and ranks both; a Bot, a group chat, the other sessions, or
+// chart by Bot or by model and ranks both; a Bot, a group chat, or
 // a model opens on its own (the settings route's id is `owner:<key>` or
 // `model:<key>`), with its tokens split by kind.
 
@@ -417,7 +417,7 @@ export function UsagePage({ roster, actions, focusId }) {
         const value = await actions.usage()
         await resized
         if (stopped) return
-        startTransition(() => setView(value))
+        startTransition(() => setView(teamUsage(value)))
         setError('')
         // While older chats are still being read, totals catch up quickly.
         timer = setTimeout(load, value.scanning ? 3000 : 20000)

@@ -76,8 +76,6 @@ const ZH = {
   // Sidebar and account menu
   'Bot list': 'Bot 列表',
   'Setting up your Main Bot…': '正在设置你的主 Bot…',
-  'Connect plugins': '连接插件',
-  'Plugin compatibility is not fully verified.': '插件兼容性未完全验证',
   'Automation tasks': '自动化任务',
   Connectors: '连接器',
   'Search connectors': '搜索连接器',
@@ -127,9 +125,7 @@ const ZH = {
   'GitHub addresses must start with https://': 'GitHub 地址必须以 https:// 开头',
   'This DSH cannot load connectors': '这个 DSH 不能加载连接器',
   'No such connector': '没有这个连接器',
-  'Classic Agent mode': '经典 Agent 模式',
   'Switch': '切换',
-  'Switch to classic Agent mode': '切换经典 Agent 模式',
   '{model} is not available anymore. Pick another model for me.': '{model} 已经不可用了。给我换一个模型吧。',
   "Hi, I'm {name}. I don't have a model yet. How do you want to set one up?": '你好，我是 {name}。我还没有可用的模型。你想怎么配置？',
   "Hi, I'm {name}. Pick a model for me first. You can change it later in my details.": '你好，我是 {name}。先给我选一个模型吧，以后可以在我的详情里换。',
@@ -310,6 +306,9 @@ const ZH = {
 
   // Themes
   'Follow DSH': '跟随 DSH',
+  'Bot usage': 'Bot 用量',
+  'Bot connectors': 'Bot 连接器',
+  'Bot tasks': 'Bot 定时任务',
   'Resize conversation list': '调整会话列表宽度',
   'Resize conversation details': '调整对话详情宽度',
   DeepSeek: 'DeepSeek', Mono: '黑白', Paper: '纸张', Moonlight: '月光',
@@ -340,7 +339,6 @@ const ZH = {
   'DS Bot settings': 'DS Bot 设置',
   'Settings pages': '设置页面',
   'Models, providers, and the rest of DeepSeek Harness': '模型、服务商和 DeepSeek Harness 的其他设置',
-  'Harness settings': 'Harness 设置',
   'Back to Bots': '返回 Bot 列表',
   'Close settings': '关闭设置',
 

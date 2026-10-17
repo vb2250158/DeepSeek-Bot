@@ -1,5 +1,5 @@
 import { createElement as h, Fragment, useEffect } from 'react'
-import { TeamSidebar, AccountLauncher, ConnectPlugins } from './sidebar.js'
+import { TeamSidebar, AccountLauncher } from './sidebar.js'
 import { DetailsDrawer } from './details-drawer.js'
 import { FishLogo } from '@deepseek-ai/dsh-client-ui-primitives'
 import { t } from './i18n.js'
@@ -21,7 +21,7 @@ export function BotTeam(props) {
   return h('aside', { className: 'bt-team-column', 'aria-label': t('DS Bot'), style: { '--bt-team-width': `${width}px` } },
     h(TeamSidebar, { ...props, wide: true, compactMain: true, groupTiles: true }),
     h('div', { className: 'bt-team-footer' },
-      h(AccountLauncher, { ...props, seat: false }), h(ConnectPlugins, { ...props, wide: true })),
+      h(AccountLauncher, { ...props, seat: false })),
     h(ColumnResizer, { side: 'team', width, onChange }))
 }
 
@@ -64,7 +64,6 @@ export const WORKBENCH_CSS = `
 .bt-team-column .bt-row-role{min-width:0;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;line-height:16px;color:var(--bt-ink-2);background:var(--bt-tag-bg);border-radius:4px;padding:0 4px}
 .bt-team-column .bt-row{min-height:58px}
 .bt-team-footer{display:flex;align-items:center;gap:8px;padding:8px 12px 12px}
-.bt-team-footer>.bt-connect-wrap{flex:1;min-width:0}
 .bt-chat-column{display:flex;flex:1;flex-direction:column;position:relative;min-width:320px;min-height:0;background:var(--bt-main)}
 .bt-chat-column [class*="_composerSeat"]{margin-top:auto}
 .bt-chat-column [data-conversation-scroll]{padding-top:32px!important}
