@@ -2,6 +2,12 @@
 
 All notable changes to DS Bot are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the versions follow [Semantic Versioning](https://semver.org/). Before 1.0, a minor version can contain breaking changes.
 
+## [0.1.6-rabi.18] - 2026-10-17
+
+### Changed
+
+- Correct the lower-left label to “Bot设置” and give the settings row a larger click target, a settings icon, and hover, pressed and keyboard focus states.
+
 ## [0.1.6-rabi.17] - 2026-10-17
 
 ### Changed

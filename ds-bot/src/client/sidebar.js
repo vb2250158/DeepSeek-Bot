@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { FishLogo } from '@deepseek-ai/dsh-client-ui-primitives'
 import { isMainOf } from './sources.js'
 import { currentPart, previewOf, relativeShort } from './text.js'
-import { PlusIcon, SearchIcon, PinMarkIcon, CloudDownloadIcon } from './icons.js'
+import { PlusIcon, SearchIcon, PinMarkIcon, CloudDownloadIcon, GearIcon } from './icons.js'
 import { MAIN_LOOK } from './characters.js'
 import { botState, BotMark, BotAvatar, RoomAvatar } from './mark.js'
 import { reducedMotion } from './activity-row.js'
@@ -456,9 +456,10 @@ export function AccountLauncher({ seat = true, openSettings, openOnboarding, act
     openShellOnboarding = openOnboarding
     return () => { if (openShellOnboarding === openOnboarding) openShellOnboarding = null }
   }, [openOnboarding])
-  return h('button', { type: 'button', className: 'bt-account', 'aria-label': t('Bold settings'), title: t('Bold settings'), onClick: () => actions.openSettings('general') },
+  return h('button', { type: 'button', className: 'bt-account', 'aria-label': t('Bot settings'), title: t('Bot settings'), onClick: () => actions.openSettings('general') },
     h('span', { className: 'bt-you', 'aria-hidden': true }, h(BotMark, { look: MAIN_LOOK, size: 24 })),
-    h('span', null, t('Bold settings')))
+    h('span', { className: 'bt-account-label' }, t('Bot settings')),
+    h('span', { className: 'bt-account-gear', 'aria-hidden': true }, h(GearIcon)))
 }
 
 // Opens the Main Bot whenever the main view holds no Bot conversation, the way

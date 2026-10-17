@@ -101,8 +101,7 @@ var ZH = {
   "Edit Bot": "编辑 Bot",
   "Make Main Bot": "设为主 Bot",
   "Remove Main Bot role": "取消主 Bot",
-  "Bot settings": "Bot 设置",
-  "Bold settings": "Bold设置",
+  "Bot settings": "Bot设置",
   "Create group chat": "新建群聊",
   "Delete group": "删除群聊",
   "Open {name}'s chat": "打开 {name} 的对话",
@@ -2519,8 +2518,14 @@ button:hover .bt-you{background:color-mix(in srgb,var(--bt-ink) 9%,var(--bt-side
 .bt-palette-empty-label{font-size:14px;font-weight:500;color:var(--bt-ink-2)}
 .bt-palette-empty-hint{font-size:13px;line-height:16px;color:var(--bt-ink-3)}
 @media (prefers-reduced-motion:reduce){.bt-palette{animation:bt-fade .1s ease-out}}
-.bt-account{flex:none;max-width:100%;height:36px;border:0;padding:0 8px 0 0;background:none;border-radius:8px;color:var(--bt-ink);font:inherit;cursor:pointer;display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
-.bt-account:hover .bt-you{background:color-mix(in srgb,var(--bt-ink) 9%,var(--bt-sidebar))}
+.bt-account{flex:none;max-width:100%;min-height:44px;border:1px solid transparent;padding:5px 8px;background:none;border-radius:12px;color:var(--bt-ink);font:inherit;font-size:14px;cursor:pointer;display:inline-flex;align-items:center;gap:10px;white-space:nowrap}
+.bt-account:hover{background:var(--bt-hover);border-color:var(--bt-line)}
+.bt-account:focus-visible{outline:2px solid var(--bt-accent);outline-offset:2px}
+.bt-account:active{background:color-mix(in srgb,var(--bt-ink) 9%,var(--bt-sidebar))}
+.bt-account .bt-you{flex:none;width:32px;height:32px}
+.bt-account-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;text-align:left}
+.bt-account-gear{flex:none;display:inline-flex;color:var(--bt-ink-3)}
+.bt-account-gear svg{width:16px;height:16px}
 /* Popover keyframes move translate and scale, which compose with a transform the popover
    already has. */
 @keyframes bt-pop-drop{from{translate:0 -4px;scale:.96}}
@@ -5383,9 +5388,10 @@ function AccountLauncher({ seat = true, openSettings, openOnboarding, actions })
   }, [openOnboarding]);
   return (0, import_react8.createElement)(
     "button",
-    { type: "button", className: "bt-account", "aria-label": t("Bold settings"), title: t("Bold settings"), onClick: () => actions.openSettings("general") },
+    { type: "button", className: "bt-account", "aria-label": t("Bot settings"), title: t("Bot settings"), onClick: () => actions.openSettings("general") },
     (0, import_react8.createElement)("span", { className: "bt-you", "aria-hidden": true }, (0, import_react8.createElement)(BotMark, { look: MAIN_LOOK, size: 24 })),
-    (0, import_react8.createElement)("span", null, t("Bold settings"))
+    (0, import_react8.createElement)("span", { className: "bt-account-label" }, t("Bot settings")),
+    (0, import_react8.createElement)("span", { className: "bt-account-gear", "aria-hidden": true }, (0, import_react8.createElement)(GearIcon))
   );
 }
 function useLandOnMainBot(roster, useSessions, actions) {
@@ -9348,6 +9354,7 @@ var WORKBENCH_CSS = `
 .bt-team-column .bt-row-role{min-width:0;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;line-height:16px;color:var(--bt-ink-2);background:var(--bt-tag-bg);border-radius:4px;padding:0 4px}
 .bt-team-column .bt-row{min-height:58px}
 .bt-team-footer{display:flex;align-items:center;gap:8px;padding:8px 12px 12px}
+.bt-team-footer .bt-account{width:100%}
 .bt-chat-column{display:flex;flex:1;flex-direction:column;position:relative;min-width:320px;min-height:0;background:var(--bt-main)}
 .bt-chat-column [class*="_composerSeat"]{margin-top:auto}
 .bt-chat-column [data-conversation-scroll]{padding-top:32px!important}

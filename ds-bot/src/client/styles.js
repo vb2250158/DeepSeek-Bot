@@ -599,8 +599,14 @@ button:hover .bt-you{background:color-mix(in srgb,var(--bt-ink) 9%,var(--bt-side
 .bt-palette-empty-label{font-size:14px;font-weight:500;color:var(--bt-ink-2)}
 .bt-palette-empty-hint{font-size:13px;line-height:16px;color:var(--bt-ink-3)}
 @media (prefers-reduced-motion:reduce){.bt-palette{animation:bt-fade .1s ease-out}}
-.bt-account{flex:none;max-width:100%;height:36px;border:0;padding:0 8px 0 0;background:none;border-radius:8px;color:var(--bt-ink);font:inherit;cursor:pointer;display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
-.bt-account:hover .bt-you{background:color-mix(in srgb,var(--bt-ink) 9%,var(--bt-sidebar))}
+.bt-account{flex:none;max-width:100%;min-height:44px;border:1px solid transparent;padding:5px 8px;background:none;border-radius:12px;color:var(--bt-ink);font:inherit;font-size:14px;cursor:pointer;display:inline-flex;align-items:center;gap:10px;white-space:nowrap}
+.bt-account:hover{background:var(--bt-hover);border-color:var(--bt-line)}
+.bt-account:focus-visible{outline:2px solid var(--bt-accent);outline-offset:2px}
+.bt-account:active{background:color-mix(in srgb,var(--bt-ink) 9%,var(--bt-sidebar))}
+.bt-account .bt-you{flex:none;width:32px;height:32px}
+.bt-account-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;text-align:left}
+.bt-account-gear{flex:none;display:inline-flex;color:var(--bt-ink-3)}
+.bt-account-gear svg{width:16px;height:16px}
 /* Popover keyframes move translate and scale, which compose with a transform the popover
    already has. */
 @keyframes bt-pop-drop{from{translate:0 -4px;scale:.96}}

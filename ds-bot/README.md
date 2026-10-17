@@ -1,6 +1,6 @@
 # ds-bot
 
-The lower-left **Bold settings** button opens the Bot settings.
+The lower-left **Bot settings** button opens the Bot settings.
 
 The DS Bot plugin for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (dsh). It turns dsh into a team of long-lived Bots that talk to you, to each other and in group chats. See the [project page](../README.md) for an overview, install steps and screenshots.
 

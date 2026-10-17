@@ -7,7 +7,7 @@
 
 # DeepSeek Bot
 
-左下角的 **Bold设置** 按钮打开 Bot 设置。
+左下角的 **Bot设置** 按钮打开 Bot 设置。
 
 这是 [vb2250158 维护的 fork](https://github.com/vb2250158/DeepSeek-Bot)，上游为 [Fei2411/DeepSeek-Bot](https://github.com/Fei2411/DeepSeek-Bot)。独立执行主机及电脑、手机浏览器客户端见[主机部署](host/README.zh.md)。
 
