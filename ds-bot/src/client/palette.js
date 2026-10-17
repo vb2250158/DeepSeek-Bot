@@ -1,6 +1,5 @@
 import { createElement as h, Fragment, useEffect, useState } from 'react'
 import { FishLogo } from '@deepseek-ai/dsh-client-ui-primitives'
-import { isMainOf } from './sources.js'
 import { currentPart, stripHeader } from './text.js'
 import { PlusIcon, SearchIcon, PeopleIcon, CloseIcon, GearIcon } from './icons.js'
 import { BotAvatar, RoomAvatar } from './mark.js'
@@ -51,7 +50,7 @@ export function CommandPalette({ start, token, roster, actions, useSessions }) {
   const people = [
     ...roster.bots.filter(bot => matchesName(bot.name, bot.role)).map(bot => ({
       key: bot.id, avatar: h(BotAvatar, { bot, size: 24, badge: false, live: false }), title: bot.name,
-      subtitle: [bot.role, isMainOf(roster, bot.id) ? t('Main Bot') : ''].filter(Boolean).join(' · '), badge: bot.hidden ? t('Hidden') : undefined,
+      subtitle: bot.role, badge: bot.hidden ? t('Hidden') : undefined,
       run: async () => { if (bot.hidden) await actions.setFlags(bot.id, { hidden: false }); actions.openSession(bot.id) },
     })),
     ...roster.rooms.filter(room => matchesName(room.name)).map(room => ({

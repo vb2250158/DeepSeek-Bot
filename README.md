@@ -31,6 +31,8 @@ Manage plugins through the native **Plugins** entry. The team footer opens **Bot
 
 Drag either column divider to resize the conversation list or details. Widths stay on this browser; double-click resets a column, and the focused divider accepts arrow keys. Narrow panels hide details and then compact the list to keep the chat usable.
 
+Every Bot can create and change Bots and manage every group chat. Right-click a chat to pin or unpin it, or drag it to the pin region above the list. Pinned tiles are saved independently of permissions.
+
 ## Install
 
 For this fork's host and browser clients, follow [Host deployment](host/README.md). The instructions below install the original upstream plugin.
@@ -84,7 +86,7 @@ Any bot can hand work to another bot with @. That bot does the work on its own, 
 
 ### Capabilities
 
-Settings → **Capabilities** is a shared library of MCP servers, skills and packs. Add a capability to a Bot in its settings; it is available from that Bot's next message in its own chat and group chats. A local MCP command that a Bot adds needs your approval before it can run. While other Bots use a capability, only you or a Main Bot can change or delete it.
+Settings → **Capabilities** is a shared library of MCP servers, skills and packs. Add a capability to a Bot in its settings; it is available from that Bot's next message in its own chat and group chats. A local MCP command that a Bot adds needs your approval before it can run. Every Bot can manage shared capabilities; executable changes still require your approval.
 
 ### Usage
 

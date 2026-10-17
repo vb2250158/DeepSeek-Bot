@@ -39,6 +39,10 @@ module.exports = __toCommonJS(index_exports);
 // src/client/i18n.js
 var NAMESPACE = "ds-bot";
 var ZH = {
+  "Rabi could not finish reading this persona folder. Check its storage in Rabi, then refresh.": "Rabi 读取人格目录超时，请检查 Rabi 的存储连接后刷新",
+  "Pinned chats": "置顶聊天",
+  "Drop here to pin": "拖到这里置顶",
+  "Setting up your Bots…": "正在设置 Bot…",
   "Computers": "电脑",
   Retry: "重试",
   "Allow all Bots to use remote computers": "允许所有 Bot 使用远端电脑",
@@ -3016,13 +3020,6 @@ function StarIcon({ size = 8 }) {
 function AdminStar() {
   return (0, import_react2.createElement)("span", { className: "bt-admin-star", role: "img", "aria-label": t("Admin") }, (0, import_react2.createElement)(StarIcon, { size: 7 }));
 }
-function MainStar() {
-  return (0, import_react2.createElement)(
-    "svg",
-    { viewBox: "0 0 20 20", "aria-hidden": true },
-    (0, import_react2.createElement)("path", { d: "M10 2.4l2.29 5.04 5.51.63-4.09 3.74 1.11 5.42L10 14.5l-4.82 2.73 1.11-5.42L2.2 8.07l5.51-.63z" })
-  );
-}
 function useSettled(state) {
   const prev = (0, import_react2.useRef)(state);
   const [settled, setSettled] = (0, import_react2.useState)(false);
@@ -3040,18 +3037,17 @@ function useSettled(state) {
   }, [state]);
   return settled;
 }
-function BotAvatar({ bot, size, state = "idle", main, admin, badge = true, live = true, gaze = false, pokeable = false }) {
+function BotAvatar({ bot, size, state = "idle", admin, badge = true, live = true, gaze = false, pokeable = false }) {
   const settled = useSettled(state);
   if (bot === void 0) return (0, import_react2.createElement)(BotMark, { size });
-  const badgeKind = !badge ? null : state === "alert" ? "alert" : state !== "idle" ? "working" : admin ? "admin" : main ? "main" : null;
+  const badgeKind = !badge ? null : state === "alert" ? "alert" : state !== "idle" ? "working" : admin ? "admin" : null;
   return (0, import_react2.createElement)(
     "span",
     { className: "bt-mark", style: { width: size, height: size, "--bt-size": `${size}px` } },
     (0, import_react2.createElement)(BotMark, { bot, size, state: settled ? "done" : state, live, gaze, pokeable }),
     badgeKind === "working" ? (0, import_react2.createElement)("span", { className: "bt-badge bt-badge-working", "aria-label": t("Working"), role: "img" }) : null,
     badgeKind === "alert" ? (0, import_react2.createElement)("span", { className: "bt-badge bt-badge-alert", "aria-label": t("Waiting for your answer"), role: "img" }, "?") : null,
-    badgeKind === "admin" ? (0, import_react2.createElement)("span", { className: "bt-badge bt-badge-admin", "aria-label": t("Admin"), role: "img" }, (0, import_react2.createElement)(StarIcon)) : null,
-    badgeKind === "main" ? (0, import_react2.createElement)("span", { className: "bt-badge bt-badge-main", "aria-label": t("Main Bot"), role: "img" }, (0, import_react2.createElement)(MainStar)) : null
+    badgeKind === "admin" ? (0, import_react2.createElement)("span", { className: "bt-badge bt-badge-admin", "aria-label": t("Admin"), role: "img" }, (0, import_react2.createElement)(StarIcon)) : null
   );
 }
 function clusterSeats(count, frame) {
@@ -4845,7 +4841,36 @@ var useGroupWork = (useWork, pick2) => useWork ? useWork((work) => JSON.stringif
 var workKeys = (text) => JSON.parse(text);
 var doingOf = ({ tool, said, note, target, switching }) => ({ tool, said, note, target, switching });
 var workLine = (lead, doing, more) => (0, import_react8.createElement)(Shimmer, null, `${lead} · ${workPhrase(doing)}…${more > 0 ? ` +${more}` : ""}`);
-function BotRow({ bot, roster, actions, useSessions, useSessionStatus, useSessionRetainInfo, useActivity, useWork, wide, marked, compactMain = false }) {
+function PinnedChat({ entry: { kind, item }, roster, actions, useSessions, useSessionStatus, useWork, marked }) {
+  const ids = kind === "bot" ? [currentPart(item)] : kind === "agent" ? item.sessions : [item.id];
+  const active = useSessions((list) => ids.some((id) => (list.byId[id]?.retainedBy?.mainView ?? 0) > 0));
+  const running = useSessionStatus((map) => ids.some((id) => map.get(id)?.running === true));
+  const unread = useSessionStatus((map) => ids.some((id) => map.get(id)?.completionUnread === true || map.get(id)?.pendingInteraction !== void 0)) || marked && !active;
+  const approval = useApproval(useWork, (entry) => kind === "bot" ? entry.botId === item.id : entry.roomId === item.id);
+  useMarkedUnread(item.id, active, marked, actions);
+  const label = [item.name, t("Pinned"), running ? t("Working") : "", approval ? t("Waiting for your approval") : "", unread ? t("Unread activity") : ""].filter(Boolean).join(", ");
+  return (0, import_react8.createElement)(
+    "button",
+    {
+      type: "button",
+      className: "bt-group-tile",
+      draggable: false,
+      [kind === "bot" ? "data-bot-id" : kind === "room" ? "data-room-id" : "data-agent-id"]: item.id,
+      title: item.name,
+      "aria-label": label,
+      "aria-current": active ? "page" : void 0,
+      onClick: () => kind === "agent" ? actions.openAgent(item.id) : actions.openSession(item.id),
+      onContextMenu: (event) => {
+        event.preventDefault();
+        actions.openMenu({ kind, id: item.id, x: event.clientX, y: event.clientY });
+      }
+    },
+    kind === "bot" ? (0, import_react8.createElement)(BotAvatar, { bot: item, size: 48, state: botState(running, void 0, approval || roster.questions?.[ids[0]] !== void 0) }) : kind === "room" ? (0, import_react8.createElement)(RoomAvatar, { room: item, roster, size: 48 }) : (0, import_react8.createElement)(import_dsh_client_ui_primitives2.FishLogo),
+    unread && !active ? (0, import_react8.createElement)("span", { className: "bt-unread", "aria-hidden": true }) : null,
+    (0, import_react8.createElement)("span", null, item.name)
+  );
+}
+function BotRow({ bot, roster, actions, useSessions, useSessionStatus, useSessionRetainInfo, useActivity, useWork, wide, marked }) {
   const id = bot.id;
   const part = currentPart(bot);
   const preview = useSessions((list) => previewOf(list, part, roster.exchangeTurns[part]));
@@ -4853,8 +4878,6 @@ function BotRow({ bot, roster, actions, useSessions, useSessionStatus, useSessio
   const active = useSessionRetainInfo(part, (info) => (info?.retainedBy?.mainView ?? 0) > 0);
   const unread = useSessionStatus((map) => map.get(part)?.completionUnread === true || map.get(part)?.pendingInteraction !== void 0) || marked && !active;
   useMarkedUnread(id, active, marked, actions);
-  const main = isMainOf(roster, id);
-  const tile = roster.mainBotId === id && !compactMain;
   const approval = useApproval(useWork, (entry) => entry.botId === id);
   const alert = roster.questions?.[part] !== void 0 || approval;
   const doing = useActivity((map) => map[id]);
@@ -4862,36 +4885,19 @@ function BotRow({ bot, roster, actions, useSessions, useSessionStatus, useSessio
   const away = !running && groups.length > 0;
   const state = botState(running || away, doing, alert);
   const awayLine = away ? workLine(roster.roomsById[groups[0].id]?.name ?? t("a group chat"), groups[0], groups.length - 1) : null;
-  if (bot.hidden && !active && !main) return null;
+  if (bot.hidden && !active) return null;
   const onContextMenu = (event) => {
     event.preventDefault();
     actions.openMenu({ kind: "bot", id, x: event.clientX, y: event.clientY });
   };
-  const pinned = bot.pinned === true && !tile;
-  const label = [bot.name, main ? t("Main Bot") : "", pinned ? t("Pinned") : "", running || away ? t("Working") : "", approval ? t("Waiting for your approval") : alert ? t("Waiting for your answer") : "", unread ? t("Unread activity") : ""].filter(Boolean).join(", ");
-  if (tile && wide) {
-    return (0, import_react8.createElement)("div", { className: "bt-tile-wrap" }, (0, import_react8.createElement)(
-      "button",
-      {
-        type: "button",
-        className: "bt-tile",
-        "aria-label": label,
-        "aria-current": active ? "page" : void 0,
-        "data-bot-id": id,
-        title: preview || bot.name,
-        onClick: () => actions.openSession(id),
-        onContextMenu
-      },
-      (0, import_react8.createElement)(BotAvatar, { bot, size: 60, state, main: true }),
-      (0, import_react8.createElement)("span", { className: "bt-tile-name" }, bot.name),
-      bot.role ? (0, import_react8.createElement)("span", { className: "bt-chip" }, bot.role) : null
-    ));
-  }
+  const pinned = bot.pinned === true;
+  const label = [bot.name, pinned ? t("Pinned") : "", running || away ? t("Working") : "", approval ? t("Waiting for your approval") : alert ? t("Waiting for your answer") : "", unread ? t("Unread activity") : ""].filter(Boolean).join(", ");
   return (0, import_react8.createElement)(
     "button",
     {
       type: "button",
       className: "bt-row",
+      draggable: false,
       "aria-label": label,
       "aria-current": active ? "page" : void 0,
       "data-bot-id": id,
@@ -4899,12 +4905,12 @@ function BotRow({ bot, roster, actions, useSessions, useSessionStatus, useSessio
       onClick: () => actions.openSession(id),
       onContextMenu
     },
-    (0, import_react8.createElement)(BotAvatar, { bot, size: 36, state, main }),
+    (0, import_react8.createElement)(BotAvatar, { bot, size: 36, state }),
     pinned && !wide ? (0, import_react8.createElement)(PinMark) : null,
     wide ? (0, import_react8.createElement)(
       "span",
       { className: "bt-row-body" },
-      (0, import_react8.createElement)("span", { className: "bt-row-name" }, (0, import_react8.createElement)("span", { className: "bt-row-title" }, bot.name), compactMain && bot.role ? (0, import_react8.createElement)("span", { className: "bt-row-role" }, bot.role) : null, pinned ? (0, import_react8.createElement)(PinMark) : null),
+      (0, import_react8.createElement)("span", { className: "bt-row-name" }, (0, import_react8.createElement)("span", { className: "bt-row-title" }, bot.name), bot.role ? (0, import_react8.createElement)("span", { className: "bt-row-role" }, bot.role) : null, pinned ? (0, import_react8.createElement)(PinMark) : null),
       awayLine ? (0, import_react8.createElement)("span", { className: "bt-row-preview" }, awayLine) : preview ? (0, import_react8.createElement)("span", { className: "bt-row-preview" }, preview) : null
     ) : null,
     wide && unread && !active ? (0, import_react8.createElement)("span", { className: "bt-unread", "aria-hidden": true }) : null
@@ -4929,6 +4935,7 @@ function RoomRow({ room: room2, roster, actions, useSessions, useSessionStatus, 
     {
       type: "button",
       className: "bt-row",
+      draggable: false,
       "aria-label": label,
       "aria-current": active ? "page" : void 0,
       "data-room-id": id,
@@ -5046,6 +5053,7 @@ function AgentRow({ agent, actions, useSessions, useSessionStatus, useUi, wide, 
       {
         type: "button",
         className: "bt-row",
+        draggable: false,
         "aria-label": label,
         "aria-current": active ? "page" : void 0,
         "data-agent-id": agent.id,
@@ -5114,6 +5122,11 @@ function useListGlide(listRef, layout, key) {
 function TeamSidebar(props) {
   const { wide, useRoster, useUi, useSessions, actions } = props;
   const listRef = (0, import_react8.useRef)(null);
+  const pinRef = (0, import_react8.useRef)(null);
+  const dragged = (0, import_react8.useRef)(null);
+  const suppressClickUntil = (0, import_react8.useRef)(0);
+  const [dragging, setDragging] = (0, import_react8.useState)(false);
+  const [overPins, setOverPins] = (0, import_react8.useState)(false);
   const roster = useRoster((value) => value);
   const markedUnread = useUi((value) => value.unread);
   props.useRegistry((value) => value);
@@ -5125,17 +5138,54 @@ function TeamSidebar(props) {
   const order = (0, import_react8.useMemo)(() => {
     const stamps = JSON.parse(updated);
     const entries2 = [
-      ...roster.bots.filter((bot) => bot.id !== roster.mainBotId).map((bot) => ({ kind: "bot", item: bot, at: stamps[currentPart(bot)] ?? bot.createdAt })),
+      ...roster.bots.map((bot) => ({ kind: "bot", item: bot, at: stamps[currentPart(bot)] ?? bot.createdAt })),
       ...roster.rooms.map((room2) => ({ kind: "room", item: room2, at: stamps[room2.id] ?? room2.createdAt })),
       // The Agent sorts by its most recent Session, falling back to when it was added.
       ...(roster.agents ?? []).map((agent) => ({ kind: "agent", item: agent, at: Math.max(0, ...agent.sessions.map((id) => stamps[id] ?? 0)) || agent.createdAt }))
     ];
-    return entries2.sort((a, b) => Number(Boolean(b.item.pinned)) - Number(Boolean(a.item.pinned)) || b.at - a.at);
+    return entries2.sort((a, b) => Number(Boolean(b.item.pinned)) - Number(Boolean(a.item.pinned)) || (a.item.pinned ? (b.item.pinnedAt ?? 0) - (a.item.pinnedAt ?? 0) || a.item.createdAt - b.item.createdAt : b.at - a.at));
   }, [roster, updated]);
-  const main = roster.byId[roster.mainBotId];
+  const pins = order.filter((entry) => entry.item.pinned && !entry.item.hidden);
+  const inPins = (event) => {
+    const rect = pinRef.current?.getBoundingClientRect();
+    return Boolean(rect && event.clientX >= rect.left && event.clientX <= rect.right && event.clientY >= rect.top && event.clientY <= rect.bottom);
+  };
+  const dragEnd = () => {
+    dragged.current = null;
+    setDragging(false);
+    setOverPins(false);
+  };
+  const pointerDown = (event) => {
+    if (event.button !== 0 || roster.readOnly) return;
+    const row = event.target.closest("[data-bot-id],[data-room-id],[data-agent-id]");
+    const id = row?.dataset.botId ?? row?.dataset.roomId ?? row?.dataset.agentId;
+    if (!id) return;
+    dragged.current = { id, pointerId: event.pointerId, x: event.clientX, y: event.clientY, started: false };
+  };
+  const pointerMove = (event) => {
+    const drag = dragged.current;
+    if (!drag || event.pointerId !== drag.pointerId) return;
+    if (!drag.started && Math.hypot(event.clientX - drag.x, event.clientY - drag.y) < 8) return;
+    if (!drag.started) {
+      drag.started = true;
+      event.currentTarget.setPointerCapture(event.pointerId);
+      setDragging(true);
+    }
+    event.preventDefault();
+    setOverPins(inPins(event));
+  };
+  const pointerUp = (event) => {
+    const drag = dragged.current;
+    if (!drag || event.pointerId !== drag.pointerId) return;
+    const pin = drag.started && inPins(event);
+    if (drag.started) suppressClickUntil.current = Date.now() + 250;
+    dragEnd();
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    if (pin) void actions.setFlags(drag.id, { pinned: true }).catch((error) => actions.reportError(error, "pin"));
+  };
   useListGlide(listRef, wide, order.map((entry) => entry.item.id).join(","));
   useLandOnMainBot(roster, useSessions, actions);
-  const rowProps = { roster, actions, useSessions, useUi, useSessionStatus: props.useSessionStatus, useSessionRetainInfo: props.useSessionRetainInfo, useActivity: props.useActivity, useWork: props.useWork, wide, compactMain: props.compactMain };
+  const rowProps = { roster, actions, useSessions, useUi, useSessionStatus: props.useSessionStatus, useSessionRetainInfo: props.useSessionRetainInfo, useActivity: props.useActivity, useWork: props.useWork, wide };
   const typeToSearch = (event) => {
     if (event.defaultPrevented || event.key.length !== 1 || event.key === " " || event.metaKey || event.ctrlKey || event.altKey || event.nativeEvent.isComposing) return;
     if (event.target instanceof Element && event.target.closest("input,textarea,[contenteditable]")) return;
@@ -5144,7 +5194,28 @@ function TeamSidebar(props) {
   };
   return (0, import_react8.createElement)(
     "div",
-    { className: wide ? "bt-side" : "bt-side bt-rail", onKeyDown: typeToSearch },
+    {
+      className: wide ? "bt-side" : "bt-side bt-rail",
+      onKeyDown: (event) => {
+        if (event.key === "Escape" && dragged.current?.started) {
+          event.preventDefault();
+          dragEnd();
+        } else typeToSearch(event);
+      },
+      onPointerDown: pointerDown,
+      onPointerMove: pointerMove,
+      onPointerUp: pointerUp,
+      onPointerCancel: dragEnd,
+      onLostPointerCapture: dragEnd,
+      onDragStart: (event) => event.preventDefault(),
+      onClickCapture: (event) => {
+        if (Date.now() < suppressClickUntil.current) {
+          event.preventDefault();
+          event.stopPropagation();
+          suppressClickUntil.current = 0;
+        }
+      }
+    },
     wide ? (0, import_react8.createElement)(
       "div",
       { className: "bt-side-top" },
@@ -5158,27 +5229,25 @@ function TeamSidebar(props) {
       (0, import_react8.createElement)(UpdateButton, { useUpdate: props.useUpdate, actions }),
       (0, import_react8.createElement)("button", { type: "button", className: "bt-round", "aria-label": t("New…"), title: t("New…"), onClick: () => actions.openNewChat("new") }, (0, import_react8.createElement)(PlusIcon))
     ),
-    props.groupTiles && roster.rooms.some((room2) => !room2.hidden) ? (0, import_react8.createElement)(
+    (0, import_react8.createElement)(
       "div",
-      { className: "bt-group-grid", "aria-label": t("Group chats") },
-      roster.rooms.filter((room2) => !room2.hidden).map((room2) => (0, import_react8.createElement)("button", {
-        key: room2.id,
-        type: "button",
-        className: "bt-group-tile",
-        title: room2.name,
-        onClick: () => actions.openSession(room2.id),
-        onContextMenu: (event) => {
-          event.preventDefault();
-          actions.openMenu({ kind: "room", id: room2.id, x: event.clientX, y: event.clientY });
-        }
-      }, (0, import_react8.createElement)(RoomAvatar, { room: room2, roster, size: 48 }), (0, import_react8.createElement)("span", null, room2.name)))
-    ) : null,
+      {
+        ref: pinRef,
+        className: "bt-pinned-area",
+        "data-dragging": dragging || void 0,
+        "data-over": overPins || void 0,
+        role: "region",
+        "aria-label": t("Pinned chats")
+      },
+      pins.length ? (0, import_react8.createElement)("div", { className: "bt-group-grid bt-pinned-grid" }, pins.map((entry) => (0, import_react8.createElement)(PinnedChat, { key: entry.item.id, ...rowProps, entry, marked: markedUnread[entry.item.id] === true }))) : null,
+      (0, import_react8.createElement)("div", { className: "bt-pin-drop", role: dragging ? "status" : void 0 }, t("Drop here to pin"))
+    ),
     wide && roster.readOnly ? (0, import_react8.createElement)("div", { className: "bt-hint bt-read-only", role: "status" }, hostText(roster.readOnly)) : null,
     (0, import_react8.createElement)(
       "div",
       { ref: listRef, className: "bt-list", role: "region", "aria-label": t("Bot list") },
-      main ? (0, import_react8.createElement)(BotRow, { ...rowProps, bot: main, marked: markedUnread[main.id] === true }) : roster.ready ? null : (0, import_react8.createElement)("div", { className: "bt-hint" }, t("Setting up your Main Bot…")),
-      order.filter((entry) => !props.groupTiles || entry.kind !== "room").map((entry) => entry.kind === "bot" ? (0, import_react8.createElement)(BotRow, { key: entry.item.id, ...rowProps, bot: entry.item, marked: markedUnread[entry.item.id] === true }) : entry.kind === "room" ? (0, import_react8.createElement)(RoomRow, { key: entry.item.id, ...rowProps, room: entry.item, marked: markedUnread[entry.item.id] === true }) : (0, import_react8.createElement)(AgentRow, { key: entry.item.id, ...rowProps, agent: entry.item, marked: markedUnread[entry.item.id] === true }))
+      roster.ready ? null : (0, import_react8.createElement)("div", { className: "bt-hint" }, t("Setting up your Bots…")),
+      order.filter((entry) => !entry.item.pinned).map((entry) => entry.kind === "bot" ? (0, import_react8.createElement)(BotRow, { key: entry.item.id, ...rowProps, bot: entry.item, marked: markedUnread[entry.item.id] === true }) : entry.kind === "room" ? (0, import_react8.createElement)(RoomRow, { key: entry.item.id, ...rowProps, room: entry.item, marked: markedUnread[entry.item.id] === true }) : (0, import_react8.createElement)(AgentRow, { key: entry.item.id, ...rowProps, agent: entry.item, marked: markedUnread[entry.item.id] === true }))
     )
   );
 }
@@ -5438,6 +5507,19 @@ var SIDEBAR_CSS = `
 .bt-side-top .bt-brand:hover{background:none}
 .bt-brand .bt-mark{flex:none}
 .bt-pin{flex:none;display:inline-flex;color:var(--bt-ink-3)}
+.bt-pinned-area{flex:none;margin:0 8px;border-radius:12px}
+.bt-pinned-area[data-dragging]{min-height:64px;background:var(--bt-hover);outline:1px dashed var(--bt-line-2)}
+.bt-pinned-area[data-over]{outline:2px solid var(--bt-accent);background:var(--bt-hover)}
+.bt-pin-drop{display:none;padding:18px 8px;text-align:center;font-size:13px;color:var(--bt-ink-2)}
+.bt-pinned-area[data-dragging] .bt-pin-drop{display:block}
+.bt-pinned-grid{margin:0!important;max-height:36vh;overflow-y:auto}
+.bt-pinned-grid .bt-group-tile{position:relative}
+.bt-row>:is(.bt-mark,.bt-cluster),.bt-group-tile>:is(.bt-mark,.bt-cluster){touch-action:none}
+.bt-pinned-grid .bt-group-tile[aria-current=page]{background:var(--bt-hover)}
+.bt-pinned-grid .bt-unread{position:absolute;right:8px;top:8px}
+.bt-rail .bt-pinned-grid{grid-template-columns:1fr}
+.bt-rail .bt-pinned-grid .bt-group-tile{min-width:0;padding:6px 2px}
+.bt-rail .bt-pinned-grid .bt-group-tile>span:last-child{display:none}
 .bt-rail .bt-row{position:relative}
 .bt-rail .bt-pin{position:absolute;top:3px;left:calc(50% + 12px)}
 .bt-side .bt-read-only{margin:4px 8px 6px;padding:8px 10px;border-radius:10px;background:var(--bt-hover);font-size:12px;line-height:1.45;text-align:left}
@@ -7961,9 +8043,6 @@ function BotSettingsForm({ bot, roster, actions, run }) {
     const timer = setTimeout(() => setConfirming(false), 4e3);
     return () => clearTimeout(timer);
   }, [confirming]);
-  const isMainBot = isMainOf(roster, bot.id);
-  const onlyMain = isMainBot && (roster.mainBotIds ?? []).length === 1;
-  const isTile = roster.mainBotId === bot.id;
   const save = (patch) => run(actions.updateBot(bot.id, patch));
   const duplicate = () => run(actions.duplicateBot(bot.id).then((copy2) => actions.openSession(copy2.id)));
   const remove = () => {
@@ -7994,7 +8073,7 @@ function BotSettingsForm({ bot, roster, actions, run }) {
         "div",
         { className: "bt-bs-who" },
         (0, import_react17.createElement)("span", { className: "bt-bs-name" }, bot.name),
-        (0, import_react17.createElement)("span", { className: "bt-bs-sub" }, [bot.role, isMainBot ? t("Main Bot") : ""].filter(Boolean).join(" · ") || t("Bot"))
+        (0, import_react17.createElement)("span", { className: "bt-bs-sub" }, bot.role || t("Bot"))
       )
     ),
     (0, import_react17.createElement)(
@@ -8037,25 +8116,9 @@ function BotSettingsForm({ bot, roster, actions, run }) {
     (0, import_react17.createElement)(BotSchedules, { bot, roster, actions }),
     (0, import_react17.createElement)(
       Card,
-      { title: t("Main Bot") },
-      onlyMain ? (0, import_react17.createElement)(
-        "div",
-        { className: "bt-set-row bt-bs-row" },
-        (0, import_react17.createElement)(
-          "span",
-          { className: "bt-set-copy" },
-          (0, import_react17.createElement)("span", { className: "bt-bs-label" }, t("Main Bot")),
-          (0, import_react17.createElement)("span", { className: "bt-set-hint" }, t("The only Main Bot. To hand the role to another Bot, use Main Bot on the Bots page."))
-        ),
-        (0, import_react17.createElement)("button", { type: "button", className: "bt-soft bt-soft-sm", onClick: () => actions.openSettings("bots") }, t("Change"))
-      ) : (0, import_react17.createElement)(SwitchRow, { label: t("Main Bot"), hint: t("Can create and change Bots, and runs every group chat."), on: isMainBot, onChange: (on) => run(actions.setMain(bot.id, on)) })
-    ),
-    // The Main Bot tile is always first and always shown, like in the context menu.
-    isTile ? null : (0, import_react17.createElement)(
-      Card,
       { title: t("Sidebar") },
       (0, import_react17.createElement)(SwitchRow, { label: t("Pin"), hint: t("Kept above the other chats."), on: bot.pinned === true, onChange: (pinned) => run(actions.setFlags(bot.id, { pinned })) }),
-      isMainBot ? null : (0, import_react17.createElement)(SwitchRow, { label: t("Hide from sidebar"), hint: t("Search still finds it."), on: bot.hidden === true, onChange: (hidden) => run(actions.setFlags(bot.id, { hidden })) })
+      (0, import_react17.createElement)(SwitchRow, { label: t("Hide from sidebar"), hint: t("Search still finds it."), on: bot.hidden === true, onChange: (hidden) => run(actions.setFlags(bot.id, { hidden })) })
     ),
     (0, import_react17.createElement)(
       Card,
@@ -8066,7 +8129,7 @@ function BotSettingsForm({ bot, roster, actions, run }) {
         (0, import_react17.createElement)("span", { className: "bt-set-copy" }, (0, import_react17.createElement)("span", { className: "bt-bs-label" }, t("Duplicate")), (0, import_react17.createElement)("span", { className: "bt-set-hint" }, t("A copy with the same job and model, and fresh memory."))),
         (0, import_react17.createElement)("span", { className: "bt-chevron" }, (0, import_react17.createElement)(ChevronRightIcon))
       ),
-      isMainBot ? null : (0, import_react17.createElement)(
+      (0, import_react17.createElement)(
         "button",
         { type: "button", className: "bt-set-row bt-bs-row bt-bs-danger", "data-confirm": confirming || void 0, onClick: remove },
         (0, import_react17.createElement)(
@@ -9006,7 +9069,7 @@ function BotTeam(props) {
   return (0, import_react22.createElement)(
     "aside",
     { className: "bt-team-column", "aria-label": t("DS Bot"), style: { "--bt-team-width": `${width}px` } },
-    (0, import_react22.createElement)(TeamSidebar, { ...props, wide: true, compactMain: true, groupTiles: true }),
+    (0, import_react22.createElement)(TeamSidebar, { ...props, wide: true }),
     (0, import_react22.createElement)(
       "div",
       { className: "bt-team-footer" },
@@ -9536,7 +9599,7 @@ function CommandPalette({ start, token, roster, actions, useSessions }) {
       key: bot.id,
       avatar: (0, import_react24.createElement)(BotAvatar, { bot, size: 24, badge: false, live: false }),
       title: bot.name,
-      subtitle: [bot.role, isMainOf(roster, bot.id) ? t("Main Bot") : ""].filter(Boolean).join(" · "),
+      subtitle: bot.role,
       badge: bot.hidden ? t("Hidden") : void 0,
       run: async () => {
         if (bot.hidden) await actions.setFlags(bot.id, { hidden: false });
@@ -12152,46 +12215,6 @@ function GeneralPage({ roster, actions, run }) {
     )
   ];
 }
-function MainBotsSection({ roster, actions, run }) {
-  const mains = (roster.mainBotIds ?? []).map((id) => roster.byId[id]).filter(Boolean);
-  const [first, ...others] = mains;
-  const candidates = roster.bots.filter((bot) => !isMainOf(roster, bot.id));
-  return (0, import_react35.createElement)(
-    SetSection,
-    { title: t("Main Bot") },
-    (0, import_react35.createElement)(
-      SetRow,
-      {
-        label: t("Main Bot"),
-        hint: first ? t("First in the sidebar. Pick another Bot to hand it the role; {name} then stops being a Main Bot.", { name: first.name }) : void 0
-      },
-      (0, import_react35.createElement)("select", {
-        className: "bt-select",
-        "aria-label": t("Main Bot"),
-        value: first?.id ?? "",
-        onChange: (event) => run(actions.setMain(event.target.value, true, first ? { replace: first.id } : {}))
-      }, first ? null : (0, import_react35.createElement)("option", { value: "" }, t("Choose a Bot…")), roster.bots.map((bot) => (0, import_react35.createElement)("option", { key: bot.id, value: bot.id }, bot.name)))
-    ),
-    others.map((bot) => (0, import_react35.createElement)(
-      SetRow,
-      { key: bot.id, label: bot.name, hint: t("Also a Main Bot.") },
-      (0, import_react35.createElement)("button", { type: "button", className: "bt-soft bt-soft-sm", onClick: () => run(actions.setMain(bot.id, true, { primary: true })) }, t("Move to first")),
-      (0, import_react35.createElement)("button", { type: "button", className: "bt-soft bt-soft-sm", onClick: () => run(actions.setMain(bot.id, false)) }, t("Remove Main Bot role"))
-    )),
-    candidates.length > 0 ? (0, import_react35.createElement)(
-      SetRow,
-      { label: t("Add a Main Bot"), hint: t("Main Bots can create and change Bots, and run every group chat.") },
-      (0, import_react35.createElement)("select", {
-        className: "bt-select",
-        "aria-label": t("Add a Main Bot"),
-        value: "",
-        onChange: (event) => {
-          if (event.target.value) void run(actions.setMain(event.target.value, true));
-        }
-      }, (0, import_react35.createElement)("option", { value: "" }, t("Choose a Bot…")), candidates.map((bot) => (0, import_react35.createElement)("option", { key: bot.id, value: bot.id }, bot.name)))
-    ) : null
-  );
-}
 var MOTIONS = [["quiet", "Quiet"], ["normal", "Normal"], ["lively", "Lively"]];
 function MotionSection({ roster, actions, run }) {
   const motion = roster.prefs?.motion === "quiet" || roster.prefs?.motion === "lively" ? roster.prefs.motion : "normal";
@@ -12215,7 +12238,6 @@ function MotionSection({ roster, actions, run }) {
 function BotsPage({ roster, actions, run }) {
   const [creating, setCreating] = (0, import_react35.useState)(false);
   return [
-    (0, import_react35.createElement)(MainBotsSection, { key: "main", roster, actions, run }),
     (0, import_react35.createElement)(MotionSection, { key: "motion", roster, actions, run }),
     creating ? (0, import_react35.createElement)(CreateBot, { key: "create", roster, actions, inline: true, onBack: () => setCreating(false), onCreated: (bot) => actions.openSettings("bots", bot.id) }) : (0, import_react35.createElement)(
       "div",
@@ -12234,8 +12256,7 @@ function BotsPage({ roster, actions, run }) {
           (0, import_react35.createElement)(BotAvatar, { bot, size: 28, badge: false, live: false }),
           (0, import_react35.createElement)("span", { className: "bt-row-title" }, bot.name),
           bot.role ? (0, import_react35.createElement)("span", { className: "bt-tag" }, bot.role) : null,
-          isMainOf(roster, bot.id) ? (0, import_react35.createElement)("span", { className: "bt-tag" }, t("Main Bot")) : null,
-          bot.hidden && !isMainOf(roster, bot.id) ? (0, import_react35.createElement)("span", { className: "bt-tag" }, t("Hidden")) : null
+          bot.hidden ? (0, import_react35.createElement)("span", { className: "bt-tag" }, t("Hidden")) : null
         ),
         (0, import_react35.createElement)("span", { className: "bt-chevron" }, (0, import_react35.createElement)(ChevronRightIcon))
       ))
@@ -12381,12 +12402,9 @@ function ContextMenu({ menu, roster, actions, leaving = false }) {
   const room2 = roster.roomsById[menu.id];
   const entry = bot ?? room2;
   if (entry === void 0) return null;
-  const isMainBot = isMainOf(roster, menu.id);
-  const isTile = roster.mainBotId === menu.id;
-  const mainCount = (roster.mainBotIds ?? []).length;
   const groups = [
     [
-      isTile ? null : [entry.pinned ? t("Unpin") : t("Pin"), PinIcon, () => actions.setFlags(menu.id, { pinned: !entry.pinned })],
+      [entry.pinned ? t("Unpin") : t("Pin"), PinIcon, () => actions.setFlags(menu.id, { pinned: !entry.pinned })],
       [t("Mark as Unread"), UnreadIcon, () => actions.markUnread(menu.id)]
     ],
     [
@@ -12397,14 +12415,12 @@ function ContextMenu({ menu, roster, actions, leaving = false }) {
       bot ? [t("Duplicate"), DuplicateIcon, async () => {
         const copy2 = await actions.duplicateBot(bot.id);
         actions.openSession(copy2.id);
-      }] : null,
-      bot && !isMainBot ? [t("Make Main Bot"), StarLineIcon, () => actions.setMain(bot.id, true)] : null,
-      bot && isMainBot && mainCount > 1 ? [t("Remove Main Bot role"), StarLineIcon, () => actions.setMain(bot.id, false)] : null
+      }] : null
     ],
     [[t("Copy conversation ID"), CopyIcon, () => navigator.clipboard?.writeText(bot ? currentPart(bot) : menu.id)]],
     [
-      isMainBot ? null : [t("Hide from sidebar"), HideIcon, () => actions.setFlags(menu.id, { hidden: true })],
-      isMainBot ? null : [room2 ? t("Delete group") : t("Delete"), TrashIcon, () => bot ? actions.deleteBot(bot.id) : actions.deleteRoom(menu.id), true]
+      [t("Hide from sidebar"), HideIcon, () => actions.setFlags(menu.id, { hidden: true })],
+      [room2 ? t("Delete group") : t("Delete"), TrashIcon, () => bot ? actions.deleteBot(bot.id) : actions.deleteRoom(menu.id), true]
     ]
   ].map((group) => group.filter(Boolean)).filter((group) => group.length > 0);
   return (0, import_react36.createElement)(

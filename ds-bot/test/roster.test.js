@@ -67,6 +67,47 @@ function start(team, { models = [], reasoning = {}, archiveError } = {}) {
 }
 
 const settle = () => new Promise(resolve => setTimeout(resolve, 20))
+
+test('an ordinary Bot creates Bots and manages a group it does not belong to', async (t) => {
+  const { call, ctx, stop } = start(undefined, { models: ['deepseek-v4-flash'] })
+  t.after(stop)
+  const chief = (await call('state', {})).value.mainBotId
+  const writer = (await call('create-bot', { name: 'Writer', model: 'deepseek/deepseek-v4-flash' })).value
+  const create = ctx.registeredTools.get('create_bot')
+  assert.match(await create.execute({ name: 'Helper', role: 'Help', instructions: 'Help the team.' }, { agent: { id: writer.id } }), /^Created Helper/)
+  const team = (await call('state', {})).value
+  const helper = team.bots.find(bot => bot.name === 'Helper')
+  assert.equal(helper.createdBy, writer.id)
+  assert.deepEqual(team.mainBotIds, [chief], 'management never requires a legacy role change')
+  const room = (await call('create-room', { name: 'Shared', members: [chief, helper.id] })).value
+  assert.match(await ctx.registeredTools.get('update_group').execute({ group: 'Shared', notice: 'All Bots can manage this group.' }, { agent: { id: writer.id } }), /^Updated/)
+  assert.equal((await call('state', {})).value.rooms.find(item => item.id === room.id).notice, 'All Bots can manage this group.')
+  assert.match(await create.execute({ name: 'Outside', role: 'None', instructions: 'None.' }, { agent: { id: 'outside' } }), /Only a Bot on the team/)
+  assert.equal((await call('state', {})).value.bots.length, 3)
+})
+
+test('pinning unhides any Bot, persists across reload, and does not change legacy roles', async (t) => {
+  const first = start({ version: 1, mainBotIds: ['first'], bots: {
+    first: { id: 'first', name: 'First', createdAt: 1 },
+    second: { id: 'second', name: 'Second', hidden: true, createdAt: 2 },
+  } })
+  t.after(first.stop)
+  assert.equal((await first.call('set-flags', { id: 'second', pinned: true })).ok, true)
+  const saved = JSON.parse(readFileSync(join(first.home, 'state.json'), 'utf8'))
+  assert.equal(saved.bots.second.pinned, true)
+  assert.ok(saved.bots.second.pinnedAt > 0)
+  assert.equal(saved.bots.second.hidden, undefined)
+  assert.deepEqual(saved.mainBotIds, ['first'])
+  const second = start(saved)
+  t.after(second.stop)
+  const view = (await second.call('state', {})).value
+  assert.equal(view.bots.find(bot => bot.id === 'second').pinned, true)
+  assert.equal((await second.call('set-flags', { id: 'first', pinned: true })).ok, true)
+  assert.equal((await second.call('set-flags', { id: 'second', pinned: false })).ok, true)
+  const unpinned = JSON.parse(readFileSync(join(second.home, 'state.json'), 'utf8')).bots.second
+  assert.equal(unpinned.pinned, false)
+  assert.equal(unpinned.pinnedAt, undefined)
+})
 // A greeting goes out after the team is saved, which can take longer than one settle() on a
 // busy machine.
 const until = async (check) => {

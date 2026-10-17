@@ -34,8 +34,8 @@ export function install(rt) {
   const view = () => ({
     revision: state.revision,
     workspaceId: state.workspaceId ?? null,
-    // `mainBotId` is the first Main Bot, which the sidebar shows as its tile.
-    mainBotId: state.mainBotIds[0] ?? null,
+    // Legacy landing preference only; it grants no permissions or sidebar priority.
+    mainBotId: state.mainBotIds.find(id => state.bots[id] && !state.bots[id].hidden) ?? Object.values(state.bots).find(bot => !bot.hidden)?.id ?? null,
     mainBotIds: state.mainBotIds,
     // `sessionId` is the Bot's current own-chat part; `parts` its earlier ones.
     // `waiting`: the Bot holds its greeting until the user picks its model.

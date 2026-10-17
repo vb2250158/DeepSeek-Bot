@@ -39,8 +39,8 @@ export function install(rt) {
     ].filter(Boolean)
     return `- "${room.name}" — ${parts.join('; ')}`
   }
-  // Main Bots see every group; other Bots see the groups they are in.
-  const visibleRooms = self => Object.values(state.rooms).filter(room => rt.isMain(self) || room.members.includes(self))
+  // Every registered Bot can discover and manage every group.
+  const visibleRooms = self => Object.values(state.rooms).filter(room => rt.canManageTeam(self) || room.members.includes(self))
 
   ctx.tools.register(defineTool({
     name: 'list_bots',
@@ -52,7 +52,7 @@ export function install(rt) {
       const self = rt.selfOf(exec.agent?.id)
       const lines = Object.values(state.bots).map(bot => {
         const model = bot.appliedModel ?? bot.model
-        const tags = [bot.role, model ? `model ${model}` : '', bot.workDir ? `works in ${bot.workDir}` : '', rt.isMain(bot.id) ? 'Main Bot' : '', bot.id === self ? 'you' : ''].filter(Boolean).join(', ')
+        const tags = [bot.role, model ? `model ${model}` : '', bot.workDir ? `works in ${bot.workDir}` : '', bot.id === self ? 'you' : ''].filter(Boolean).join(', ')
         const job = bot.instructions ? ` — ${bot.instructions.split('\n')[0].slice(0, 120)}` : ''
         return `- ${bot.name}${tags ? ` (${tags})` : ''}${job}`
       })
@@ -153,14 +153,14 @@ export function install(rt) {
       // Messages reach a Bot's own chat only; work in a group goes on without them.
       const groups = activeSessions(target.id).running.filter(sessionId => sessionId !== chat)
       if (groups.length === 0) return status
-      const stop = rt.isMain(sender.id) ? ' If it must not go on there, use stop_bot.' : ''
+      const stop = rt.canManageTeam(sender.id) ? ' If it must not go on there, use stop_bot.' : ''
       return `${status} ${target.name} is also working in ${groups.map(whereOf).join(' and ')}; your message does not reach that work.${stop}`
     },
   }))
 
   ctx.tools.register(defineTool({
     name: 'stop_bot',
-    description: 'Main Bot only. Stop another Bot\'s running turn immediately — when it must not finish a dangerous action and a message_bot warning is not enough. Its queued messages are dropped with the turn. It is then told why in a new turn, whose reply comes back to you.',
+    description: 'Stop another Bot\'s running turn immediately — when it must not finish a dangerous action and a message_bot warning is not enough. Its queued messages are dropped with the turn. It is then told why in a new turn, whose reply comes back to you.',
     parameters: {
       bot: { type: 'string', required: true, description: 'Exact Bot name from list_bots' },
       reason: { type: 'string', description: 'Why it was stopped; it reads this afterwards' },
@@ -169,7 +169,7 @@ export function install(rt) {
     async execute(args, exec) {
       await rt.load()
       const sender = callerBot(exec)
-      if (sender === undefined || !rt.isMain(sender.id)) refuse('Only a Main Bot can stop other Bots.')
+      if (sender === undefined || !rt.canManageTeam(sender.id)) refuse('Only a Bot on the team can stop other Bots.')
       const target = rt.findBot(args.bot)
       if (target === undefined) refuse(`No Bot named ${args.bot}. Team: ${Object.values(state.bots).map(bot => bot.name).join(', ')}`)
       if (target.id === sender.id) refuse('You cannot stop yourself.')
@@ -187,7 +187,7 @@ export function install(rt) {
 
   ctx.tools.register(defineTool({
     name: 'create_bot',
-    description: 'Main Bot only. Create a new Bot on the user\'s team. It appears in the sidebar and greets the user.',
+    description: 'Create a new Bot on the user\'s team. It appears in the sidebar and greets the user.',
     parameters: {
       name: { type: 'string', required: true, description: 'Short display name, e.g. "Researcher" or "Editor"' },
       role: { type: 'string', required: true, description: 'Two-to-four character role label shown under the name' },
@@ -199,7 +199,7 @@ export function install(rt) {
     output,
     async execute(args, exec) {
       await rt.load()
-      if (!rt.isMain(rt.selfOf(exec.agent?.id))) return 'Only the Main Bot can create Bots. Ask the Main Bot instead.'
+      if (!rt.canManageTeam(rt.selfOf(exec.agent?.id))) return 'Only a Bot on the team can create Bots. Ask a Bot on the team instead.'
       try {
         const workDir = args.work_dir ? await rt.cleanWorkDir(args.work_dir) : undefined
         const name = String(args.name ?? '').trim()
@@ -219,7 +219,7 @@ export function install(rt) {
 
   ctx.tools.register(defineTool({
     name: 'update_bot',
-    description: 'Change a Bot\'s name, role, color, model, working folder, or instructions. Every Bot may change itself; only a Main Bot may change another Bot.',
+    description: 'Change a Bot\'s name, role, color, model, working folder, or instructions. Every Bot on the team may change any Bot.',
     parameters: {
       bot: { type: 'string', description: 'Current name of the Bot to change; leave out to change yourself' },
       name: { type: 'string', description: 'New name' },
@@ -237,7 +237,7 @@ export function install(rt) {
       if (caller === undefined) return 'Only Bots on the team can use update_bot.'
       const bot = args.bot ? rt.findBot(args.bot) : caller
       if (bot === undefined) return `No Bot named ${args.bot}.`
-      if (bot.id !== caller.id && !rt.isMain(self)) return 'Only a Main Bot can change another Bot. Leave out bot to change yourself, or ask a Main Bot with message_bot.'
+      if (bot.id !== caller.id && !rt.canManageTeam(self)) return 'Only a Bot on the team can change another Bot. Leave out bot to change yourself, or ask a Bot on the team with message_bot.'
       try {
         const { name: newName, role, instructions, color, model } = args
         const moving = typeof args.work_dir === 'string'
@@ -291,7 +291,7 @@ export function install(rt) {
 
   ctx.tools.register(defineTool({
     name: 'create_group',
-    description: 'Main Bot only. Create a group chat with the user and some Bots. You join it as its admin unless you name another member.',
+    description: 'Create a group chat with the user and some Bots. You join it as its admin unless you name another member.',
     parameters: {
       members: { type: 'array', required: true, items: { type: 'string' }, description: 'Exact names of the other Bots to add; you are added automatically' },
       name: { type: 'string', description: 'Group name; defaults to the member names' },
@@ -303,7 +303,7 @@ export function install(rt) {
     async execute(args, exec) {
       await rt.load()
       const self = rt.selfOf(exec.agent?.id)
-      if (!rt.isMain(self)) return 'Only a Main Bot can create group chats. Ask a Main Bot instead.'
+      if (!rt.canManageTeam(self)) return 'Only a Bot on the team can create group chats. Ask a Bot on the team instead.'
       const { bots, unknown } = resolveBots(args.members)
       if (unknown.length > 0) return `No Bot named ${unknown.join(', ')}. Team: ${teamNames()}`
       const admin = args.admin ? rt.findBot(args.admin) : rt.botOf(self)
@@ -320,16 +320,16 @@ export function install(rt) {
 
   ctx.tools.register(defineTool({
     name: 'update_group',
-    description: 'Change a group chat: rename it, set its notice, add or remove members, change its admin or reply mode. Main Bots may change any group; a group\'s admin may change its own group.',
+    description: 'Change a group chat: rename it, set its notice, add or remove members, change its admin or reply mode. Every Bot on the team may change any group.',
     parameters: {
       group: GROUP_REF,
       name: { type: 'string', description: 'New group name; an empty string names it after its members again' },
       notice: { type: 'string', description: 'Replacement notice, the shared instructions every member reads; an empty string clears it' },
       add_members: { type: 'array', items: { type: 'string' }, description: 'Exact names of Bots to add' },
       remove_members: { type: 'array', items: { type: 'string' }, description: 'Exact names of Bots to remove' },
-      admin: { type: 'string', description: 'Member to make the admin; "none" leaves the group without one (Main Bots only)' },
+      admin: { type: 'string', description: 'Member to make the admin; "none" leaves the group without one (team Bots only)' },
       mode: MODE_PARAM,
-      work_dir: { ...WORK_DIR_PARAM, description: `${WORK_DIR_PARAM.description}. Every member works there in this group; an empty string lets each member work in its own folder again (Main Bots only)` },
+      work_dir: { ...WORK_DIR_PARAM, description: `${WORK_DIR_PARAM.description}. Every member works there in this group; an empty string lets each member work in its own folder again (team Bots only)` },
     },
     output,
     async execute(args, exec) {
@@ -339,7 +339,7 @@ export function install(rt) {
       const { room, error } = pickRoom(args.group, self)
       if (error) return error
       const moving = typeof args.work_dir === 'string'
-      if (moving && !rt.isMain(self)) return `Only a Main Bot can set the folder of "${room.name}".`
+      if (moving && !rt.canManageTeam(self)) return `Only a Bot on the team can set the folder of "${room.name}".`
       const add = resolveBots(args.add_members)
       const remove = resolveBots(args.remove_members)
       const unknown = [...add.unknown, ...remove.unknown]
@@ -381,13 +381,13 @@ export function install(rt) {
 
   ctx.tools.register(defineTool({
     name: 'delete_group',
-    description: 'Main Bot only. Delete a group chat; its history is archived. Only when the user asks.',
+    description: 'Delete a group chat; its history is archived. Only when the user asks.',
     parameters: { group: GROUP_REF },
     output,
     async execute(args, exec) {
       await rt.load()
       const self = rt.selfOf(exec.agent?.id)
-      if (!rt.isMain(self)) return 'Only a Main Bot can delete group chats.'
+      if (!rt.canManageTeam(self)) return 'Only a Bot on the team can delete group chats.'
       const { room, error } = pickRoom(args.group, self)
       if (error) return error
       if (rt.roomBusy(room.id)) return `"${room.name}" is in the middle of a round. Delete it after the round ends.`
@@ -398,7 +398,7 @@ export function install(rt) {
 
   ctx.tools.register(defineTool({
     name: 'post_to_group',
-    description: 'Post a message into a group chat as yourself. It starts a round: members reply in the group, where the user reads them. Main Bots may post into any group; an admin into its own group.',
+    description: 'Post a message into a group chat as yourself. It starts a round: members reply in the group, where the user reads them. Every Bot on the team may post into any group.',
     parameters: {
       group: GROUP_REF,
       message: { type: 'string', required: true, description: 'What to say; write "@Name" to choose who answers, and a name without "@" to only mention a member' },
@@ -412,7 +412,7 @@ export function install(rt) {
       if (sender === undefined) return 'Only Bots on the team can use post_to_group.'
       const { room, error } = pickRoom(args.group, self)
       if (error) return error
-      if (!rt.isMain(self) && !rt.isAdminOf(room, self)) return `Only a Main Bot or the admin of "${room.name}" can post there. Use message_bot to reach its members.`
+      if (!rt.canManageTeam(self) && !rt.isAdminOf(room, self)) return `Only a Bot on the team or the admin of "${room.name}" can post there. Use message_bot to reach its members.`
       const info = rt.live.get(exec.agent?.id)?.info
       if (info?.role === 'room' && info.roomId === room.id) return `You are speaking in "${room.name}" right now. Write your message as your reply instead.`
       const hop = nextHop(exec)
@@ -628,10 +628,10 @@ export function install(rt) {
   for (const [name, endpoint, verb] of [['attach_capability', 'attach', 'Attached'], ['detach_capability', 'detach', 'Detached']]) {
     ctx.tools.register(defineTool({
       name,
-      description: `${verb} a shared capability to yourself, or to another Bot if you are a Main Bot.`,
+      description: `${verb} a shared capability to yourself, or to another Bot if you are a Bot on the team.`,
       parameters: {
         name: { type: 'string', required: true, description: 'Capability name from list_capabilities' },
-        bot: { type: 'string', description: 'Optional Bot name; only a Main Bot may change another Bot' },
+        bot: { type: 'string', description: 'Optional Bot name; only a Bot on the team may change another Bot' },
       },
       output,
       async execute(args, exec) {

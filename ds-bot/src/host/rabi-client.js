@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 
 const TOOL = 'rabiroute_manager_api'
-export const rabiRefuse = message => { throw Object.assign(new Error(message), { code: 'bot/refused' }) }
+export const rabiRefuse = (message, code = 'bot/refused') => { throw Object.assign(new Error(message), { code }) }
 export const rabiSegment = value => {
   if (typeof value !== 'string' || !value || value.length > 200 || [...value].some(char => char.charCodeAt(0) < 32)) rabiRefuse('Invalid Rabi identity')
   return encodeURIComponent(value)
@@ -20,6 +20,13 @@ export function rabiClient(ctx, timeoutMs = 8000) {
     if (result.isError) rabiRefuse(result.error?.message ?? 'Rabi request failed')
     const receipt = result.value
     if (receipt?.uncertain) rabiRefuse('Rabi operation outcome is uncertain. Read back the original operation before retrying; it was not replayed.')
+    if (method === 'GET' && !receipt?.ok && receipt?.statusCode >= 500) {
+      let failure
+      try { failure = JSON.parse(receipt.body) } catch { /* Invalid remote bodies use the adapter's existing error below. */ }
+      if (/^Manager read exceeded \d+ ms\.$/.test(failure?.message ?? '')) {
+        rabiRefuse('Rabi could not finish reading this persona folder. Check its storage in Rabi, then refresh.', 'bot/rabi-read-timeout')
+      }
+    }
     if (!receipt?.ok) rabiRefuse(receipt?.error?.message ?? `Rabi HTTP ${receipt?.statusCode ?? 0}`)
     return receipt
   }

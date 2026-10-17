@@ -151,7 +151,7 @@ test('a Bot busy in a group gets the message in its own chat, and the sender is 
   // A non-Main sender gets no stop_bot hint.
   emit('ga', 'turn/start', { turn: 1 })
   const back = await tool('message_bot', { to: 'Chief', message: 'done' }, 'b')
-  assert.equal(back, 'Delivered to Chief. Its reply will arrive later as a new message; do not wait for it. Chief is also working in group "Ops"; your message does not reach that work.')
+  assert.equal(back, 'Delivered to Chief. Its reply will arrive later as a new message; do not wait for it. Chief is also working in group "Ops"; your message does not reach that work. If it must not go on there, use stop_bot.')
 })
 
 test('a request steered into a running turn is recorded once and answered in a turn of its own', async (t) => {
@@ -242,11 +242,11 @@ test('stop_bot cancels the running turns and tells the Bot why in a new turn', a
   assert.equal(notice.source.role, 'stopped')
 })
 
-test('stop_bot belongs to a Main Bot', async (t) => {
+test('stop_bot is available to every Bot and refuses outsiders', async (t) => {
   const { tool, stop } = await start(team())
   t.after(stop)
 
-  await assert.rejects(tool('stop_bot', { bot: 'Writer' }, 'b'), { message: 'Only a Main Bot can stop other Bots.' })
+  await assert.rejects(tool('stop_bot', { bot: 'Writer' }, 'b'), { message: 'You cannot stop yourself.' })
   await assert.rejects(tool('stop_bot', { bot: 'Chief' }, 'a'), { message: 'You cannot stop yourself.' })
   await assert.rejects(tool('stop_bot', { bot: 'Writer' }, 'a'), { message: 'Writer is not running right now, so there is nothing to stop. Use message_bot to reach it.' })
 })

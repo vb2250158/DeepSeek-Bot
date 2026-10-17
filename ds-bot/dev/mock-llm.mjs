@@ -1,5 +1,5 @@
 // Scripted Anthropic-Messages-compatible mock that drives the Bot team flows
-// (Main Bot setup, create_bot, message_bot round trips, group chat relay, questions)
+// (Bot setup, create_bot, message_bot round trips, group chat relay, questions)
 // without a real model. Usage: node dev/mock-llm.mjs, then point DEEPSEEK_BASE_URL at it.
 //
 // Group turns read only the "This round so far" section of the prompt, so counting goes
@@ -117,7 +117,7 @@ function decide(body) {
   const last = messages.at(-1)
   const blocks = Array.isArray(last?.content) ? last.content : []
   const me = /You are (.+?), a Bot on the user's team/.exec(system)?.[1] ?? 'Bot'
-  const isMain = system.includes('You are the Main Bot')
+  const canManage = tools.has('create_bot')
   const isRelay = system.includes('# Group chat relay')
 
   // Summary requests: the Bot's handoff prompt, or the backend's own one when the
@@ -294,7 +294,7 @@ function decide(body) {
     return [text(/in the group chat "/.test(userText) ? `${me}：第 ${number} 段接着群里的话说完。` : `第 ${number} 段接着做完了。`)]
   }
   if (userText.startsWith('[Bot team setup]')) {
-    if (isMain) {
+    if (canManage) {
       return [
         text(`嘿，我是 ${me}。从今天起我来管你的 Bot 团队，需要拍板的事找我就行。`),
         text('现在还只有我一个。我先摸清你每天用的工具，再决定先上谁。先让团队帮你做哪块？'),
@@ -430,7 +430,7 @@ function decide(body) {
   if ((match = /^\[Reply from ([^\]]+)\]/.exec(userText))) {
     return [text(`${match[1]} 回话了：目标和截止时间都还没和你聊过，它没法凭空开工。`), tool('ask_user', { question: '下一步怎么走？', detail: '没有目标之前它只能空转。', options: ['现在告诉我目标', '先去跟它聊', '先搁着'] })]
   }
-  if ((match = /(?:创建|创|建|新建|create)\s*(?:一个|个)?\s*(?:叫|名为)?\s*[「“"]?([^」”"\s，,。]+?)[」”"]?\s*(?:的)?\s*bot/i.exec(userText)) && isMain && tools.has('create_bot')) {
+  if ((match = /(?:创建|创|建|新建|create)\s*(?:一个|个)?\s*(?:叫|名为)?\s*[「“"]?([^」”"\s，,。]+?)[」”"]?\s*(?:的)?\s*bot/i.exec(userText)) && canManage && tools.has('create_bot')) {
     const name = match[1].replace(/^(一个|个)/, '')
     return [text(`先建 ${name}，建好再让它报一下打算。`), tool('create_bot', { name, role: name.slice(-2), instructions: `负责${name}相关的一切工作：规划、执行、复盘。`, brief: userText })]
   }

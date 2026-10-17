@@ -5,6 +5,10 @@
 export const NAMESPACE = 'ds-bot'
 
 const ZH = {
+  'Rabi could not finish reading this persona folder. Check its storage in Rabi, then refresh.': 'Rabi 读取人格目录超时，请检查 Rabi 的存储连接后刷新',
+  'Pinned chats': '置顶聊天',
+  'Drop here to pin': '拖到这里置顶',
+  'Setting up your Bots…': '正在设置 Bot…',
   'Computers': '电脑',
   Retry: '重试',
   'Allow all Bots to use remote computers': '允许所有 Bot 使用远端电脑',

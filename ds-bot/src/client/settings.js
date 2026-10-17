@@ -1,6 +1,5 @@
 import { createElement as h, useCallback, useEffect, useRef, useState } from 'react'
 import { ACCENT_INKS, INKS } from './inks.js'
-import { isMainOf } from './sources.js'
 import { allThemes } from './themes.js'
 import { CloseIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, ConnectorIcon, InfoIcon, PlugIcon, PlusIcon, SlidersIcon, SETTINGS_ICONS } from './icons.js'
 import { AdminStar, BotAvatar, RoomAvatar } from './mark.js'
@@ -77,31 +76,6 @@ function GeneralPage({ roster, actions, run }) {
   ]
 }
 
-// The first Main Bot is the sidebar tile. Picking another Bot there hands it the role
-// in one step; more Main Bots can sit beside it.
-function MainBotsSection({ roster, actions, run }) {
-  const mains = (roster.mainBotIds ?? []).map(id => roster.byId[id]).filter(Boolean)
-  const [first, ...others] = mains
-  const candidates = roster.bots.filter(bot => !isMainOf(roster, bot.id))
-  return h(SetSection, { title: t('Main Bot') },
-    h(SetRow, {
-      label: t('Main Bot'),
-      hint: first ? t('First in the sidebar. Pick another Bot to hand it the role; {name} then stops being a Main Bot.', { name: first.name }) : undefined,
-    },
-    h('select', {
-      className: 'bt-select', 'aria-label': t('Main Bot'), value: first?.id ?? '',
-      onChange: event => run(actions.setMain(event.target.value, true, first ? { replace: first.id } : {})),
-    }, first ? null : h('option', { value: '' }, t('Choose a Bot…')), roster.bots.map(bot => h('option', { key: bot.id, value: bot.id }, bot.name)))),
-    others.map(bot => h(SetRow, { key: bot.id, label: bot.name, hint: t('Also a Main Bot.') },
-      h('button', { type: 'button', className: 'bt-soft bt-soft-sm', onClick: () => run(actions.setMain(bot.id, true, { primary: true })) }, t('Move to first')),
-      h('button', { type: 'button', className: 'bt-soft bt-soft-sm', onClick: () => run(actions.setMain(bot.id, false)) }, t('Remove Main Bot role')))),
-    candidates.length > 0 ? h(SetRow, { label: t('Add a Main Bot'), hint: t('Main Bots can create and change Bots, and run every group chat.') },
-      h('select', {
-        className: 'bt-select', 'aria-label': t('Add a Main Bot'), value: '',
-        onChange: (event) => { if (event.target.value) void run(actions.setMain(event.target.value, true)) },
-      }, h('option', { value: '' }, t('Choose a Bot…')), candidates.map(bot => h('option', { key: bot.id, value: bot.id }, bot.name)))) : null)
-}
-
 const MOTIONS = [['quiet', 'Quiet'], ['normal', 'Normal'], ['lively', 'Lively']]
 function MotionSection({ roster, actions, run }) {
   const motion = roster.prefs?.motion === 'quiet' || roster.prefs?.motion === 'lively' ? roster.prefs.motion : 'normal'
@@ -116,7 +90,6 @@ function MotionSection({ roster, actions, run }) {
 function BotsPage({ roster, actions, run }) {
   const [creating, setCreating] = useState(false)
   return [
-    h(MainBotsSection, { key: 'main', roster, actions, run }),
     h(MotionSection, { key: 'motion', roster, actions, run }),
     creating
       ? h(CreateBot, { key: 'create', roster, actions, inline: true, onBack: () => setCreating(false), onCreated: bot => actions.openSettings('bots', bot.id) })
@@ -128,8 +101,7 @@ function BotsPage({ roster, actions, run }) {
           h(BotAvatar, { bot, size: 28, badge: false, live: false }),
           h('span', { className: 'bt-row-title' }, bot.name),
           bot.role ? h('span', { className: 'bt-tag' }, bot.role) : null,
-          isMainOf(roster, bot.id) ? h('span', { className: 'bt-tag' }, t('Main Bot')) : null,
-          bot.hidden && !isMainOf(roster, bot.id) ? h('span', { className: 'bt-tag' }, t('Hidden')) : null),
+          bot.hidden ? h('span', { className: 'bt-tag' }, t('Hidden')) : null),
         h('span', { className: 'bt-chevron' }, h(ChevronRightIcon))))),
   ]
 }

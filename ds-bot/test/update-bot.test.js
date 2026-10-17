@@ -68,14 +68,23 @@ test('a Bot changes itself by leaving out bot, or by naming itself', async (t) =
   assert.equal(state().bots.b2.role, '掌门')
 })
 
-test('a Bot cannot change another Bot; a Main Bot can', async (t) => {
+test('every Bot can change another Bot', async (t) => {
   const { tool, state, stop } = start()
   t.after(stop)
-  assert.match(await tool('update_bot', { bot: 'Chief', role: 'boss' }, 'b2'), /^Only a Main Bot can change another Bot/)
-  assert.equal(state().bots.m1.role, 'Chief of Staff')
+  assert.equal(await tool('update_bot', { bot: 'Chief', role: 'boss' }, 'b2'), 'Updated Chief.')
+  assert.equal(state().bots.m1.role, 'boss')
   assert.equal(await tool('update_bot', { bot: 'Writer', role: '主笔' }, 'm1'), 'Updated Writer.')
   assert.equal(state().bots.b2.role, '主笔')
   assert.match(await tool('update_bot', { bot: 'Nobody' }, 'm1'), /^No Bot named Nobody/)
+})
+
+test('a non-admin Bot manages a group and outsiders still cannot', async (t) => {
+  const { tool, state, stop } = start()
+  t.after(stop)
+  assert.match(await tool('update_group', { group: 'Launch', notice: 'Shared team work' }, 'b2'), /^Updated/)
+  assert.equal(state().rooms.r1.notice, 'Shared team work')
+  assert.match(await tool('update_group', { group: 'Launch', notice: 'outside' }, 'outside'), /Only Bots on the team/)
+  assert.equal(state().rooms.r1.notice, 'Shared team work')
 })
 
 test('a group Session changes its own Bot; a Session outside the team changes nothing', async (t) => {

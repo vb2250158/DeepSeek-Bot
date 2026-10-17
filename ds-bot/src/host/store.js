@@ -297,6 +297,8 @@ export function install(rt) {
   const botOf = id => (id === undefined ? undefined : state.bots[id])
   const roomOf = id => (id === undefined ? undefined : state.rooms[id])
   const isMain = id => id !== undefined && state.mainBotIds.includes(id)
+  // Legacy Main Bot ids remain readable; team management belongs to every live Bot.
+  const canManageTeam = id => botOf(id) !== undefined
 
   // Group Sessions. A member speaks in each group from a hidden Session of its own,
   // `room.sessions[botId]`, that renders the same system prompt and tools as its own
@@ -366,7 +368,7 @@ export function install(rt) {
 
   Object.assign(rt, {
     state, load, save, refresh, readOnly,
-    botOf, roomOf, isMain, chatOf, selfOf, isBotSession,
+    botOf, roomOf, isMain, canManageTeam, chatOf, selfOf, isBotSession,
     chatOwners, groupOwners, pastOwners,
     groupSessionsOf, dropGroupSession, findBot, findRooms, isAdminOf,
   })

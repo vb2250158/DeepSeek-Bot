@@ -13,7 +13,7 @@ The Bot team:
 
 - Every Bot is a DSH Session and runs through the normal DSH agent loop, tools and model routes.
 - The team works together: Bots message each other, share group chats and can see what the other Bots are doing. Each Bot still runs on its own and does not disturb the others.
-- Bots have clear, different roles. A Main Bot has the highest rights: it creates, changes and removes other Bots. Other Bots do not get these rights. There can be more than one Main Bot.
+- Bots have clear, different jobs and equal team-management rights: every Bot can create, change and remove Bots and manage every group chat. Sidebar pins are independent of permissions.
 - Users customize each Bot (name, role label, instructions, model, character).
 - Behavior must be reliable: a Bot acts on evidence, stays inside its goal, and its results can be checked.
 

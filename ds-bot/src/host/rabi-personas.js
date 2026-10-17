@@ -3,7 +3,7 @@ import { rabiClient, rabiRefuse as refuse, rabiSegment as segment } from './rabi
 /** Rabi owns persona documents and bindings; Bots keep only the imported persona reference. */
 export function install(rt) {
   const { ctx, state } = rt
-  const timeout = rt.config.rabiRequestTimeoutMs ?? 8000
+  const timeout = rt.config.rabiRequestTimeoutMs ?? 45000
   const maxBytes = rt.config.rabiPersonaMaxBytes ?? 262144
   if (!Number.isInteger(timeout) || timeout < 1000 || timeout > 120000) throw new TypeError('rabiRequestTimeoutMs must be 1000-120000')
   if (!Number.isInteger(maxBytes) || maxBytes < 1024 || maxBytes > 2097152) throw new TypeError('rabiPersonaMaxBytes must be 1024-2097152')

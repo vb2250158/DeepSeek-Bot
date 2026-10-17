@@ -1,7 +1,6 @@
 import { createElement as h, Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { FishLogo } from '@deepseek-ai/dsh-client-ui-primitives'
-import { isMainOf } from './sources.js'
 import { currentPart, previewOf, relativeShort } from './text.js'
 import { PlusIcon, SearchIcon, PinMarkIcon, CloudDownloadIcon, GearIcon } from './icons.js'
 import { MAIN_LOOK } from './characters.js'
@@ -36,7 +35,27 @@ const workKeys = text => JSON.parse(text)
 const doingOf = ({ tool, said, note, target, switching }) => ({ tool, said, note, target, switching })
 const workLine = (lead, doing, more) => h(Shimmer, null, `${lead} · ${workPhrase(doing)}…${more > 0 ? ` +${more}` : ''}`)
 
-function BotRow({ bot, roster, actions, useSessions, useSessionStatus, useSessionRetainInfo, useActivity, useWork, wide, marked, compactMain = false }) {
+function PinnedChat({ entry: { kind, item }, roster, actions, useSessions, useSessionStatus, useWork, marked }) {
+  const ids = kind === 'bot' ? [currentPart(item)] : kind === 'agent' ? item.sessions : [item.id]
+  const active = useSessions(list => ids.some(id => (list.byId[id]?.retainedBy?.mainView ?? 0) > 0))
+  const running = useSessionStatus(map => ids.some(id => map.get(id)?.running === true))
+  const unread = useSessionStatus(map => ids.some(id => map.get(id)?.completionUnread === true || map.get(id)?.pendingInteraction !== undefined)) || (marked && !active)
+  const approval = useApproval(useWork, entry => kind === 'bot' ? entry.botId === item.id : entry.roomId === item.id)
+  useMarkedUnread(item.id, active, marked, actions)
+  const label = [item.name, t('Pinned'), running ? t('Working') : '', approval ? t('Waiting for your approval') : '', unread ? t('Unread activity') : ''].filter(Boolean).join(', ')
+  return h('button', {
+    type: 'button', className: 'bt-group-tile', draggable: false,
+    [kind === 'bot' ? 'data-bot-id' : kind === 'room' ? 'data-room-id' : 'data-agent-id']: item.id,
+    title: item.name, 'aria-label': label, 'aria-current': active ? 'page' : undefined,
+    onClick: () => kind === 'agent' ? actions.openAgent(item.id) : actions.openSession(item.id),
+    onContextMenu: event => { event.preventDefault(); actions.openMenu({ kind, id: item.id, x: event.clientX, y: event.clientY }) },
+  }, kind === 'bot' ? h(BotAvatar, { bot: item, size: 48, state: botState(running, undefined, approval || roster.questions?.[ids[0]] !== undefined) })
+    : kind === 'room' ? h(RoomAvatar, { room: item, roster, size: 48 }) : h(FishLogo),
+  unread && !active ? h('span', { className: 'bt-unread', 'aria-hidden': true }) : null,
+  h('span', null, item.name))
+}
+
+function BotRow({ bot, roster, actions, useSessions, useSessionStatus, useSessionRetainInfo, useActivity, useWork, wide, marked }) {
   const id = bot.id
   const part = currentPart(bot)
   const preview = useSessions(list => previewOf(list, part, roster.exchangeTurns[part]))
@@ -44,8 +63,6 @@ function BotRow({ bot, roster, actions, useSessions, useSessionStatus, useSessio
   const active = useSessionRetainInfo(part, info => (info?.retainedBy?.mainView ?? 0) > 0)
   const unread = useSessionStatus(map => map.get(part)?.completionUnread === true || map.get(part)?.pendingInteraction !== undefined) || (marked && !active)
   useMarkedUnread(id, active, marked, actions)
-  const main = isMainOf(roster, id)
-  const tile = roster.mainBotId === id && !compactMain
   const approval = useApproval(useWork, entry => entry.botId === id)
   const alert = roster.questions?.[part] !== undefined || approval
   const doing = useActivity(map => map[id])
@@ -54,30 +71,21 @@ function BotRow({ bot, roster, actions, useSessions, useSessionStatus, useSessio
   const away = !running && groups.length > 0
   const state = botState(running || away, doing, alert)
   const awayLine = away ? workLine(roster.roomsById[groups[0].id]?.name ?? t('a group chat'), groups[0], groups.length - 1) : null
-  if (bot.hidden && !active && !main) return null
+  if (bot.hidden && !active) return null
   const onContextMenu = (event) => {
     event.preventDefault()
     actions.openMenu({ kind: 'bot', id, x: event.clientX, y: event.clientY })
   }
-  const pinned = bot.pinned === true && !tile
-  const label = [bot.name, main ? t('Main Bot') : '', pinned ? t('Pinned') : '', running || away ? t('Working') : '', approval ? t('Waiting for your approval') : alert ? t('Waiting for your answer') : '', unread ? t('Unread activity') : ''].filter(Boolean).join(', ')
-  if (tile && wide) {
-    return h('div', { className: 'bt-tile-wrap' }, h('button', {
-      type: 'button', className: 'bt-tile', 'aria-label': label, 'aria-current': active ? 'page' : undefined,
-      'data-bot-id': id, title: preview || bot.name, onClick: () => actions.openSession(id), onContextMenu,
-    },
-    h(BotAvatar, { bot, size: 60, state, main: true }),
-    h('span', { className: 'bt-tile-name' }, bot.name),
-    bot.role ? h('span', { className: 'bt-chip' }, bot.role) : null))
-  }
+  const pinned = bot.pinned === true
+  const label = [bot.name, pinned ? t('Pinned') : '', running || away ? t('Working') : '', approval ? t('Waiting for your approval') : alert ? t('Waiting for your answer') : '', unread ? t('Unread activity') : ''].filter(Boolean).join(', ')
   return h('button', {
-    type: 'button', className: 'bt-row', 'aria-label': label, 'aria-current': active ? 'page' : undefined,
+    type: 'button', className: 'bt-row', draggable: false, 'aria-label': label, 'aria-current': active ? 'page' : undefined,
     'data-bot-id': id, title: wide ? undefined : bot.name, onClick: () => actions.openSession(id), onContextMenu,
   },
-  h(BotAvatar, { bot, size: 36, state, main }),
+  h(BotAvatar, { bot, size: 36, state }),
   pinned && !wide ? h(PinMark) : null,
   wide ? h('span', { className: 'bt-row-body' },
-    h('span', { className: 'bt-row-name' }, h('span', { className: 'bt-row-title' }, bot.name), compactMain && bot.role ? h('span', { className: 'bt-row-role' }, bot.role) : null, pinned ? h(PinMark) : null),
+    h('span', { className: 'bt-row-name' }, h('span', { className: 'bt-row-title' }, bot.name), bot.role ? h('span', { className: 'bt-row-role' }, bot.role) : null, pinned ? h(PinMark) : null),
     awayLine ? h('span', { className: 'bt-row-preview' }, awayLine) : preview ? h('span', { className: 'bt-row-preview' }, preview) : null) : null,
   wide && unread && !active ? h('span', { className: 'bt-unread', 'aria-hidden': true }) : null)
 }
@@ -97,7 +105,7 @@ function RoomRow({ room, roster, actions, useSessions, useSessionStatus, useSess
   const pinned = room.pinned === true
   const label = [room.name, pinned ? t('Pinned') : '', members.length > 0 ? t('Working') : '', approval ? t('Waiting for your approval') : ''].filter(Boolean).join(', ')
   return h('button', {
-    type: 'button', className: 'bt-row', 'aria-label': label, 'aria-current': active ? 'page' : undefined,
+    type: 'button', className: 'bt-row', draggable: false, 'aria-label': label, 'aria-current': active ? 'page' : undefined,
     'data-room-id': id, onClick: () => actions.openSession(id),
     onContextMenu: (event) => { event.preventDefault(); actions.openMenu({ kind: 'room', id, x: event.clientX, y: event.clientY }) },
   },
@@ -191,7 +199,7 @@ function AgentRow({ agent, actions, useSessions, useSessionStatus, useUi, wide, 
   const open = active && wide
   return h('div', { className: 'bt-agent' },
     h('button', {
-      type: 'button', className: 'bt-row', 'aria-label': label, 'aria-current': active ? 'page' : undefined,
+      type: 'button', className: 'bt-row', draggable: false, 'aria-label': label, 'aria-current': active ? 'page' : undefined,
       'data-agent-id': agent.id, title: wide ? undefined : 'DSH Agent', onClick: () => actions.openAgent(agent.id),
       onContextMenu: (event) => { event.preventDefault(); actions.openMenu({ kind: 'agent', id: agent.id, x: event.clientX, y: event.clientY }) },
     },
@@ -237,6 +245,11 @@ function useListGlide(listRef, layout, key) {
 export function TeamSidebar(props) {
   const { wide, useRoster, useUi, useSessions, actions } = props
   const listRef = useRef(null)
+  const pinRef = useRef(null)
+  const dragged = useRef(null)
+  const suppressClickUntil = useRef(0)
+  const [dragging, setDragging] = useState(false)
+  const [overPins, setOverPins] = useState(false)
   const roster = useRoster(value => value)
   const markedUnread = useUi(value => value.unread)
   props.useRegistry(value => value)
@@ -248,17 +261,50 @@ export function TeamSidebar(props) {
   const order = useMemo(() => {
     const stamps = JSON.parse(updated)
     const entries = [
-      ...roster.bots.filter(bot => bot.id !== roster.mainBotId).map(bot => ({ kind: 'bot', item: bot, at: stamps[currentPart(bot)] ?? bot.createdAt })),
+      ...roster.bots.map(bot => ({ kind: 'bot', item: bot, at: stamps[currentPart(bot)] ?? bot.createdAt })),
       ...roster.rooms.map(room => ({ kind: 'room', item: room, at: stamps[room.id] ?? room.createdAt })),
       // The Agent sorts by its most recent Session, falling back to when it was added.
       ...(roster.agents ?? []).map(agent => ({ kind: 'agent', item: agent, at: Math.max(0, ...agent.sessions.map(id => stamps[id] ?? 0)) || agent.createdAt })),
     ]
-    return entries.sort((a, b) => Number(Boolean(b.item.pinned)) - Number(Boolean(a.item.pinned)) || b.at - a.at)
+    return entries.sort((a, b) => Number(Boolean(b.item.pinned)) - Number(Boolean(a.item.pinned)) || (a.item.pinned ? (b.item.pinnedAt ?? 0) - (a.item.pinnedAt ?? 0) || a.item.createdAt - b.item.createdAt : b.at - a.at))
   }, [roster, updated])
-  const main = roster.byId[roster.mainBotId]
+  const pins = order.filter(entry => entry.item.pinned && !entry.item.hidden)
+  const inPins = event => {
+    const rect = pinRef.current?.getBoundingClientRect()
+    return Boolean(rect && event.clientX >= rect.left && event.clientX <= rect.right && event.clientY >= rect.top && event.clientY <= rect.bottom)
+  }
+  const dragEnd = () => { dragged.current = null; setDragging(false); setOverPins(false) }
+  const pointerDown = event => {
+    if (event.button !== 0 || roster.readOnly) return
+    const row = event.target.closest('[data-bot-id],[data-room-id],[data-agent-id]')
+    const id = row?.dataset.botId ?? row?.dataset.roomId ?? row?.dataset.agentId
+    if (!id) return
+    dragged.current = { id, pointerId: event.pointerId, x: event.clientX, y: event.clientY, started: false }
+  }
+  const pointerMove = event => {
+    const drag = dragged.current
+    if (!drag || event.pointerId !== drag.pointerId) return
+    if (!drag.started && Math.hypot(event.clientX - drag.x, event.clientY - drag.y) < 8) return
+    if (!drag.started) {
+      drag.started = true
+      event.currentTarget.setPointerCapture(event.pointerId)
+      setDragging(true)
+    }
+    event.preventDefault()
+    setOverPins(inPins(event))
+  }
+  const pointerUp = event => {
+    const drag = dragged.current
+    if (!drag || event.pointerId !== drag.pointerId) return
+    const pin = drag.started && inPins(event)
+    if (drag.started) suppressClickUntil.current = Date.now() + 250
+    dragEnd()
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+    if (pin) void actions.setFlags(drag.id, { pinned: true }).catch(error => actions.reportError(error, 'pin'))
+  }
   useListGlide(listRef, wide, order.map(entry => entry.item.id).join(','))
   useLandOnMainBot(roster, useSessions, actions)
-  const rowProps = { roster, actions, useSessions, useUi, useSessionStatus: props.useSessionStatus, useSessionRetainInfo: props.useSessionRetainInfo, useActivity: props.useActivity, useWork: props.useWork, wide, compactMain: props.compactMain }
+  const rowProps = { roster, actions, useSessions, useUi, useSessionStatus: props.useSessionStatus, useSessionRetainInfo: props.useSessionRetainInfo, useActivity: props.useActivity, useWork: props.useWork, wide }
   // Typing while the sidebar has focus starts a search.
   const typeToSearch = (event) => {
     if (event.defaultPrevented || event.key.length !== 1 || event.key === ' ' || event.metaKey || event.ctrlKey || event.altKey || event.nativeEvent.isComposing) return
@@ -266,7 +312,10 @@ export function TeamSidebar(props) {
     event.preventDefault()
     actions.openPalette(event.key)
   }
-  return h('div', { className: wide ? 'bt-side' : 'bt-side bt-rail', onKeyDown: typeToSearch },
+  return h('div', { className: wide ? 'bt-side' : 'bt-side bt-rail', onKeyDown: event => { if (event.key === 'Escape' && dragged.current?.started) { event.preventDefault(); dragEnd() } else typeToSearch(event) },
+    onPointerDown: pointerDown, onPointerMove: pointerMove, onPointerUp: pointerUp, onPointerCancel: dragEnd, onLostPointerCapture: dragEnd,
+    onDragStart: event => event.preventDefault(),
+    onClickCapture: event => { if (Date.now() < suppressClickUntil.current) { event.preventDefault(); event.stopPropagation(); suppressClickUntil.current = 0 } } },
     wide ? h('div', { className: 'bt-side-top' },
       h('span', { className: 'bt-brand' }, h(BrandMark, { size: 22 }), h(BrandName)),
       h(UpdateButton, { useUpdate: props.useUpdate, actions }),
@@ -275,16 +324,16 @@ export function TeamSidebar(props) {
       : h(Fragment, null,
           h(UpdateButton, { useUpdate: props.useUpdate, actions }),
           h('button', { type: 'button', className: 'bt-round', 'aria-label': t('New…'), title: t('New…'), onClick: () => actions.openNewChat('new') }, h(PlusIcon))),
-    props.groupTiles && roster.rooms.some(room => !room.hidden) ? h('div', { className: 'bt-group-grid', 'aria-label': t('Group chats') },
-      roster.rooms.filter(room => !room.hidden).map(room => h('button', {
-        key: room.id, type: 'button', className: 'bt-group-tile', title: room.name,
-        onClick: () => actions.openSession(room.id),
-        onContextMenu: event => { event.preventDefault(); actions.openMenu({ kind: 'room', id: room.id, x: event.clientX, y: event.clientY }) },
-      }, h(RoomAvatar, { room, roster, size: 48 }), h('span', null, room.name)))) : null,
+    h('div', {
+      ref: pinRef, className: 'bt-pinned-area', 'data-dragging': dragging || undefined, 'data-over': overPins || undefined,
+      role: 'region', 'aria-label': t('Pinned chats'),
+    },
+      pins.length ? h('div', { className: 'bt-group-grid bt-pinned-grid' }, pins.map(entry => h(PinnedChat, { key: entry.item.id, ...rowProps, entry, marked: markedUnread[entry.item.id] === true }))) : null,
+      h('div', { className: 'bt-pin-drop', role: dragging ? 'status' : undefined }, t('Drop here to pin'))),
     wide && roster.readOnly ? h('div', { className: 'bt-hint bt-read-only', role: 'status' }, hostText(roster.readOnly)) : null,
     h('div', { ref: listRef, className: 'bt-list', role: 'region', 'aria-label': t('Bot list') },
-      main ? h(BotRow, { ...rowProps, bot: main, marked: markedUnread[main.id] === true }) : roster.ready ? null : h('div', { className: 'bt-hint' }, t('Setting up your Main Bot…')),
-      order.filter(entry => !props.groupTiles || entry.kind !== 'room').map(entry => (entry.kind === 'bot'
+      roster.ready ? null : h('div', { className: 'bt-hint' }, t('Setting up your Bots…')),
+      order.filter(entry => !entry.item.pinned).map(entry => (entry.kind === 'bot'
         ? h(BotRow, { key: entry.item.id, ...rowProps, bot: entry.item, marked: markedUnread[entry.item.id] === true })
         : entry.kind === 'room'
           ? h(RoomRow, { key: entry.item.id, ...rowProps, room: entry.item, marked: markedUnread[entry.item.id] === true })
@@ -535,6 +584,19 @@ export const SIDEBAR_CSS = `
 .bt-side-top .bt-brand:hover{background:none}
 .bt-brand .bt-mark{flex:none}
 .bt-pin{flex:none;display:inline-flex;color:var(--bt-ink-3)}
+.bt-pinned-area{flex:none;margin:0 8px;border-radius:12px}
+.bt-pinned-area[data-dragging]{min-height:64px;background:var(--bt-hover);outline:1px dashed var(--bt-line-2)}
+.bt-pinned-area[data-over]{outline:2px solid var(--bt-accent);background:var(--bt-hover)}
+.bt-pin-drop{display:none;padding:18px 8px;text-align:center;font-size:13px;color:var(--bt-ink-2)}
+.bt-pinned-area[data-dragging] .bt-pin-drop{display:block}
+.bt-pinned-grid{margin:0!important;max-height:36vh;overflow-y:auto}
+.bt-pinned-grid .bt-group-tile{position:relative}
+.bt-row>:is(.bt-mark,.bt-cluster),.bt-group-tile>:is(.bt-mark,.bt-cluster){touch-action:none}
+.bt-pinned-grid .bt-group-tile[aria-current=page]{background:var(--bt-hover)}
+.bt-pinned-grid .bt-unread{position:absolute;right:8px;top:8px}
+.bt-rail .bt-pinned-grid{grid-template-columns:1fr}
+.bt-rail .bt-pinned-grid .bt-group-tile{min-width:0;padding:6px 2px}
+.bt-rail .bt-pinned-grid .bt-group-tile>span:last-child{display:none}
 .bt-rail .bt-row{position:relative}
 .bt-rail .bt-pin{position:absolute;top:3px;left:calc(50% + 12px)}
 .bt-side .bt-read-only{margin:4px 8px 6px;padding:8px 10px;border-radius:10px;background:var(--bt-hover);font-size:12px;line-height:1.45;text-align:left}

@@ -545,7 +545,7 @@ export function install(rt) {
 
   ctx.tools.register(defineTool({
     name: 'read_group_chat',
-    description: 'Read the latest messages of a group chat, including what you said there. You speak in groups from separate conversations, so your own chat does not show them. Main Bots may read any group; others the groups they are in.',
+    description: 'Read the latest messages of a group chat, including what you said there. You speak in groups from separate conversations, so your own chat does not show them. Every Bot on the team may read any group.',
     parameters: { group: GROUP_REF },
     output,
     async execute(args, exec) {

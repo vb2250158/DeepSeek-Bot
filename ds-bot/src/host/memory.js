@@ -307,10 +307,10 @@ const memoryRules = review => [
 ].join('\n')
 
 const teamRule = (main, writer) => (main
-  ? '- The team memory is shared by every Bot. As a Main Bot you write it with remember scope "team", for what the whole team needs; with scope set to a Bot\'s name you read or change that Bot\'s memory, when the user asks.'
+  ? '- The team memory is shared by every Bot. As a Bot on the team you write it with remember scope "team", for what the whole team needs; with scope set to a Bot\'s name you read or change that Bot\'s memory, when the user asks.'
   : writer
     ? '- The team memory is shared by every Bot. As a group admin you write it with remember scope "team", for what the whole team needs.'
-    : '- The team memory is shared by every Bot. Main Bots and group admins write it; when the whole team should know something, tell a Main Bot with message_bot.')
+    : '- The team memory is shared by every Bot. Bots on the team write it; when the whole team should know something, tell a Bot on the team with message_bot.')
 
 const SUMMARY_SYSTEM = 'You write the memory summary that a user reads in the memory panel of DS Bot, an app where a team of AI Bots works for the user. You only restate saved memory entries; you never add to them.'
 
@@ -485,10 +485,10 @@ export function install(rt) {
 
   // ---------------------------------------------------------------------------
   // Who may do what. A Bot reads and writes its own memory and reads the team's;
-  // Main Bots and the admins of a group also write the team's; Main Bots read and
+  // All Bots and the admins of a group also write the team's; All Bots read and
   // write every Bot's. The user may do everything from the memory panel.
 
-  const writesTeam = botId => rt.isMain(botId) || Object.values(state.rooms).some(room => room.admin === botId)
+  const writesTeam = botId => rt.canManageTeam(botId) || Object.values(state.rooms).some(room => room.admin === botId)
 
   // `raw` names a scope: "own", "team", or a Bot. Undefined for the default.
   function namedScope(raw, botId) {
@@ -502,8 +502,8 @@ export function install(rt) {
   }
   function writeDenied(scope, botId) {
     if (rabiOwned(rt.botOf(botId)) || (scope.kind === 'bot' && rabiOwned(rt.botOf(scope.botId)))) return rabiNotice
-    if (scope.kind === 'team') return writesTeam(botId) ? undefined : 'Only Main Bots and group admins write the team memory. Tell a Main Bot with message_bot what the team should know.'
-    if (scope.botId !== botId && !rt.isMain(botId)) return 'Only a Main Bot can change another Bot\'s memory. Use message_bot to tell that Bot instead.'
+    if (scope.kind === 'team') return writesTeam(botId) ? undefined : 'Only Bots on the team write the team memory. Tell a Bot on the team with message_bot what the team should know.'
+    if (scope.botId !== botId && !rt.canManageTeam(botId)) return 'Only a Bot on the team can change another Bot\'s memory. Use message_bot to tell that Bot instead.'
     return undefined
   }
   const labelOf = (scope, botId) => (scope.kind === 'team' ? 'the team memory' : scope.botId === botId ? 'your memory' : `${rt.botOf(scope.botId)?.name ?? 'that Bot'}'s memory`)
@@ -663,7 +663,7 @@ export function install(rt) {
     return [
       '# Your memory',
       memoryRules(reviewOn),
-      teamRule(rt.isMain(bot.id), writesTeam(bot.id)),
+      teamRule(rt.canManageTeam(bot.id), writesTeam(bot.id)),
       '',
       '## Your memory (MEMORY.md)',
       ...shownEntries(main),
@@ -682,9 +682,9 @@ export function install(rt) {
     if (sessionId === undefined) return ''
     const bot = rt.botOf(rt.selfOf(sessionId))
     if (bot === undefined || rabiOwned(bot)) return ''
-    // A section frozen under another role (made a Main Bot or a group admin since, or no
+    // A section frozen under another role (made a Bot on the team or a group admin since, or no
     // longer one) is frozen again, so the rule it states matches what the tools allow.
-    const rule = teamRule(rt.isMain(bot.id), writesTeam(bot.id))
+    const rule = teamRule(rt.canManageTeam(bot.id), writesTeam(bot.id))
     const kept = frozen.get(sessionId)
     if (kept !== undefined && kept.includes(rule)) return kept
     const path = snapshotPath(sessionId)
@@ -753,7 +753,7 @@ export function install(rt) {
     added: today(),
   })
 
-  const SCOPE_WRITE = { type: 'string', description: '"own" (the default); "team" for the memory every Bot reads (Main Bots and group admins only); or a Bot\'s name to change that Bot\'s memory (Main Bots only, when the user asks)' }
+  const SCOPE_WRITE = { type: 'string', description: '"own" (the default); "team" for the memory every Bot reads (Bots on the team only); or a Bot\'s name to change that Bot\'s memory (team Bots only, when the user asks)' }
   const TOPIC_WHERE = { type: 'string', description: 'The topic the entry is in, if you know it; omit to look in every file' }
 
   // What remember and forget share: the caller, the scope, and the right to write it.
@@ -833,7 +833,7 @@ export function install(rt) {
     const { scope, error } = namedScope(raw, botId)
     if (error) return { error }
     if (scope === undefined) return { scopes: [ownScope(botId), TEAM] }
-    if (scope.kind === 'bot' && scope.botId !== botId && !rt.isMain(botId)) return { error: 'Only a Main Bot can read another Bot\'s memory. Ask that Bot with message_bot instead.' }
+    if (scope.kind === 'bot' && scope.botId !== botId && !rt.canManageTeam(botId)) return { error: 'Only a Bot on the team can read another Bot\'s memory. Ask that Bot with message_bot instead.' }
     return { scopes: [scope] }
   }
   const tagOf = (scope, botId) => (scope.kind === 'team' ? 'team' : scope.botId === botId ? 'yours' : rt.botOf(scope.botId)?.name ?? '?')
@@ -844,7 +844,7 @@ export function install(rt) {
     parameters: {
       query: { type: 'string', description: 'Words to look for, separated by spaces. An entry must have all of them; when none has, those with the most are shown' },
       topic: { type: 'string', description: 'A topic to read whole, as listed with [[topic]]' },
-      scope: { type: 'string', description: 'Omit for yours and the team\'s; "own", "team", or a Bot\'s name (Main Bots only)' },
+      scope: { type: 'string', description: 'Omit for yours and the team\'s; "own", "team", or a Bot\'s name (team Bots only)' },
     },
     output,
     async execute(args, exec) {

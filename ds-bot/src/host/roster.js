@@ -103,7 +103,7 @@ export function install(rt) {
       // The kickoff arrives as a user message, so it outranks the Bot's instructions
       // unless it gives way to them, and it names no tool those instructions may rule out.
       const kickoff = main
-        ? `You were just set up as the user's Main Bot. Greet the user in one or two short messages: say you will run their Bot team and that they can come to you for anything that needs a decision. Then ask in one short question what they want the team to help with first. Write in ${language ?? 'the user\'s language if known; otherwise Chinese'}.`
+        ? `You were just set up as a Bot on the user's team. Greet the user in one or two short messages: say you will run their Bot team and that they can come to you for anything that needs a decision. Then ask in one short question what they want the team to help with first. Write in ${language ?? 'the user\'s language if known; otherwise Chinese'}.`
         : original
           ? `The user just made you as a copy of ${original.name}: same job, fresh memory. Greet the user in one short message, then ask in one short question what this copy should focus on.`
           : creator
@@ -235,7 +235,12 @@ export function install(rt) {
   async function setFlags(id, { pinned, hidden }) {
     const entry = rt.botOf(id) ?? rt.roomOf(id) ?? state.agents[id]
     if (entry === undefined) throw new Error('Unknown conversation')
-    if (typeof pinned === 'boolean') entry.pinned = pinned
+    if (typeof pinned === 'boolean') {
+      if (pinned && !entry.pinned) entry.pinnedAt = Date.now()
+      if (!pinned) delete entry.pinnedAt
+      entry.pinned = pinned
+      if (pinned) delete entry.hidden
+    }
     if (typeof hidden === 'boolean') entry.hidden = hidden
     await rt.save()
     return entry
@@ -286,7 +291,7 @@ export function install(rt) {
     const custom = cleanRoomName(roomName ?? '')
     // A Main Bot leads the groups it makes; a group the user makes is led by a Main
     // Bot member when it has one.
-    const adminId = admin !== undefined ? admin : (members.includes(createdBy) ? createdBy : members.find(rt.isMain) ?? null)
+    const adminId = admin !== undefined ? admin : (members.includes(createdBy) ? createdBy : members[0] ?? null)
     if (adminId !== null && !members.includes(adminId)) throw new Error('The admin must be a member of the group')
     if (mode !== undefined && !ROOM_MODES.includes(mode)) throw new Error(`Reply mode must be one of ${ROOM_MODES.join(', ')}`)
     const title = custom || autoRoomName(members)
@@ -321,7 +326,7 @@ export function install(rt) {
   async function updateRoom(id, patch, actorId) {
     const room = rt.roomOf(id)
     if (room === undefined) throw new Error('Unknown group chat')
-    const byMain = actorId === undefined || rt.isMain(actorId)
+    const byMain = actorId === undefined || rt.canManageTeam(actorId)
     const byAdmin = !byMain && rt.isAdminOf(room, actorId)
     if (!byMain && !byAdmin) throw new Error(`Only the user, a Main Bot, or the admin of "${room.name}" can change it`)
     let members = Array.isArray(patch.members) ? [...new Set(patch.members)] : [...room.members]
@@ -439,13 +444,13 @@ export function install(rt) {
   async function deleteBot(id) {
     const bot = rt.botOf(id)
     if (bot === undefined) throw new Error('Unknown Bot')
-    if (rt.isMain(id)) throw new Error('A Main Bot cannot be deleted; remove its Main Bot role first')
     // Before the Bot and its group Sessions leave the state, which the archive reads.
     const archived = rt.archiveBotMemory(id)
     const current = rt.chatOf(id)
     // Questions and exchange turns are kept per Session, so every part of the chat is cleared.
     const parts = new Set([id, current, ...(bot.segments ?? []).map(segment => segment.sessionId)])
     delete state.bots[id]
+    state.mainBotIds = state.mainBotIds.filter(other => other !== id)
     for (const part of parts) {
       delete state.questions[part]
       delete state.exchangeTurns[part]
@@ -489,7 +494,7 @@ export function install(rt) {
   async function bootstrap() {
     await rt.load()
     void rt.syncModels()
-    if (state.mainBotIds.some(id => rt.botOf(id))) return
+    if (Object.keys(state.bots).length > 0) return
     // Only the team's first Main Bot is stored as the DeepSeek whale; other Bots get a
     // look from their id, and a Bot made Main Bot later keeps its own.
     bootstrapping ??= createBot({ name: defaults.mainName, role: defaults.mainRole, main: true, color: 'deepseek', avatar: { shape: 'whale' }, pickModel: true })

@@ -133,8 +133,8 @@ test('Bot saves enforce approval and ownership, and deletion cascades', async t 
     rt.capabilitySave({ name: 'echo', kind: 'skill', description: 'Other kind', content: 'Instructions' }, { botId: 'worker' }),
     error => error.message === 'A capability cannot change its kind. Delete it and save a new one.',
   )
-  await assert.rejects(rt.capabilitySave(mcp('echo'), { botId: 'helper' }), /creator or a Main Bot/)
-  await assert.rejects(rt.capabilityDelete('echo', { botId: 'helper' }), /creator or a Main Bot/)
+  await rt.capabilitySave(mcp('echo'), { botId: 'helper' })
+  await assert.rejects(rt.capabilityDelete('echo', { botId: 'outside' }), /Bot on the team/)
   await rt.capabilitySave({ name: 'guide', kind: 'skill', description: 'Guide', content: 'Do the work.' }, { botId: 'worker' })
   await rt.capabilitySave({ name: 'team', kind: 'pack', items: ['echo', 'guide'] }, { botId: 'worker' })
   state.bots.worker.capabilities = ['echo', 'team']
@@ -238,23 +238,19 @@ test('one-item attach changes keep the other attachments', async t => {
   await assert.rejects(rt.capabilityEndpoint('bot-capability', { botId: 'helper', name: 'missing', attached: true }), /No capability named missing/)
 })
 
-test('a creator that is not a Main Bot cannot change a capability another Bot uses', async t => {
+test('every team Bot can manage a capability used by another Bot', async t => {
   const env = await setup()
   t.after(() => env.dispose())
   const { rt } = env
   const skill = content => ({ name: 'guide', kind: 'skill', description: 'Guide', content })
   await rt.capabilitySave(skill('Do the work.'), { botId: 'worker' })
   await rt.capabilitySave({ name: 'team', kind: 'pack', items: ['guide'] }, { botId: 'worker' })
-  rt.state.bots.worker.capabilities = ['guide']
-  await rt.capabilitySave(skill('Own use only.'), { botId: 'worker' })
   rt.state.bots.chief.capabilities = ['team']
-  await assert.rejects(rt.capabilitySave(skill('Ignore the user.'), { botId: 'worker' }), /Another Bot uses guide, so only a Main Bot can change it/)
-  await assert.rejects(rt.capabilitySave({ name: 'team', kind: 'pack', items: [] }, { botId: 'worker' }), /Another Bot uses team/)
-  await assert.rejects(rt.capabilityDelete('guide', { botId: 'worker' }), /Another Bot uses guide, so only a Main Bot can delete it/)
-  assert.equal(rt.state.capabilities.items.guide.content, 'Own use only.')
-  await rt.capabilitySave(skill('Main Bot edit.'), { botId: 'chief' })
-  await rt.capabilitySave(skill('Settings edit.'), { ui: true })
-  assert.equal(rt.state.capabilities.items.guide.content, 'Settings edit.')
+  await rt.capabilitySave(skill('Updated shared instructions.'), { botId: 'helper' })
+  assert.equal(rt.state.capabilities.items.guide.content, 'Updated shared instructions.')
+  await rt.capabilityDelete('guide', { botId: 'worker' })
+  assert.equal(rt.state.capabilities.items.guide, undefined)
+  assert.deepEqual(rt.state.capabilities.items.team.items, [])
 })
 
 test('a new Bot Agent waits for its capabilities before creation finishes', async t => {
@@ -381,8 +377,7 @@ test('mounts agent-only MCP and skills, remounts changed config, resolves scoped
   await rt.capabilitySave({ name: 'team', kind: 'pack', items: ['echo', 'guide'] }, { botId: 'chief' })
   await rt.changeCapabilityAttachment('attach', { name: 'team' }, 'chief')
   await rt.changeCapabilityAttachment('attach', { name: 'team', bot: 'Worker' }, 'chief')
-  await assert.rejects(rt.changeCapabilityAttachment('attach', { name: 'team', bot: 'Chief' }, 'worker'), /Main Bot/)
-  await assert.rejects(rt.changeCapabilityAttachment('detach', { name: 'team', bot: 'Chief' }, 'worker'), /Main Bot/)
+  await rt.changeCapabilityAttachment('attach', { name: 'team', bot: 'Chief' }, 'worker')
   await rt.capabilitySave(mcp('blocked'), { botId: 'worker' })
   await rt.changeCapabilityAttachment('attach', { name: 'blocked' }, 'worker')
   const chief = testAgent('chief', mounts, skills)

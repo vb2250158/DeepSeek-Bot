@@ -2,6 +2,14 @@
 
 All notable changes to DS Bot are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the versions follow [Semantic Versioning](https://semver.org/). Before 1.0, a minor version can contain breaking changes.
 
+## [0.1.6-rabi.21] - 2026-10-18
+
+### Changed
+
+- Remove Main Bot selectors, promotion actions and badges. Every registered Bot can manage Bots, groups, shared capabilities and memory; existing folder and executable approvals remain in force. Legacy role ids are read only as a landing preference.
+- Pin any Bot or group with its context menu or by dragging it above the chat list. Pinned tiles persist across reload and never inherit a Main Bot role. Pinning also unhides a conversation and retains working and unread indicators.
+- Let persona reads wait for the Manager’s bounded read timeout instead of aborting after eight seconds; report storage read timeouts with a storage-specific action. Uncertain writes remain blocked without replay.
+
 ## [0.1.6-rabi.19] - 2026-10-17
 
 ### Changed

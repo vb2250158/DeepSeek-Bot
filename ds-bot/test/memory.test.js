@@ -218,21 +218,20 @@ test('topics hold details, linked from MEMORY.md, and go when their last entry d
   assert.equal(read('bots', 'b2', 'MEMORY.md'), '# Memory\n\n## Index\n')
 })
 
-test('Main Bots and group admins write the team memory; only Main Bots touch another Bot\'s', async (t) => {
+test('all team Bots manage shared and other Bots\' memory', async (t) => {
   const { tool, read, stop } = start()
   t.after(() => stop())
-  assert.match(await tool('remember', { text: 'Ship on Friday', scope: 'team' }, 'b2'), /^Only Main Bots and group admins write the team memory/)
+  assert.match(await tool('remember', { text: 'Team note', scope: 'team' }, 'b2'), /^Saved to the team memory/)
   // Coder is the admin of Launch, and speaks there from its group Session.
   assert.match(await tool('remember', { text: 'Ship on Friday', scope: 'team' }, 'g3'), /^Saved to the team memory/)
   assert.match(read('team', 'MEMORY.md'), /- Ship on Friday \[source: group "Launch" \d{2}-\d{2} \d{2}:\d{2}; by: Coder; added: /)
   assert.match(await tool('remember', { text: 'Writes in Chinese', scope: 'Writer' }, 'm1'), /^Saved to Writer's memory/)
   assert.match(read('bots', 'b2', 'MEMORY.md'), /- Writes in Chinese \[source: part 1 #10; by: Chief; added: /)
-  assert.match(await tool('remember', { text: 'Bossy', scope: 'Chief' }, 'b2'), /^Only a Main Bot can change another Bot's memory/)
-  assert.match(await tool('recall', { scope: 'Writer' }, 'b3'), /^Only a Main Bot can read another Bot's memory/)
+  assert.match(await tool('remember', { text: 'Bossy', scope: 'Chief' }, 'b2'), /^Saved to Chief's memory/)
+  assert.match(await tool('recall', { scope: 'Writer' }, 'b3'), /Writes in Chinese/)
   assert.match(await tool('recall', { scope: 'Nobody' }, 'b3'), /^No Bot named Nobody/)
   assert.match(await tool('recall', { query: 'friday' }, 'b2'), /\[team · MEMORY\.md\] Ship on Friday/)
-  assert.match(await tool('forget', { entry: 'Friday', scope: 'team' }, 'b2'), /^Only Main Bots and group admins/)
-  assert.match(await tool('forget', { entry: 'Friday', scope: 'team' }, 'm1'), /^Removed from the team memory/)
+  assert.match(await tool('forget', { entry: 'Friday', scope: 'team' }, 'b2'), /^Removed from the team memory/)
   assert.match(await tool('remember', { text: 'x' }, 'stranger'), /^Only Bots on the team keep a memory\./)
 })
 
@@ -260,9 +259,9 @@ test('a Session keeps the memory it began with, across restarts, until its snaps
   const opened = first.section('b2')
   assert.match(opened, /^# Your memory\n/)
   assert.match(opened, /## Your memory \(MEMORY\.md\)\n- Likes tea \[source: part 1 #10; added: [\d-]+\]\n\n## Team memory, shared by every Bot \(team\/MEMORY\.md\)\n\(nothing saved yet\)$/)
-  assert.match(opened, /when the whole team should know something, tell a Main Bot with message_bot/)
-  assert.match(first.section('m1'), /As a Main Bot you write it with remember scope "team"/)
-  assert.match(first.section('g3'), /As a group admin you write it/)
+  assert.match(opened, /As a Bot on the team you write it/)
+  assert.match(first.section('m1'), /As a Bot on the team you write it with remember scope "team"/)
+  assert.match(first.section('g3'), /As a Bot on the team you write it/)
   assert.equal(first.section('nobody'), '')
 
   await first.tool('remember', { text: 'Lives in Hangzhou', topic: 'home' }, 'b2')
@@ -281,30 +280,17 @@ test('a Session keeps the memory it began with, across restarts, until its snaps
   assert.match(renewed.section('b2'), /- Likes tea \[.*\]\nTopics: \[\[home\]\]\n/)
 })
 
-test('a change of role freezes the section again, so its team rule matches the tools', async (t) => {
+test('legacy role changes do not change team permissions or frozen memory', async (t) => {
   const { call, tool, section, stop } = start()
   t.after(() => stop())
   await tool('remember', { text: 'Likes tea' }, 'b2')
   const before = section('b2')
-  assert.match(before, /tell a Main Bot with message_bot/)
-  await tool('remember', { text: 'Lives in Hangzhou' }, 'b2')
+  assert.match(before, /As a Bot on the team you write it/)
+  await call('set-main', { id: 'b2', main: true })
+  await call('set-main', { id: 'b2', main: false })
   assert.equal(section('b2'), before)
-
-  assert.equal((await call('set-main', { id: 'b2', main: true })).ok, true)
-  const promoted = section('b2')
-  assert.match(promoted, /As a Main Bot you write it with remember scope "team"/)
-  assert.doesNotMatch(promoted, /tell a Main Bot with message_bot/)
-  // Frozen anew, so entries saved since come along; then it holds still again.
-  assert.match(promoted, /- Lives in Hangzhou \[/)
-  assert.equal(section('b2'), promoted)
-
-  assert.equal((await call('set-main', { id: 'b2', main: false })).ok, true)
-  assert.match(section('b2'), /tell a Main Bot with message_bot/)
-  // Coder loses the admin seat of Launch, and with it the team rule in its group Session.
-  assert.match(section('g3'), /As a group admin you write it/)
-  assert.equal((await call('update-room', { id: 'r1', admin: 'b2' })).ok, true)
-  assert.match(section('g3'), /tell a Main Bot with message_bot/)
-  assert.match(section('b2'), /As a group admin you write it/)
+  assert.match(await tool('remember', { text: 'Shared fact', scope: 'team' }, 'b2'), /^Saved/)
+  assert.match(await tool('remember', { text: 'Another shared fact', scope: 'team' }, 'g3'), /^Saved/)
 })
 
 test('deleting a Bot moves its memory to the archive', async (t) => {
@@ -551,7 +537,7 @@ test('when a turn ends, the memory review keeps what the user said, through the 
   await reviewed(call)
   assert.equal(requests.length, 1)
   assert.match(requests[0].system, /^You keep the long-term memory of one Bot/)
-  assert.doesNotMatch(requests[0].system, /"team": true/)
+  assert.match(requests[0].system, /"team": true/)
   assert.equal(requests[0].messages[0].content[0].text, [
     'The Bot: Writer, 写作.',
     '',
@@ -566,10 +552,11 @@ test('when a turn ends, the memory review keeps what the user said, through the 
     '',
     'Write every new or changed entry in English.',
   ].join('\n'))
-  // Writer writes no team memory, so the team entry stays its own; no password is kept.
+  // Shared facts go to team memory; secrets are still refused.
   const entries = parseMemory(read('bots', 'b2', 'MEMORY.md')).entries
-  assert.deepEqual(entries.map(entry => entry.text), ['The user writes Rust', 'The user likes a plain style, mostly black and white', 'Everyone should keep it plain'])
+  assert.deepEqual(entries.map(entry => entry.text), ['The user writes Rust', 'The user likes a plain style, mostly black and white'])
   assert.equal(entries[1].meta.source, 'part 1 #20')
+  assert.match(read('team', 'MEMORY.md'), /Everyone should keep it plain/)
   assert.deepEqual(journal().slice(1).map(record => [record.op, record.actorName, record.auto]), [
     ['add', 'Writer', true], ['add', 'Writer', true], ['replace', 'Writer', true],
   ])
@@ -597,7 +584,7 @@ test('when a turn ends, the memory review keeps what the user said, through the 
   ctx.emit('agent/status', { agent: { id: 'b2' }, status: 'running' })
   ctx.emit('agent/status', { agent: { id: 'stranger' }, status: 'idle' })
   assert.equal((await call('state', {})).value.memoryReviews, 0)
-  assert.equal(existsSync(join(home, 'memory', 'team', 'MEMORY.md')), false)
+  assert.equal(existsSync(join(home, 'memory', 'team', 'MEMORY.md')), true)
 
   // Changes the user makes in the memory panel are no news.
   replies.push(JSON.stringify({ reply: 'Done.', changes: [{ op: 'add', text: 'Likes tea' }] }))

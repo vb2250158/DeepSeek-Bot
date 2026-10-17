@@ -72,14 +72,14 @@ export function install(rt) {
     const readOnly = rt.readOnly()
     if (readOnly !== undefined) throw new Error(readOnly)
   }
-  const allowedToEdit = (item, botId) => rt.isMain(botId) || item.createdBy === botId
+  const allowedToEdit = (item, botId) => rt.canManageTeam(botId) || item.createdBy === botId
   const usedByOthers = (name, botId) => Object.values(state.bots).some(bot => bot.id !== botId
     && (bot.capabilities ?? []).some(attached => attached === name
       || (library()[attached]?.kind === 'pack' && (library()[attached].items ?? []).includes(name))))
-  // A creator that is not a Main Bot could otherwise rewrite what a Main Bot runs.
+  // A creator that is not a Bot on the team could otherwise rewrite what a Bot on the team runs.
   const editCheck = (item, botId, verb) => {
-    if (!allowedToEdit(item, botId)) throw new Error(`Only ${item.createdBy ? 'its creator or a Main Bot' : 'a Main Bot'} can ${verb} ${item.name}.`)
-    if (!rt.isMain(botId) && usedByOthers(item.name, botId)) throw new Error(`Another Bot uses ${item.name}, so only a Main Bot can ${verb} it.`)
+    if (!allowedToEdit(item, botId)) throw new Error(`Only ${item.createdBy ? 'its creator or a Bot on the team' : 'a Bot on the team'} can ${verb} ${item.name}.`)
+    if (!rt.canManageTeam(botId) && usedByOthers(item.name, botId)) throw new Error(`Another Bot uses ${item.name}, so only a Bot on the team can ${verb} it.`)
   }
   const itemInput = (body, { botId, ui }) => {
     const name = validateCapabilityName(body.name)
@@ -156,7 +156,7 @@ export function install(rt) {
     if (!caller) throw new Error('Only Bots on the team can change capabilities.')
     const target = targetRef ? rt.findBot(targetRef) : caller
     if (!target) throw new Error(`No Bot named ${targetRef}.`)
-    if (target.id !== caller.id && !rt.isMain(callerId)) throw new Error('Only a Main Bot can change another Bot’s capabilities.')
+    if (target.id !== caller.id && !rt.canManageTeam(callerId)) throw new Error('Only a Bot on the team can change another Bot’s capabilities.')
     const item = ensureLibrary()[String(name ?? '')]
     if (!item) throw new Error(`No capability named ${name}.`)
     await setAttached(target, item.name, endpoint === 'attach')

@@ -84,12 +84,6 @@ function StarIcon({ size = 8 }) {
 export function AdminStar() {
   return h('span', { className: 'bt-admin-star', role: 'img', 'aria-label': t('Admin') }, h(StarIcon, { size: 7 }))
 }
-// A Main Bot wears a large solid star; a group admin wears the small star in a disc.
-function MainStar() {
-  return h('svg', { viewBox: '0 0 20 20', 'aria-hidden': true },
-    h('path', { d: 'M10 2.4l2.29 5.04 5.51.63-4.09 3.74 1.11 5.42L10 14.5l-4.82 2.73 1.11-5.42L2.2 8.07l5.51-.63z' }))
-}
-
 // Marks settle with a short squash when a run finishes.
 function useSettled(state) {
   const prev = useRef(state)
@@ -106,16 +100,15 @@ function useSettled(state) {
   return settled
 }
 
-export function BotAvatar({ bot, size, state = 'idle', main, admin, badge = true, live = true, gaze = false, pokeable = false }) {
+export function BotAvatar({ bot, size, state = 'idle', admin, badge = true, live = true, gaze = false, pokeable = false }) {
   const settled = useSettled(state)
   if (bot === undefined) return h(BotMark, { size })
-  const badgeKind = !badge ? null : state === 'alert' ? 'alert' : state !== 'idle' ? 'working' : admin ? 'admin' : main ? 'main' : null
+  const badgeKind = !badge ? null : state === 'alert' ? 'alert' : state !== 'idle' ? 'working' : admin ? 'admin' : null
   return h('span', { className: 'bt-mark', style: { width: size, height: size, '--bt-size': `${size}px` } },
     h(BotMark, { bot, size, state: settled ? 'done' : state, live, gaze, pokeable }),
     badgeKind === 'working' ? h('span', { className: 'bt-badge bt-badge-working', 'aria-label': t('Working'), role: 'img' }) : null,
     badgeKind === 'alert' ? h('span', { className: 'bt-badge bt-badge-alert', 'aria-label': t('Waiting for your answer'), role: 'img' }, '?') : null,
-    badgeKind === 'admin' ? h('span', { className: 'bt-badge bt-badge-admin', 'aria-label': t('Admin'), role: 'img' }, h(StarIcon)) : null,
-    badgeKind === 'main' ? h('span', { className: 'bt-badge bt-badge-main', 'aria-label': t('Main Bot'), role: 'img' }, h(MainStar)) : null)
+    badgeKind === 'admin' ? h('span', { className: 'bt-badge bt-badge-admin', 'aria-label': t('Admin'), role: 'img' }, h(StarIcon)) : null)
 }
 
 // A group avatar seats its members' characters in the frame: two on a

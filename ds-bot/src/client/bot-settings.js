@@ -1,7 +1,6 @@
 import { createElement as h, Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { paintCss } from './inks.js'
 import { CHARACTERS, PICKER_SHAPES, PICKER_COLUMNS, CHARACTER_COLORS, SHAPES, hasShape, shapeOf, bodyOf, maskBox, holes, nextMarkSerial } from './characters.js'
-import { isMainOf } from './sources.js'
 import { PencilIcon, ChevronRightIcon } from './icons.js'
 import { lookOf, BotMark } from './mark.js'
 import { ModelMenu, modelOf } from './model-menu.js'
@@ -199,9 +198,6 @@ export function BotSettingsForm({ bot, roster, actions, run }) {
     const timer = setTimeout(() => setConfirming(false), 4000)
     return () => clearTimeout(timer)
   }, [confirming])
-  const isMainBot = isMainOf(roster, bot.id)
-  const onlyMain = isMainBot && (roster.mainBotIds ?? []).length === 1
-  const isTile = roster.mainBotId === bot.id
   const save = patch => run(actions.updateBot(bot.id, patch))
   const duplicate = () => run(actions.duplicateBot(bot.id).then(copy => actions.openSession(copy.id)))
   const remove = () => { if (confirming) void run(actions.deleteBot(bot.id)); else setConfirming(true) }
@@ -216,7 +212,7 @@ export function BotSettingsForm({ bot, roster, actions, run }) {
         editing ? h(AvatarEditor, { bot, actions, run, onClose: closeEditor }) : null),
       h('div', { className: 'bt-bs-who' },
         h('span', { className: 'bt-bs-name' }, bot.name),
-        h('span', { className: 'bt-bs-sub' }, [bot.role, isMainBot ? t('Main Bot') : ''].filter(Boolean).join(' · ') || t('Bot')))),
+        h('span', { className: 'bt-bs-sub' }, bot.role || t('Bot')))),
     h(Card, { title: t('Profile') },
       h(Row, { label: t('Name') }, h(InlineText, { label: t('Name'), value: bot.name, placeholder: 'Bob', required: true, maxLength: 40, onSave: name => save({ name }) })),
       h(Row, { label: t('Label'), hint: t('Optional. Shown under the name.') }, h(InlineText, { label: t('Label'), value: bot.role, placeholder: t('Research, admin…'), maxLength: 24, onSave: role => save({ role }) }))),
@@ -234,23 +230,14 @@ export function BotSettingsForm({ bot, roster, actions, run }) {
     h(BotCapabilitiesCard, { bot, roster, actions, run, Card, SwitchRow }),
     roster.memory === false ? null : h(MemoryCard, { bot, actions }),
     h(BotSchedules, { bot, roster, actions }),
-    h(Card, { title: t('Main Bot') },
-      onlyMain
-        ? h('div', { className: 'bt-set-row bt-bs-row' },
-            h('span', { className: 'bt-set-copy' },
-              h('span', { className: 'bt-bs-label' }, t('Main Bot')),
-              h('span', { className: 'bt-set-hint' }, t('The only Main Bot. To hand the role to another Bot, use Main Bot on the Bots page.'))),
-            h('button', { type: 'button', className: 'bt-soft bt-soft-sm', onClick: () => actions.openSettings('bots') }, t('Change')))
-        : h(SwitchRow, { label: t('Main Bot'), hint: t('Can create and change Bots, and runs every group chat.'), on: isMainBot, onChange: on => run(actions.setMain(bot.id, on)) })),
-    // The Main Bot tile is always first and always shown, like in the context menu.
-    isTile ? null : h(Card, { title: t('Sidebar') },
+    h(Card, { title: t('Sidebar') },
       h(SwitchRow, { label: t('Pin'), hint: t('Kept above the other chats.'), on: bot.pinned === true, onChange: pinned => run(actions.setFlags(bot.id, { pinned })) }),
-      isMainBot ? null : h(SwitchRow, { label: t('Hide from sidebar'), hint: t('Search still finds it.'), on: bot.hidden === true, onChange: hidden => run(actions.setFlags(bot.id, { hidden })) })),
+      h(SwitchRow, { label: t('Hide from sidebar'), hint: t('Search still finds it.'), on: bot.hidden === true, onChange: hidden => run(actions.setFlags(bot.id, { hidden })) })),
     h(Card, { title: t('Manage') },
       h('button', { type: 'button', className: 'bt-set-row bt-bs-row', onClick: duplicate },
         h('span', { className: 'bt-set-copy' }, h('span', { className: 'bt-bs-label' }, t('Duplicate')), h('span', { className: 'bt-set-hint' }, t('A copy with the same job and model, and fresh memory.'))),
         h('span', { className: 'bt-chevron' }, h(ChevronRightIcon))),
-      isMainBot ? null : h('button', { type: 'button', className: 'bt-set-row bt-bs-row bt-bs-danger', 'data-confirm': confirming || undefined, onClick: remove },
+      h('button', { type: 'button', className: 'bt-set-row bt-bs-row bt-bs-danger', 'data-confirm': confirming || undefined, onClick: remove },
         h('span', { className: 'bt-set-copy' },
           h('span', { className: 'bt-bs-label' }, confirming ? t('Delete {name}?', { name: bot.name }) : t('Delete Bot')),
           h('span', { className: 'bt-set-hint' }, confirming ? t('Click again to delete. Its chats are archived.') : t('Removes the Bot from the team.'))),

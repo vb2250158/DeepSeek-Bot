@@ -269,15 +269,14 @@ test('a folder outside the team workspace needs the user\'s approval', async (t)
   assert.match(await third.tool('list_bots', {}, 'a'), new RegExp(`- Builder \\(Build, works in ${escapeRegExp(third.project)}\\)`))
 })
 
-test('a group\'s folder holds for every member there; only the user or a Main Bot sets it', async (t) => {
+test('every Bot can set a group\'s folder with approval', async (t) => {
   const { requests, services } = approvalServices('allowed-once')
   const { call, tool, preStep, created, project, state, stop } = await start({ services })
   t.after(stop)
-  // The admin may change the group, but not its folder.
-  assert.equal(await tool('update_group', { group: 'Ops', work_dir: project }, 'gb'), 'Only a Main Bot can set the folder of "Ops".')
+  assert.match(await tool('update_group', { group: 'Ops', work_dir: project }, 'gb'), /^Updated/ )
   assert.equal((await call('update-room', { id: 'r1', workDir: project })).ok, true)
   assert.equal(state().rooms.r1.workDir, project)
-  assert.equal(requests.length, 0)
+  assert.equal(requests.length, 1)
   assert.match(await tool('list_bots', {}, 'a'), new RegExp(`"Ops" — .*; members work in ${escapeRegExp(project)} here`))
 
   // The member's group Session moves at its next turn there, not within a reply; its
@@ -293,9 +292,9 @@ test('a group\'s folder holds for every member there; only the user or a Main Bo
   // A Main Bot clears it without asking; setting it asks the user once for every member.
   assert.equal(await tool('update_group', { group: 'Ops', work_dir: '' }, 'a'), 'Updated "Ops": every member works in its own folder again.')
   assert.equal(state().rooms.r1.workDir, undefined)
-  assert.equal(requests.length, 0)
+  assert.equal(requests.length, 1)
   assert.match(await tool('update_group', { group: 'Ops', work_dir: project }, 'a'), /^Updated "Ops": every member now works in .* here\.$/)
-  assert.equal(requests[0].displayReason.zh, `允许群聊「Ops」的成员在 ${project} 中工作吗？之后可以修改这个文件夹里的文件。`)
+  assert.equal(requests.at(-1).displayReason.zh, `允许群聊「Ops」的成员在 ${project} 中工作吗？之后可以修改这个文件夹里的文件。`)
 })
 
 test('the approval counts every Session that would work in the folder', async (t) => {

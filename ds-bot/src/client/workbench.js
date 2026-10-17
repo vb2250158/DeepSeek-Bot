@@ -19,7 +19,7 @@ export function BotWorkbench({ renderSlot }) {
 export function BotTeam(props) {
   const [width, onChange] = useColumnWidth('team')
   return h('aside', { className: 'bt-team-column', 'aria-label': t('DS Bot'), style: { '--bt-team-width': `${width}px` } },
-    h(TeamSidebar, { ...props, wide: true, compactMain: true, groupTiles: true }),
+    h(TeamSidebar, { ...props, wide: true }),
     h('div', { className: 'bt-team-footer' },
       h(AccountLauncher, { ...props, seat: false })),
     h(ColumnResizer, { side: 'team', width, onChange }))
