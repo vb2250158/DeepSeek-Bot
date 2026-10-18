@@ -2,6 +2,12 @@
 
 All notable changes to DS Bot are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the versions follow [Semantic Versioning](https://semver.org/). Before 1.0, a minor version can contain breaking changes.
 
+## [0.1.6-rabi.29] - 2026-10-18
+
+### Added
+
+- Group Details, Library and Members tabs, direct member addition, and independent persistent text-document folders. Add or upload documents without overwriting existing files; team Bots read references through read_group_library.
+
 ## [0.1.6-rabi.28] - 2026-10-18
 
 ### Changed
