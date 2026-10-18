@@ -209,6 +209,27 @@ test('a finished turn leaves nothing to pick up', async (t) => {
   assert.equal(second.agentOf('a').calls.length, 0)
 })
 
+test('restart recovery uses native continuation without another group message when the driver supports it', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const home = freshHome(t)
+  const first = await start(home)
+  run(first, 'gb', 1, { content: [{ type: 'text', text: 'Finish the group task' }],
+    source: { kind: 'bot', role: 'room', roomId: 'r1', exchangeId: 'native-group' } })
+  await settle(() => inflight(home).gb !== undefined)
+  await first.stop()
+  const second = await start(home)
+  const agent = second.agentOf('gb'), continued = []
+  agent.session.snapshotEvents = () => [
+    { type: 'turn/start', seq: 10, data: { turn: 1 } },
+    { type: 'turn/end', seq: 11, data: { reason: { kind: 'interrupted' } } },
+  ]
+  agent.continueInterrupted = seq => { continued.push(seq); return true }
+  t.mock.timers.tick(3000)
+  await settle(() => continued.length === 1)
+  assert.deepEqual(continued, [10])
+  assert.equal(agent.calls.length, 0)
+})
+
 test('a turn DSH stops as it shuts down stays noted; one the user stops does not', async (t) => {
   const home = freshHome(t)
   const host = await start(home)

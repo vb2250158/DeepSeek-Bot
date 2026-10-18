@@ -14,7 +14,9 @@ The chat tail reports submitted messages and live Rabi Hook progress, with expli
 
 Rabi settings discover the service and load bindings on entry and focus without overlapping requests. Each persona switch enables or disables its confirmed binding; disabling preserves its Bot and conversation. Group feedback lists members working in that group and removes them as their work ends. A Bot's label is its work title, assigned from actual responsibilities with `update_bot`; legacy imported `Rabi` labels are removed, while other titles are preserved.
 
-Terminal errors, failed-turn retry actions and retained Rabi failure notices are visible only when they occurred during the current page navigation. Refreshing dismisses their historical presentation without changing the Session log. New failures keep the installed renderer and actions; genuine interrupted-turn recovery and other turn-tail contributions remain available. This policy is scoped to Bot conversations and is removed when leaving that surface.
+Bot chats do not show manual continuation or retry buttons. Interrupted turns and quota failures continue automatically through DSH's native continuation API, without resending the user's message. Repeated quota failures back off from autoContinueDelayMs (default 1000) to autoContinueMaxDelayMs (default 60000); both are integer milliseconds, with 1 <= delay <= maximum <= 3600000. New input, explicit stops and unloading cancel pending continuation. Other errors, including unknown Rabi write outcomes, are not replayed. Existing provider request retries remain in effect. On restart, native continuation is preferred; older drivers retain the existing one-time recovery prompt.
+
+Terminal errors and retained Rabi failure notices are visible only when they occurred during the current page navigation. Refreshing dismisses their historical presentation without changing the Session log. New failures keep the installed renderer; deliverables and other turn-tail contributions remain available. This policy is scoped to Bot conversations and is removed when leaving that surface.
 
 ## Harness panel
 

@@ -48,7 +48,7 @@ test('historical failure rows disappear on refresh while new failures retain the
   assert.equal(slots.listeners(), 0)
 })
 
-test('old failed-turn retries disappear without removing crash recovery or changing retry actions', async () => {
+test('manual continuation buttons never appear for failed or interrupted Bot turns', async () => {
   const slots = registry(), inject = () => ({ continueTurn() {} })
   slots.register({ name: TAIL, id: 'turn-continuation', priority: 20, inject }, 'RetryAction')
   const dispose = installTransientErrors(slots)
@@ -56,8 +56,12 @@ test('old failed-turn retries disappear without removing crash recovery or chang
   const entry = slots.entries(TAIL)[0]
   assert.equal(entry.inject, inject)
   assert.equal(entry.component(tailProps(99)), null)
-  assert.equal(entry.component(tailProps(100)).type, 'RetryAction')
-  assert.equal(entry.component(tailProps(50, 'interrupted')).type, 'RetryAction')
+  assert.equal(entry.component(tailProps(100)), null)
+  assert.equal(entry.component(tailProps(50, 'interrupted')), null)
+  assert.equal(entry.component(tailProps(101, 'interrupted')), null)
+  slots.register({ name: TAIL, id: 'deliverables', priority: 30 }, 'Files')
+  await flush()
+  assert.equal(slots.entries(TAIL).find(item => item.options.id === 'deliverables').component, 'Files')
   dispose()
 })
 

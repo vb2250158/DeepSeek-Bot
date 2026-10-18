@@ -16,6 +16,26 @@ const RESUME_DELAY_MS = 3000
 const QUEUED_KEPT_MS = 24 * 60 * 60 * 1000
 const QUEUED_MAX = 50
 
+/** Native continuation only accepts interruptions and quota failures, never unknown write outcomes. */
+export function continuationKind(reason) {
+  if (reason?.kind === 'interrupted') return 'interrupted'
+  const error = reason?.kind === 'error' ? reason.error : undefined
+  if (error?.code === 'QUOTA' || (error?.code === 'PI_AI_ERROR' && /402 status code/u.test(error.message ?? ''))) return 'quota'
+  return undefined
+}
+
+/** Return undefined only for older drivers without native continuation support. */
+function continueNative(agent, expected) {
+  const events = agent.session.snapshotEvents?.()
+  const start = events?.findLast(event => event.type === 'turn/start')
+  const end = events?.findLast(event => event.type === 'turn/end' && event.seq > start?.seq)
+  const kind = continuationKind(end?.data.reason)
+  const method = kind === 'quota' ? agent.continueQuotaFailure : agent.continueInterrupted
+  if (typeof method !== 'function' || !events) return undefined
+  if (!start || !kind || (expected && (expected.startSeq !== start.seq || expected.endSeq !== end.seq))) return false
+  return method.call(agent, start.seq)
+}
+
 export const resumeText = record => [
   'DeepSeek Harness restarted while you were working on this, so your last turn stopped before it finished.',
   record.approval ? `You were waiting for the user's approval to run ${record.approval.tool || 'a tool'}${record.approval.reason ? ` (${record.approval.reason})` : ''}; that request is gone, so ask again if you still need it.` : '',
@@ -57,6 +77,39 @@ export function install(rt) {
   let queued = {}
   let writing = Promise.resolve()
   let stopped = false
+  const delayMs = rt.config?.autoContinueDelayMs ?? 1000
+  const maxDelayMs = rt.config?.autoContinueMaxDelayMs ?? 60000
+  if (!Number.isInteger(delayMs) || delayMs < 1 || !Number.isInteger(maxDelayMs) || maxDelayMs < delayMs || maxDelayMs > 3600000) {
+    throw new Error('autoContinueDelayMs and autoContinueMaxDelayMs must be positive integers with delay <= maximum <= 3600000')
+  }
+  const continuations = new Map()
+  const attempts = new Map()
+  const cancelContinuation = id => {
+    clearTimeout(continuations.get(id)?.timer)
+    continuations.delete(id)
+  }
+  const scheduleContinuation = (id, event) => {
+    if (stopped || rt.readOnly() !== undefined) return
+    cancelContinuation(id)
+    const attempt = attempts.get(id) ?? 0
+    attempts.set(id, attempt + 1)
+    const pending = { endSeq: event.seq }
+    continuations.set(id, pending)
+    pending.timer = setTimeout(async () => {
+      try {
+        const agent = await rt.resolveAgent(id)
+        if (stopped || continuations.get(id) !== pending || rt.readOnly() !== undefined || !rt.isBotSession(id)) return
+        const start = agent.session.snapshotEvents?.().findLast(item => item.type === 'turn/start')
+        if (start) continueNative(agent, { startSeq: start.seq, endSeq: pending.endSeq })
+      } catch (error) {
+        rt.warn('ds-bot: automatic continuation of %s failed: %s', id, error)
+        if (!stopped && continuations.get(id) === pending) scheduleContinuation(id, event)
+      } finally {
+        if (continuations.get(id) === pending) continuations.delete(id)
+      }
+    }, Math.min(maxDelayMs, delayMs * 2 ** Math.min(attempt, 30)))
+    pending.timer.unref?.()
+  }
   let latest
   let due = false
   const persist = () => {
@@ -135,12 +188,15 @@ export function install(rt) {
     if (!rt.isBotSession(id)) return
     switch (event.type) {
       case 'turn/start': {
+        cancelContinuation(id)
         const owner = rt.groupOwners.get(id)
         const botId = owner?.botId ?? rt.chatOwners.get(id)
         update(id, () => ({ botId, ...(owner ? { roomId: owner.roomId } : {}), since: event.time ?? Date.now() }))
         break
       }
       case 'user/message': {
+        cancelContinuation(id)
+        attempts.delete(id)
         if (event.data?.source?.kind !== SOURCE_KIND) break
         // turns.js, installed earlier, has already claimed the turn's trigger.
         const info = rt.live.get(id)?.info
@@ -152,6 +208,12 @@ export function install(rt) {
         // DSH stops every turn as it shuts down; that one is picked up at the next start.
         const reason = event.data?.reason
         if (reason?.kind === 'aborted' && reason.reason?.kind === 'disposed') break
+        if (continuationKind(reason)) {
+          scheduleContinuation(id, event)
+          break
+        }
+        cancelContinuation(id)
+        attempts.delete(id)
         update(id, () => undefined)
         break
       }
@@ -165,6 +227,8 @@ export function install(rt) {
   async function resumeTurn(sessionId, record) {
     const bot = rt.botOf(record.botId)
     if (bot === undefined) return
+    const agent = await rt.resolveAgent(sessionId)
+    if (continueNative(agent) !== undefined) return
     const text = resumeText(record)
     if (record.roomId !== undefined) {
       const room = rt.roomOf(record.roomId)
@@ -240,6 +304,7 @@ export function install(rt) {
     // What the turns stopped by this shutdown left stays as last noted.
     return () => {
       stopped = true
+      for (const id of continuations.keys()) cancelContinuation(id)
       clearTimeout(timer)
       return writing
     }

@@ -8,11 +8,11 @@ export function isCurrentPageFailure(time, since = errorPageStartedAt) {
   return typeof time !== 'number' || time >= since
 }
 
-/** Filter replayed failures through public slots while retaining the original renderers and actions. */
+/** Hide manual continuation actions and replayed failures through public slots. */
 export function installTransientErrors(slots, since = errorPageStartedAt) {
   const cells = [
     { name: 'conversation.chat.node', key: 'turn-error', visible: props => isCurrentPageFailure(props.node.data.time, since) },
-    { name: 'conversation.chat.turnTail', id: 'turn-continuation', visible: props => props.turn.end?.data.reason.kind !== 'error' || isCurrentPageFailure(props.turn.end.time, since) },
+    { name: 'conversation.chat.turnTail', id: 'turn-continuation', visible: () => false },
   ]
   const cleanups = cells.map(cell => {
     let original, wrapper, remove = () => {}

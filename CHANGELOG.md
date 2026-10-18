@@ -2,6 +2,12 @@
 
 All notable changes to DS Bot are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the versions follow [Semantic Versioning](https://semver.org/). Before 1.0, a minor version can contain breaking changes.
 
+## [0.1.6-rabi.30] - 2026-10-18
+
+### Changed
+
+- Remove manual continuation buttons from Bot chats. Automatically continue interrupted turns and quota failures through the native driver, preserving progress without another user message. Back off repeated failures and cancel pending continuation for new input, explicit stops or unloading. Prefer native recovery after restart; unknown Hook outcomes are not replayed.
+
 ## [0.1.6-rabi.29] - 2026-10-18
 
 ### Added

@@ -3275,7 +3275,7 @@ function isCurrentPageFailure(time, since2 = errorPageStartedAt) {
 function installTransientErrors(slots, since2 = errorPageStartedAt) {
   const cells = [
     { name: "conversation.chat.node", key: "turn-error", visible: (props) => isCurrentPageFailure(props.node.data.time, since2) },
-    { name: "conversation.chat.turnTail", id: "turn-continuation", visible: (props) => props.turn.end?.data.reason.kind !== "error" || isCurrentPageFailure(props.turn.end.time, since2) }
+    { name: "conversation.chat.turnTail", id: "turn-continuation", visible: () => false }
   ];
   const cleanups = cells.map((cell) => {
     let original, wrapper, remove = () => {
