@@ -85,6 +85,15 @@ test('read-only Hosts list existing files and refuse additions', async t => {
   await assert.rejects(call('add', { name: 'new.md', text: 'not saved' }), /Another Host/)
 })
 
+test('files changed outside the app still obey text and size limits on read', async t => {
+  const { rt, call } = await start(t, { groupLibraryMaxBytes: 8 })
+  await rt.ensureGroupLibrary('first')
+  await writeFile(join(rt.groupLibraryPath('first'), 'bad.md'), Buffer.from([0xff, 0xfe]))
+  await writeFile(join(rt.groupLibraryPath('first'), 'big.md'), 'too large')
+  await assert.rejects(call('read', { name: 'bad.md' }), /UTF-8 text/)
+  await assert.rejects(call('read', { name: 'big.md' }), /file limit/)
+})
+
 test('the library tool returns recorded file data only to team Bots', async t => {
   const { call, tools } = await start(t)
   await call('add', { name: 'guide.md', text: 'Reference only' })

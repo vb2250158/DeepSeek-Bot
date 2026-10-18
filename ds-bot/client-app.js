@@ -8882,7 +8882,7 @@ function GroupLibrary({ room: room2, roster, actions }) {
       stopped = true;
       generation.current++;
     };
-  }, [room2.id, actions]);
+  }, [room2.id, actions.groupLibraryList]);
   const run = async (task) => {
     if (busy) return;
     setBusy(true);
@@ -8907,7 +8907,13 @@ function GroupLibrary({ room: room2, roster, actions }) {
     if (!selected) return;
     await run(async () => {
       if (selected.size > view.maxBytes) throw new Error(t("This document exceeds the group library file limit"));
-      const text = new TextDecoder("utf-8", { fatal: true }).decode(await selected.arrayBuffer());
+      const bytes = await selected.arrayBuffer();
+      let text;
+      try {
+        text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+      } catch (cause) {
+        throw new Error(t("Use a UTF-8 text document"), { cause });
+      }
       await actions.groupLibraryAdd(room2.id, selected.name, text);
       await refresh();
     });
@@ -8928,8 +8934,7 @@ function GroupLibrary({ room: room2, roster, actions }) {
     view ? (0, import_react22.createElement)(
       "div",
       null,
-      (0, import_react22.createElement)("div", { className: "bt-section-title" }, t("Group folder")),
-      (0, import_react22.createElement)("div", { className: "bt-group-folder" }, view.folder),
+      (0, import_react22.createElement)("details", { className: "bt-group-folder" }, (0, import_react22.createElement)("summary", null, t("Group folder")), (0, import_react22.createElement)("div", null, view.folder)),
       document2 ? (0, import_react22.createElement)(
         "div",
         { className: "bt-group-document" },

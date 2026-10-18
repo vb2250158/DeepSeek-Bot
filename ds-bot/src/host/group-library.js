@@ -78,7 +78,9 @@ export function install(rt) {
       const bytes = Buffer.alloc(maxBytes + 1)
       const { bytesRead } = await handle.read(bytes, 0, bytes.length, 0)
       if (bytesRead > maxBytes) throw refused('This document exceeds the group library file limit')
-      const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes.subarray(0, bytesRead))
+      let text
+      try { text = new TextDecoder('utf-8', { fatal: true }).decode(bytes.subarray(0, bytesRead)) }
+      catch (cause) { throw Object.assign(refused('Use a UTF-8 text document'), { cause }) }
       return { name, text, revision: revision(bytes.subarray(0, bytesRead)) }
     } finally { await handle.close() }
   }

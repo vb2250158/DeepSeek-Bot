@@ -17,7 +17,7 @@ export function GroupLibrary({ room, roster, actions }) {
     actions.groupLibraryList(room.id).then(value => { if (!stopped) setView(value) })
       .catch(failure => { if (!stopped) setError(failure.message) })
     return () => { stopped = true; generation.current++ }
-  }, [room.id, actions])
+  }, [room.id, actions.groupLibraryList])
   const run = async task => {
     if (busy) return
     setBusy(true); setError('')
@@ -36,7 +36,10 @@ export function GroupLibrary({ room, roster, actions }) {
     if (!selected) return
     await run(async () => {
       if (selected.size > view.maxBytes) throw new Error(t('This document exceeds the group library file limit'))
-      const text = new TextDecoder('utf-8', { fatal: true }).decode(await selected.arrayBuffer())
+      const bytes = await selected.arrayBuffer()
+      let text
+      try { text = new TextDecoder('utf-8', { fatal: true }).decode(bytes) }
+      catch (cause) { throw new Error(t('Use a UTF-8 text document'), { cause }) }
       await actions.groupLibraryAdd(room.id, selected.name, text)
       await refresh()
     })
@@ -53,8 +56,7 @@ export function GroupLibrary({ room, roster, actions }) {
     error ? h('div', { className: 'bt-error', role: 'alert' }, hostText(error)) : null,
     !view ? error ? h(Button, { onClick: () => void run(refresh) }, t('Retry')) : h('div', { className: 'bt-mem-skel', 'aria-label': t('Loading…') }, h('span'), h('span')) : null,
     view ? h('div', null,
-      h('div', { className: 'bt-section-title' }, t('Group folder')),
-      h('div', { className: 'bt-group-folder' }, view.folder),
+      h('details', { className: 'bt-group-folder' }, h('summary', null, t('Group folder')), h('div', null, view.folder)),
       document ? h('div', { className: 'bt-group-document' },
         h(Button, { onClick: () => setDocument(null) }, t('Back to library')),
         h('h3', null, document.name), h('pre', null, document.text))
