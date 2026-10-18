@@ -2,6 +2,12 @@
 
 All notable changes to DS Bot are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the versions follow [Semantic Versioning](https://semver.org/). Before 1.0, a minor version can contain breaking changes.
 
+## [0.1.6-rabi.25] - 2026-10-18
+
+### Changed
+
+- Stretch the single-line model selector across the Details content width, keeping its label left-aligned and its arrow at the trailing edge.
+
 ## [0.1.6-rabi.24] - 2026-10-18
 
 ### Changed

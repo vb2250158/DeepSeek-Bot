@@ -2374,8 +2374,9 @@ body[data-ds-dark-theme] .bt-scrim{background:rgba(0,0,0,.5)}
 .bt-info-column>.bt-drawer-top{min-height:32px;padding:4px 10px 0;gap:4px}
 .bt-info-column>.bt-drawer-top .bt-round{width:28px;height:28px}
 .bt-info-column .bt-drawer-current-model{max-width:none;min-width:0;margin:0}
-.bt-info-column .bt-drawer-current-model>div{min-width:0;max-width:100%}
-.bt-info-column .bt-drawer-current-model button[aria-haspopup]{max-width:100%;min-height:28px}
+.bt-info-column .bt-drawer-current-model>div{width:100%;min-width:0;max-width:100%}
+.bt-info-column .bt-drawer-current-model>div>button[aria-haspopup]{width:100%;max-width:100%;min-height:28px}
+.bt-info-column .bt-drawer-current-model>div>button[aria-haspopup]>span:first-of-type{flex:1;text-align:left}
 .bt-info-column>.bt-tabs{margin:16px 16px 0}
 .bt-info-column>.bt-drawer-body{padding:16px;gap:12px}
 .bt-info-column .bt-rabi-workspace{gap:12px}
