@@ -55,6 +55,18 @@ test('a live Rabi Hook names the wait and a streaming reply needs no duplicate t
   assert.equal(fixture().view, null)
 })
 
+test('cached conversation continues without a retry button and unconfirmed synchronization remains explicit', () => {
+  for (const state of ['cached', 'offline']) {
+    const { view } = fixture({ running: true, hook: { state, at: Date.now() + 1000 } })
+    assert.equal(view.node.props.role, 'status')
+    assert.match(JSON.stringify(view), /Replying/)
+    assert.doesNotMatch(JSON.stringify(view), /button|send your message again/)
+  }
+  const { view } = fixture({ hook: { state: 'sync_unconfirmed', at: Date.now() + 1000 } })
+  assert.match(JSON.stringify(view), /synchronization is unconfirmed/)
+  assert.doesNotMatch(JSON.stringify(view), /button/)
+})
+
 test('stopped Rabi and incomplete plan recovery remain explicit after the run ends', () => {
   const stopped = fixture({ hook: { state: 'failed', code: 'host_stopped' } })
   assert.equal(stopped.view.node.props.role, 'alert')

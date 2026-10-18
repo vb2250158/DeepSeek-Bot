@@ -5,6 +5,9 @@
 export const NAMESPACE = 'ds-bot'
 
 const ZH = {
+  'Replying with confirmed cached context': '正在使用已确认的缓存资料回复',
+  'Replying while Rabi is offline': 'Rabi 暂不可用，正在继续回复',
+  'Reply complete. Rabi synchronization is unconfirmed.': '回复已完成，Rabi 同步尚未确认',
   'Group folder': '群资料文件夹',
   'Back to library': '返回资料库',
   'File name': '文件名',

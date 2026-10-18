@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.6-rabi.32] - Unreleased
+
+### Fixed
+
+- Let cache-capable Rabi Hooks bound binding preparation and reuse confirmed context for offline ordinary replies. Preserve explicit binding rejection, live tool permission and unconfirmed write receipts; never invent missing persona context.
+- Persist pending binding writes before dispatch and read back across automatic recovery and restart without duplicate PUTs.
+- Show cached/offline progress and unconfirmed synchronization without manual retry controls. Add regression coverage for renaming an active group, saving, reloading and sending the next message through the same member sessions.
+
 All notable changes to DS Bot are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the versions follow [Semantic Versioning](https://semver.org/). Before 1.0, a minor version can contain breaking changes.
 
 ## [0.1.6-rabi.31] - 2026-10-18

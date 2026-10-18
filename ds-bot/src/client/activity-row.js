@@ -108,6 +108,8 @@ export function ActivityIndicator({ sessionId, useRoster, useSessionStatus, useL
   const inputAt = Math.max(inputRef.current, pendingInput)
   inputRef.current = inputAt
   const want = !visible ? null
+    : hook?.state === 'cached' ? { key: 'rabi:cached', label: t('Replying with confirmed cached context'), state: 'thinking' }
+    : hook?.state === 'offline' || hook?.state === 'sync_unconfirmed' ? { key: 'rabi:offline', label: t('Replying while Rabi is offline'), state: 'thinking' }
     : hook?.state === 'running' ? { key: `rabi:${hook.point}`, label: t(hook.point === 'SessionStart' || hook.point === 'UserPromptSubmit' ? 'Connecting to Rabi and reading context' : 'Synchronizing with Rabi'), state: 'working' }
     : pendingInput > 0 && !running ? { key: 'submitting', label: t('Sending message'), state: 'thinking' }
     : inputAt > (tool?.at ?? 0)
@@ -164,7 +166,9 @@ export function ActivityIndicator({ sessionId, useRoster, useSessionStatus, useL
     return () => clearInterval(timer)
   }, [phase])
   const failure = hook?.state === 'failed' && (hook.at ?? Infinity) >= inputAt && isCurrentPageFailure(hook.at) ? hook : null
-  const host = useRunningHost(active || failure !== null)
+  const unconfirmed = hook?.state === 'sync_unconfirmed' && !active && (hook.at ?? Infinity) >= inputAt && isCurrentPageFailure(hook.at)
+  const host = useRunningHost(active || failure !== null || unconfirmed)
+  if (host && unconfirmed) return createPortal(h('div', { className: 'bt-rabi-hook-error', role: 'status' }, t('Reply complete. Rabi synchronization is unconfirmed.')), host)
   if (host && failure) return createPortal(h('div', { className: 'bt-rabi-hook-error', role: 'alert' },
     h('span', null, rabiFailureMessage(failure)),
     h('button', { type: 'button', className: 'bt-link', onClick: () => actions.openSettings('rabi') }, t('Rabi connection settings'))), host)

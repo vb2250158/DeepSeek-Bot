@@ -116,6 +116,30 @@ const settle = async (check) => {
 const text = message => message.content.map(block => block.text ?? '').join('\n')
 const kinds = result => result.replies.map(reply => [reply.kind ?? 'message', reply.name])
 
+test('renaming an active group preserves member sessions, delivery and the next round after reload', async t => {
+  const host = await start(t)
+  const first = host.round('rename-first', host.say('@Chief first message'))
+  await settle(() => host.agentOf('ga').calls.length === 1)
+  host.begin('ga')
+  const renamed = await host.call('update-room', { id: 'r1', name: 'Renamed group' })
+  assert.equal(renamed.ok, true)
+  host.finish('ga', 'first reply after rename')
+  await settle(() => first() !== undefined)
+  assert.equal(first().replies[0].text, 'first reply after rename')
+  const saved = JSON.parse(readFileSync(join(host.home, 'state.json'), 'utf8')).rooms.r1
+  assert.equal(saved.id, 'r1'); assert.equal(saved.name, 'Renamed group')
+  assert.deepEqual(saved.sessions, { a: 'ga', b: 'gb', c: 'gc' })
+  assert.ok(saved.log.some(line => line.text === 'first reply after rename'))
+  const restored = await start(t, saved)
+  const second = restored.round('rename-second', restored.say('@Chief second message'))
+  await settle(() => restored.agentOf('ga').calls.length === 1)
+  assert.match(text(restored.begin('ga')), /second message/)
+  restored.finish('ga', 'second reply')
+  await settle(() => second() !== undefined)
+  assert.equal(second().replies[0].text, 'second reply')
+  assert.equal(restored.agentOf('gb').calls.length, 0)
+})
+
 test('work past the grace lets the round go on, and the member that asked answers the result', async (t) => {
   t.mock.timers.enable({ apis: ['setTimeout'] })
   const host = await start(t)

@@ -5,8 +5,8 @@ import { install } from '../src/host/rabi-personas.js'
 import { fakeContext } from './fake-ctx.js'
 
 function fixture({ state = { bots: {}, rooms: {} }, installed = true, config = {}, bindings = new Map(), personas = [{ personaId: 'fixture', name: 'Fixture', routes: [{ token: 'private' }] }] } = {}) {
-  const requirements = new Map()
-  const hooks = { requireBinding(id, roleId) { requirements.set(id, roleId); return () => requirements.delete(id) } }
+  const requirements = new Map(), preparations = new Map()
+  const hooks = { requireBinding(id, roleId, options) { requirements.set(id, roleId); preparations.set(id, options); return () => { requirements.delete(id); preparations.delete(id) } } }
   const ctx = fakeContext({ services: { rabiAgentHooks: hooks } })
   const responses = new Map()
   const requests = []
@@ -56,8 +56,28 @@ function fixture({ state = { bots: {}, rooms: {} }, installed = true, config = {
   }
   const step = async id => { await assemble(id); return { kind: 'enter' } }
   const context = id => ctx.contexts.get('ds-bot:rabi-persona').text({ agent: { id } })
-  return { rt, ctx, hooks, requirements, responses, call, step, assemble, context, requests, created, saves, bindings, setDocument: value => { document = value }, fail: fn => { failure = fn } }
+  return { rt, ctx, hooks, requirements, preparations, responses, call, step, assemble, context, requests, created, saves, bindings, setDocument: value => { document = value }, fail: fn => { failure = fn } }
 }
+
+test('cache-capable Hooks own the bounded binding refresh instead of blocking system-prompt assembly', async () => {
+  const f = fixture()
+  f.hooks.supportsContextCache = true
+  await f.call('rabi-persona-import', { roleId: 'fixture' })
+  f.rt.state.rooms.room = { members: ['bot-1'], sessions: { 'bot-1': 'group-part' } }
+  f.fail(() => true)
+  const before = f.requests.length
+  await f.assemble('group-part')
+  assert.equal(f.requests.length, before, 'assembly never waits on an unavailable Manager')
+  const options = f.preparations.get('group-part')
+  assert.equal(options.allowCachedContext, true)
+  await assert.rejects(options.prepareContext(), error => error.offlineEligible === true)
+  assert.equal(f.bindings.has('group-part'), false)
+  f.fail(undefined)
+  await options.prepareContext()
+  assert.equal(f.bindings.get('group-part'), 'fixture')
+  f.bindings.set('bot-1', 'another')
+  await assert.rejects(options.prepareContext(), error => !error.offlineEligible && /binding changed/.test(error.message))
+})
 
 test('activation and local connection status never discover Manager or read persona files', async () => {
   const f = fixture({ installed: false })
@@ -119,6 +139,27 @@ test('uncertain binding is not replayed; another import resumes the same saved B
   assert.equal((await f.call('rabi-persona-import', { roleId: 'fixture' })).botId, 'bot-1')
   assert.equal(f.created.length, 1)
   assert.equal(f.requests.filter(req => req.method === 'PUT').length, 1)
+})
+
+test('an unconfirmed binding write is not replayed after automatic refresh or restart', async () => {
+  const f = fixture()
+  f.fail(req => req.method === 'PUT')
+  await assert.rejects(f.call('rabi-persona-import', { roleId: 'fixture' }), /uncertain/)
+  f.fail(undefined)
+  await assert.rejects(f.call('rabi-persona-import', { roleId: 'fixture' }), /original receipt/)
+  assert.equal(f.requests.filter(req => req.method === 'PUT').length, 1)
+  const restored = fixture({ state: JSON.parse(JSON.stringify(f.rt.state)) })
+  await assert.rejects(restored.call('rabi-persona-import', { roleId: 'fixture' }), /original receipt/)
+  assert.equal(restored.requests.filter(req => req.method === 'PUT').length, 0)
+  restored.bindings.set('bot-1', 'fixture')
+  assert.equal((await restored.call('rabi-persona-import', { roleId: 'fixture' })).linked, true)
+  assert.equal(restored.rt.state.bots['bot-1'].rabiPersona.bindingAttempts, undefined)
+})
+
+test('invalid persisted pending-binding records cannot authorize another write', async () => {
+  const f = fixture({ state: { bots: { existing: { id: 'existing', name: 'Fixture', rabiPersona: { roleId: 'fixture', bindingAttempts: 'invalid' } } }, rooms: {} } })
+  await assert.rejects(f.call('rabi-persona-import', { roleId: 'fixture' }), /Invalid pending Rabi binding records/)
+  assert.equal(f.requests.filter(req => req.method === 'PUT').length, 0)
 })
 
 test('a restart reuses the durable import reference and rejects conflicting remote bindings', async () => {

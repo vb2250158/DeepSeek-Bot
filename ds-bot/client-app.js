@@ -39,6 +39,9 @@ module.exports = __toCommonJS(index_exports);
 // src/client/i18n.js
 var NAMESPACE = "ds-bot";
 var ZH = {
+  "Replying with confirmed cached context": "正在使用已确认的缓存资料回复",
+  "Replying while Rabi is offline": "Rabi 暂不可用，正在继续回复",
+  "Reply complete. Rabi synchronization is unconfirmed.": "回复已完成，Rabi 同步尚未确认",
   "Group folder": "群资料文件夹",
   "Back to library": "返回资料库",
   "File name": "文件名",
@@ -4887,7 +4890,7 @@ function ActivityIndicator({ sessionId, useRoster, useSessionStatus, useLive, us
   const inputRef = (0, import_react8.useRef)(0);
   const inputAt = Math.max(inputRef.current, pendingInput);
   inputRef.current = inputAt;
-  const want = !visible ? null : hook?.state === "running" ? { key: `rabi:${hook.point}`, label: t(hook.point === "SessionStart" || hook.point === "UserPromptSubmit" ? "Connecting to Rabi and reading context" : "Synchronizing with Rabi"), state: "working" } : pendingInput > 0 && !running ? { key: "submitting", label: t("Sending message"), state: "thinking" } : inputAt > (tool?.at ?? 0) ? { key: `input:${inputAt}`, pool: PHRASES.thinking, state: "thinking" } : tool ? { key: tool.label ? `tool:${tool.label}` : "working", label: tool.label, pool: PHRASES.working, state: tool.state ?? "working" } : { key: "thinking", pool: PHRASES.thinking, state: "thinking" };
+  const want = !visible ? null : hook?.state === "cached" ? { key: "rabi:cached", label: t("Replying with confirmed cached context"), state: "thinking" } : hook?.state === "offline" || hook?.state === "sync_unconfirmed" ? { key: "rabi:offline", label: t("Replying while Rabi is offline"), state: "thinking" } : hook?.state === "running" ? { key: `rabi:${hook.point}`, label: t(hook.point === "SessionStart" || hook.point === "UserPromptSubmit" ? "Connecting to Rabi and reading context" : "Synchronizing with Rabi"), state: "working" } : pendingInput > 0 && !running ? { key: "submitting", label: t("Sending message"), state: "thinking" } : inputAt > (tool?.at ?? 0) ? { key: `input:${inputAt}`, pool: PHRASES.thinking, state: "thinking" } : tool ? { key: tool.label ? `tool:${tool.label}` : "working", label: tool.label, pool: PHRASES.working, state: tool.state ?? "working" } : { key: "thinking", pool: PHRASES.thinking, state: "thinking" };
   const [shown, setShown] = (0, import_react8.useState)(null);
   const wantKey = want?.key ?? null;
   const markState = (0, import_react8.useRef)("thinking");
@@ -4942,7 +4945,9 @@ function ActivityIndicator({ sessionId, useRoster, useSessionStatus, useLive, us
     return () => clearInterval(timer);
   }, [phase]);
   const failure = hook?.state === "failed" && (hook.at ?? Infinity) >= inputAt && isCurrentPageFailure(hook.at) ? hook : null;
-  const host = useRunningHost(active || failure !== null);
+  const unconfirmed = hook?.state === "sync_unconfirmed" && !active && (hook.at ?? Infinity) >= inputAt && isCurrentPageFailure(hook.at);
+  const host = useRunningHost(active || failure !== null || unconfirmed);
+  if (host && unconfirmed) return (0, import_react_dom2.createPortal)((0, import_react8.createElement)("div", { className: "bt-rabi-hook-error", role: "status" }, t("Reply complete. Rabi synchronization is unconfirmed.")), host);
   if (host && failure) return (0, import_react_dom2.createPortal)((0, import_react8.createElement)(
     "div",
     { className: "bt-rabi-hook-error", role: "alert" },

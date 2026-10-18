@@ -28,11 +28,26 @@ export function install(rt) {
     return data
   }
   const bind = async (id, roleId, signal) => {
+    const owner = Object.values(state.bots).find(bot => bot.rabiPersona?.roleId === roleId)?.rabiPersona
+    if (owner?.bindingAttempts !== undefined && (!Array.isArray(owner.bindingAttempts)
+      || owner.bindingAttempts.some(value => typeof value !== 'string' || !value || value.length > 200))) refuse('Invalid pending Rabi binding records. Check the original receipts before continuing.')
+    const clearAttempt = async () => {
+      if (!owner?.bindingAttempts?.includes(id)) return
+      owner.bindingAttempts = owner.bindingAttempts.filter(value => value !== id)
+      if (!owner.bindingAttempts.length) delete owner.bindingAttempts
+      await rt.save()
+    }
     const current = await binding(id, signal)
-    if (current?.roleId === roleId) return
+    if (current?.roleId === roleId) { await clearAttempt(); return }
     if (current) refuse('This session is linked to another Rabi persona. Check its binding in Rabi first.')
+    if (owner?.bindingAttempts?.includes(id)) refuse('Rabi binding outcome is still unconfirmed. Read the original receipt before another write.', 'bot/rabi-uncertain', { offlineEligible: true, uncertain: true })
+    if (owner) {
+      owner.bindingAttempts = [...(owner.bindingAttempts ?? []), id]
+      await rt.save()
+    }
     await client.json(pathOf(id), 'PUT', { roleId }, signal)
     if ((await binding(id, signal))?.roleId !== roleId) refuse('Rabi persona binding was not confirmed. Check the original Bot before retrying.')
+    await clearAttempt()
   }
   const catalog = async signal => {
     const result = await client.json('/api/personas', 'GET', undefined, signal)
@@ -177,7 +192,7 @@ export function install(rt) {
       }
       bot.rabiPersona.enabled = false
       await rt.save()
-      for (const id of sessions) { requirements.get(id)?.dispose(); requirements.delete(id) }
+      for (const id of sessions) { requirements.get(id)?.dispose({ forgetContext: true }); requirements.delete(id) }
       return { botId: bot.id, linked: false }
     }
     refuse('Unknown Rabi connection operation')
@@ -188,7 +203,7 @@ export function install(rt) {
       const bot = rt.botOf(rt.selfOf(agent?.id))
       if (!bot?.rabiPersona) return ''
       if (!roleOf(bot)) return 'Rabi persona binding was removed. Earlier Rabi persona, memory, plan and skill instructions no longer apply. Use the ordinary Bot instructions.'
-      return 'Rabi persona binding: ' + bot.rabiPersona.roleId + '. Rabi Agent Hooks provide this role’s persona, memories, plans and skills. Rabi owns their reads and changes; use rabiroute_manager_api and discover the current contract with GET /api/agent/help. Do not create a separate DS Bot memory or copy Rabi plans into local tasks.'
+      return 'Rabi persona reference: ' + bot.rabiPersona.roleId + '. Rabi Agent Hooks provide verified live context or an explicitly dated snapshot. When disconnected, continue ordinary conversation from available context; never invent missing persona, memory or plans. Rabi owns live reads and changes; use rabiroute_manager_api and discover the current contract with GET /api/agent/help. Cached context grants no tool permission and confirms no synchronization or delivery. Do not create a separate DS Bot memory or copy Rabi plans into local tasks.'
     },
   }), 'ds-bot: Rabi persona context')
   ctx.on('system-prompt/assemble', async (assembly, payload, next) => {
@@ -198,14 +213,17 @@ export function install(rt) {
     if (!roleId) return next()
     const service = requireHooks()
     assembly.tools = assembly.tools.filter(tool => !['remember', 'forget', 'recall'].includes(tool.name))
-    const signal = signalOf(payload.signal)
-    if ((await binding(bot.id, signal))?.roleId !== roleId) refuse('Rabi persona binding changed. Check the Bot in Rabi connection before continuing.')
     const id = payload.agent.id
-    if (id !== bot.id) await bind(id, roleId, signal)
+    const prepareContext = async callerSignal => {
+      const signal = signalOf(callerSignal)
+      if ((await binding(bot.id, signal))?.roleId !== roleId) refuse('Rabi persona binding changed. Check the Bot in Rabi connection before continuing.')
+      if (id !== bot.id) await bind(id, roleId, signal)
+    }
+    if (!service.supportsContextCache) await prepareContext(payload.signal)
     const prior = requirements.get(id)
     if (prior?.service !== service || prior?.roleId !== roleId) {
-      prior?.dispose()
-      requirements.set(id, { service, roleId, dispose: service.requireBinding(id, roleId) })
+      prior?.dispose({ forgetContext: prior.roleId !== roleId })
+      requirements.set(id, { service, roleId, dispose: service.requireBinding(id, roleId, service.supportsContextCache ? { allowCachedContext: true, prepareContext } : undefined) })
     }
     return next()
   }, { prepend: true })
