@@ -2371,6 +2371,23 @@ body[data-ds-dark-theme] .bt-scrim{background:rgba(0,0,0,.5)}
 .bt-set-card{border:1px solid var(--bt-line);border-radius:12px;background:var(--bt-card);display:flex;flex-direction:column}
 .bt-rabi-actions{display:flex;gap:6px;flex-wrap:wrap}
 .bt-drawer-current-model{width:100%;max-width:280px;margin-top:12px}
+.bt-info-column>.bt-drawer-top{min-height:32px;padding:4px 10px 0;gap:4px}
+.bt-info-column>.bt-drawer-top .bt-round{width:28px;height:28px}
+.bt-info-column>.bt-drawer-id{display:grid;grid-template-columns:36px minmax(0,1fr) auto;gap:2px 8px;align-items:center;padding:4px 10px 0}
+.bt-info-column>.bt-drawer-id>.bt-mark{grid-column:1;grid-row:1/3;margin:0}
+.bt-info-column>.bt-drawer-id>.bt-drawer-name,.bt-info-column>.bt-drawer-id>.bt-drawer-name-input{grid-column:2;grid-row:1;justify-self:start;text-align:left;font-size:14px;line-height:20px;padding:0}
+.bt-info-column>.bt-drawer-id>.bt-drawer-role{grid-column:3;grid-row:1;margin:0;font-size:11px;color:var(--bt-ink-2)}
+.bt-info-column .bt-drawer-current-model{grid-column:2/4;grid-row:2;max-width:none;min-width:0;margin:0}
+.bt-info-column .bt-drawer-current-model>div{min-width:0;max-width:100%}
+.bt-info-column .bt-drawer-current-model button[aria-haspopup]{max-width:100%;min-height:28px}
+.bt-info-column>.bt-tabs{margin:8px 10px 0}
+.bt-info-column>.bt-drawer-body{padding:10px;gap:12px}
+.bt-info-column .bt-rabi-workspace{gap:12px}
+.bt-info-column .bt-rabi-resources{padding:2px;gap:2px}
+.bt-info-column .bt-rabi-resources>button{min-width:0;padding:5px 2px;font-size:12px}
+.bt-info-column .bt-rabi-resource{gap:6px}
+.bt-info-column .bt-set-row{padding:7px 9px;gap:6px}
+.bt-info-column .bt-set-copy>span:first-child{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .bt-rabi-workspace{display:flex;flex-direction:column;gap:20px;min-width:0}
 .bt-rabi-resources{display:flex;flex-wrap:wrap;gap:4px;padding:4px;border-radius:10px;background:var(--bt-hover)}
 .bt-rabi-resources>button{flex:1;min-width:56px;padding:7px 4px;border:0;border-radius:8px;background:transparent;color:var(--bt-ink-2);font:inherit;font-size:13px;cursor:pointer}
@@ -6341,6 +6358,19 @@ function modelOf(bot, roster) {
   const [provider, ...rest] = ref.split("/");
   return { ref, name: served?.name ?? rest.join("/"), provider: served?.providerName ?? provider, served: served !== void 0 };
 }
+function BotModelControl({ bot, roster, actions, run }) {
+  const Control = actions.modelControl?.();
+  if (!Control) return (0, import_react11.createElement)(ModelMenu, { bot, roster, actions, run });
+  const model = modelOf(bot, roster);
+  const [provider, ...parts] = model?.ref.split("/") ?? [];
+  const current = model ? { provider, model: parts.join("/"), ...bot.effort === void 0 ? {} : { reasoningEffort: bot.effort } } : null;
+  return (0, import_react11.createElement)(Control, {
+    sessionId: currentPart(bot),
+    current,
+    locked: false,
+    select: (selection) => run(actions.updateBot(bot.id, { model: `${selection.provider}/${selection.model}`, effort: selection.reasoningEffort ?? null }))
+  });
+}
 var effortCache = /* @__PURE__ */ new Map();
 function useEfforts(served, ref, actions) {
   const [fetched, setFetched] = (0, import_react11.useState)(void 0);
@@ -8902,7 +8932,7 @@ function DetailsDrawer({ sessionId, startRenaming, startTab, hasStrip, compact: 
     (0, import_react20.createElement)(
       "div",
       { key: "id", className: "bt-drawer-id", "data-move": side },
-      bot ? (0, import_react20.createElement)(BotAvatar, { bot, size: 64, state: botState(running, doing, roster.questions?.[part] !== void 0), main: isMainBot, badge: false, gaze: true, pokeable: true }) : (0, import_react20.createElement)(RoomAvatar, { room: room2, roster, size: 64 }),
+      bot ? (0, import_react20.createElement)(BotAvatar, { bot, size: compact2 ? 36 : 64, state: botState(running, doing, roster.questions?.[part] !== void 0), main: isMainBot, badge: false, gaze: true, pokeable: true }) : (0, import_react20.createElement)(RoomAvatar, { room: room2, roster, size: 64 }),
       editing ? (0, import_react20.createElement)("input", {
         className: "bt-drawer-name-input",
         autoFocus: true,
@@ -8923,7 +8953,7 @@ function DetailsDrawer({ sessionId, startRenaming, startTab, hasStrip, compact: 
         setEditing(true);
       } }, current),
       subtitle ? (0, import_react20.createElement)("span", { className: "bt-drawer-role" }, subtitle) : null,
-      compact2 && bot ? (0, import_react20.createElement)("div", { className: "bt-drawer-current-model", "aria-label": t("Model") }, (0, import_react20.createElement)(ModelMenu, { bot, roster, actions, run, wide: true })) : null
+      compact2 && bot ? (0, import_react20.createElement)("div", { className: "bt-drawer-current-model", "aria-label": t("Model") }, (0, import_react20.createElement)(BotModelControl, { bot, roster, actions, run })) : null
     ),
     (0, import_react20.createElement)(
       "div",
@@ -9142,7 +9172,7 @@ var WORKBENCH_CSS = `
 .bt-column-resizer{position:absolute;z-index:5;top:0;bottom:0;right:0;width:6px;cursor:col-resize;touch-action:none;user-select:none;outline:none}
 .bt-column-resizer[data-side=details]{left:0;right:auto}
 .bt-column-resizer:hover,.bt-column-resizer:focus-visible{background:var(--bt-accent)}
-.bt-info-column>.bt-drawer-top{min-height:44px;box-sizing:border-box}
+.bt-info-column>.bt-drawer-top{min-height:32px;box-sizing:border-box}
 .bt-workbench [data-slot="conversation.input.permission"],.bt-workbench [data-slot="conversation.input.model"]{display:none}
 @container(max-width:760px){.bt-info-column{display:none}}
 @container(max-width:600px){.bt-team-column{flex:0 0 72px;min-width:72px}.bt-chat-column{min-width:0}.bt-team-column .bt-row-body,.bt-team-column .bt-tile-name,.bt-team-column .bt-side-top,.bt-team-footer,.bt-column-resizer{display:none}.bt-team-column .bt-row{justify-content:center;padding:8px 0}.bt-team-column .bt-tile{width:48px;padding:6px 0}.bt-team-column>.bt-side{padding:8px 4px}}
@@ -13698,6 +13728,17 @@ function apply(ctx) {
     seenAt = {};
   }
   const ui2 = createSource({ details: null, view: "details", renaming: false, tab: null, newChat: null, exchange: null, menu: null, voice: null, palette: null, quote: null, settings: null, memory: null, toast: null, signIn: null, renameAgent: null, unread: savedUnread, reactions: savedReactions, visits: {} });
+  let modelControl = null;
+  ctx.inject(["modelPickers"], (child) => {
+    child.effect(() => {
+      modelControl = child.modelPickers.Control ?? null;
+      ui2.set((value) => ({ ...value }));
+      return () => {
+        modelControl = null;
+        ui2.set((value) => ({ ...value }));
+      };
+    });
+  });
   const surface = createSource({ mode: readMode(), plain: false });
   let agentSessionCache = /* @__PURE__ */ new Set();
   try {
@@ -14226,6 +14267,7 @@ function apply(ctx) {
     setPrefs: (prefs) => after(call("set-prefs", prefs)),
     rabiComputers: (endpoint, payload, signal) => call(endpoint, payload, signal),
     rabiWorkspace,
+    modelControl: () => modelControl,
     rabiConnection: (endpoint, payload, signal) => endpoint === "rabi-persona-import" || endpoint === "rabi-personas-import-all" || endpoint === "rabi-persona-unlink" ? after(call(endpoint, payload, signal)).then((value) => {
       if (payload?.botId) rabiWorkspace.invalidateBot(payload.botId);
       return value;

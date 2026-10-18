@@ -2,6 +2,12 @@
 
 All notable changes to DS Bot are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the versions follow [Semantic Versioning](https://semver.org/). Before 1.0, a minor version can contain breaking changes.
 
+## [0.1.6-rabi.23] - 2026-10-18
+
+### Changed
+
+- Compact the right-panel header and resource spacing. Reuse the installed model selector’s single-line control, frequent models, search and reasoning slider while DS Bot owns saving.
+
 ## [0.1.6-rabi.22] - 2026-10-18
 
 ### Changed

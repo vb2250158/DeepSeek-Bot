@@ -26,7 +26,19 @@ runInNewContext(bundle.outputFiles[0].text, {
     return platform[name]
   },
 })
-const { groupModels, ModelChoiceDock, effortRows } = module.exports
+const { groupModels, ModelChoiceDock, effortRows, BotModelControl } = module.exports
+
+test('the shared model and reasoning picker saves only through the Bot owner', async () => {
+  const Control = () => null
+  const saved = []
+  const node = BotModelControl({ bot: { id: 'bot', sessionId: 'part', model: 'provider/model', effort: 'low' }, roster: {},
+    actions: { modelControl: () => Control, updateBot: async (id, patch) => saved.push([id, patch]) }, run: async task => { await task; return true } })
+  assert.equal(node.type, Control)
+  assert.equal(node.props.sessionId, 'part')
+  assert.deepEqual(JSON.parse(JSON.stringify(node.props.current)), { provider: 'provider', model: 'model', reasoningEffort: 'low' })
+  assert.equal(await node.props.select({ provider: 'other', model: 'next', reasoningEffort: 'high' }), true)
+  assert.deepEqual(JSON.parse(JSON.stringify(saved)), [['bot', { model: 'other/next', effort: 'high' }]])
+})
 
 function nodes(tree, match) {
   if (!tree || typeof tree !== 'object') return []

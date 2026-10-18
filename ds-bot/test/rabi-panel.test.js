@@ -34,7 +34,7 @@ test('the compact panel shows its model in both tabs and gives Rabi resources on
     const tree = nodes(module.exports.DetailsDrawer({ sessionId: bot.id, compact: true, roster, actions: {}, useSessionStatus: pick => pick(new Map()), useActivity: pick => pick({}), useSessions: () => '', useWork: noop }))
     observed[tab] = {
       tabs: tree.filter(node => node.props?.role === 'tab').map(node => node.props.children[0]),
-      models: tree.filter(node => node.type?.name === 'ModelMenu').length,
+      models: tree.filter(node => node.type?.name === 'BotModelControl').length,
       resources: tree.filter(node => node.type?.name === 'RabiWorkspace').length,
     }
   }

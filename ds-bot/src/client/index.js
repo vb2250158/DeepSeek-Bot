@@ -57,6 +57,14 @@ export function apply(ctx) {
   // `details` is the panel's subject (a Session id); `view` picks details or the
   // subject Bot's browser inside it.
   const ui = createSource({ details: null, view: 'details', renaming: false, tab: null, newChat: null, exchange: null, menu: null, voice: null, palette: null, quote: null, settings: null, memory: null, toast: null, signIn: null, renameAgent: null, unread: savedUnread, reactions: savedReactions, visits: {} })
+  let modelControl = null
+  ctx.inject(['modelPickers'], child => {
+    child.effect(() => {
+      modelControl = child.modelPickers.Control ?? null
+      ui.set(value => ({ ...value }))
+      return () => { modelControl = null; ui.set(value => ({ ...value })) }
+    })
+  })
   // Bot mode paints the whole team surface; Agent mode withdraws every slot and
   // style so the shell's own interface returns. `plain` stays false until a Bot-mode
   // view hosts a plain session, which drops only the conversation replacements.
@@ -527,6 +535,7 @@ export function apply(ctx) {
     setPrefs: prefs => after(call('set-prefs', prefs)),
     rabiComputers: (endpoint, payload, signal) => call(endpoint, payload, signal),
     rabiWorkspace,
+    modelControl: () => modelControl,
     rabiConnection: (endpoint, payload, signal) => endpoint === 'rabi-persona-import' || endpoint === 'rabi-personas-import-all' || endpoint === 'rabi-persona-unlink'
       ? after(call(endpoint, payload, signal)).then(value => { if (payload?.botId) rabiWorkspace.invalidateBot(payload.botId); return value }) : call(endpoint, payload, signal),
     setMain: (id, main = true, options = {}) => after(call('set-main', { id, main, ...options })),

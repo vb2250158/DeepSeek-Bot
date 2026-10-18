@@ -42,6 +42,17 @@ export function modelOf(bot, roster) {
   return { ref, name: served?.name ?? rest.join('/'), provider: served?.providerName ?? provider, served: served !== undefined }
 }
 
+/** Reuse the installed chooser while DS Bot retains ownership of saved Bot routes. */
+export function BotModelControl({ bot, roster, actions, run }) {
+  const Control = actions.modelControl?.()
+  if (!Control) return h(ModelMenu, { bot, roster, actions, run })
+  const model = modelOf(bot, roster)
+  const [provider, ...parts] = model?.ref.split('/') ?? []
+  const current = model ? { provider, model: parts.join('/'), ...(bot.effort === undefined ? {} : { reasoningEffort: bot.effort }) } : null
+  return h(Control, { sessionId: currentPart(bot), current, locked: false,
+    select: selection => run(actions.updateBot(bot.id, { model: `${selection.provider}/${selection.model}`, effort: selection.reasoningEffort ?? null })) })
+}
+
 // The thinking levels of one model, `{efforts, defaultEffort?}` or undefined when it
 // has none. The catalog carries them for models Bots use; any other ref asks the host.
 const effortCache = new Map()

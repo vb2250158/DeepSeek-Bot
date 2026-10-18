@@ -72,7 +72,7 @@ export const WORKBENCH_CSS = `
 .bt-column-resizer{position:absolute;z-index:5;top:0;bottom:0;right:0;width:6px;cursor:col-resize;touch-action:none;user-select:none;outline:none}
 .bt-column-resizer[data-side=details]{left:0;right:auto}
 .bt-column-resizer:hover,.bt-column-resizer:focus-visible{background:var(--bt-accent)}
-.bt-info-column>.bt-drawer-top{min-height:44px;box-sizing:border-box}
+.bt-info-column>.bt-drawer-top{min-height:32px;box-sizing:border-box}
 .bt-workbench [data-slot="conversation.input.permission"],.bt-workbench [data-slot="conversation.input.model"]{display:none}
 @container(max-width:760px){.bt-info-column{display:none}}
 @container(max-width:600px){.bt-team-column{flex:0 0 72px;min-width:72px}.bt-chat-column{min-width:0}.bt-team-column .bt-row-body,.bt-team-column .bt-tile-name,.bt-team-column .bt-side-top,.bt-team-footer,.bt-column-resizer{display:none}.bt-team-column .bt-row{justify-content:center;padding:8px 0}.bt-team-column .bt-tile{width:48px;padding:6px 0}.bt-team-column>.bt-side{padding:8px 4px}}

@@ -7,7 +7,7 @@ import { GlobeIcon, Favicon } from './browser-pane.js'
 import { useEscape } from './overlay-hooks.js'
 import { BotSettingsForm } from './bot-settings.js'
 import { GroupSettingsForm, ROOM_MODES, roomSubtitle, shownMode } from './group-settings.js'
-import { ModelMenu, modelOf } from './model-menu.js'
+import { BotModelControl, ModelMenu, modelOf } from './model-menu.js'
 import { FolderMenu } from './folder-menu.js'
 import { MemoryRow } from './memory-panel.js'
 import { ScheduleSummary } from './schedules.js'
@@ -212,7 +212,7 @@ export function DetailsDrawer({ sessionId, startRenaming, startTab, hasStrip, co
   const tabs = bot ? (compact ? ['details', 'library'] : ['details', 'browser']) : ['details']
   return [h(Fragment, { key: 'top' }, top),
     h('div', { key: 'id', className: 'bt-drawer-id', 'data-move': side },
-      bot ? h(BotAvatar, { bot, size: 64, state: botState(running, doing, roster.questions?.[part] !== undefined), main: isMainBot, badge: false, gaze: true, pokeable: true })
+      bot ? h(BotAvatar, { bot, size: compact ? 36 : 64, state: botState(running, doing, roster.questions?.[part] !== undefined), main: isMainBot, badge: false, gaze: true, pokeable: true })
         : h(RoomAvatar, { room, roster, size: 64 }),
       editing
         ? h('input', {
@@ -223,7 +223,7 @@ export function DetailsDrawer({ sessionId, startRenaming, startTab, hasStrip, co
           })
         : h('button', { type: 'button', className: 'bt-drawer-name', 'aria-label': t('Rename {name}', { name: current }), title: t('Rename'), onClick: () => { setDraftName(room && !room.named ? '' : current); setEditing(true) } }, current),
       subtitle ? h('span', { className: 'bt-drawer-role' }, subtitle) : null,
-      compact && bot ? h('div', { className: 'bt-drawer-current-model', 'aria-label': t('Model') }, h(ModelMenu, { bot, roster, actions, run, wide: true })) : null),
+      compact && bot ? h('div', { className: 'bt-drawer-current-model', 'aria-label': t('Model') }, h(BotModelControl, { bot, roster, actions, run })) : null),
     h('div', { key: 'tabs', ref: glide.box, className: 'bt-tabs', role: 'tablist', 'data-move': side },
       h('span', { ref: glide.thumb, className: 'bt-thumb', 'aria-hidden': true }),
       tabs.map(key => h('button', { key, type: 'button', role: 'tab', className: 'bt-tab', 'aria-selected': tab === key, onClick: () => setTab(key) }, t(TAB_LABELS[key])))),
