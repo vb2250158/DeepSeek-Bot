@@ -8,6 +8,8 @@ The DS Bot plugin for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek
 
 Tested with dsh `0.2.0-rc.2` (Web and Desktop) on Linux.
 
+The chat tail reports submitted messages and live Rabi Hook progress, with explicit stopped-Host, recovery and uncertain-result notices. Bound Bots discover Rabi automatically; progress codes require adapter 0.13.36 or newer.
+
 ## Harness panel
 
 In the maintenance fork, **DS Bot** appears below automation in the native DSH sidebar. Open it for the team and conversation list, shared DSH chat and the selected Bot or group's details. Native navigation remains available; leaving the panel restores native conversation presentation. The former floating title and memory-update pill is not mounted.

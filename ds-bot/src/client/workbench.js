@@ -1,6 +1,7 @@
 import { createElement as h, Fragment, useEffect } from 'react'
 import { TeamSidebar, AccountLauncher } from './sidebar.js'
 import { DetailsDrawer } from './details-drawer.js'
+import { ActivityIndicator } from './activity-row.js'
 import { FishLogo } from '@deepseek-ai/dsh-client-ui-primitives'
 import { t } from './i18n.js'
 import { ColumnResizer, useColumnWidth } from './column-resizer.js'
@@ -42,7 +43,8 @@ export function BotConversation(props) {
   }, [sessionId, actions])
   return h(Fragment, null,
     h('section', { className: 'bt-chat-column', 'aria-label': t('Message'), style: { '--bt-placeholder': JSON.stringify(name ? t('Message {name}', { name }) : t('Message')) } },
-      renderFactorySlot('conversation.content', { variant: 'embedded', phase: 'active', hero: false })),
+      renderFactorySlot('conversation.content', { variant: 'embedded', phase: 'active', hero: false }),
+      known ? h(ActivityIndicator, { ...props, key: sessionId, sessionId }) : null),
     known ? h('aside', { className: 'bt-info-column', 'aria-label': t('View conversation details'), style: { '--bt-details-width': `${width}px` } },
       h(DetailsDrawer, { ...props, key: `${id}:${ui.details === id && ui.renaming ? 'rename' : ''}:${ui.details === id ? ui.tab ?? '' : ''}`, sessionId: id, roster, hasStrip: true, compact: true,
         startRenaming: ui.details === id && ui.renaming, startTab: ui.details === id ? ui.tab : null,

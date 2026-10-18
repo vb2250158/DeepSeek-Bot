@@ -39,6 +39,14 @@ module.exports = __toCommonJS(index_exports);
 // src/client/i18n.js
 var NAMESPACE = "ds-bot";
 var ZH = {
+  "Connecting to Rabi and reading context": "正在连接 Rabi 并读取资料",
+  "Synchronizing with Rabi": "正在同步 Rabi",
+  "Sending message": "正在提交消息",
+  "Rabi connection settings": "Rabi 连接设置",
+  "Rabi is not running. Start Rabi, then send your message again.": "Rabi 未启动，请先启动 Rabi，再发送消息",
+  "Rabi is restoring its plan service. This turn has not finished synchronizing.": "Rabi 计划服务正在恢复，本轮同步尚未完成",
+  "Rabi did not confirm this operation. Check its original receipt before retrying.": "Rabi 尚未确认本次操作结果，请先核对原回执再重试",
+  "Could not complete the Rabi connection. Check Rabi and its storage connection.": "未能完成 Rabi 连接，请检查 Rabi 及其存储连接",
   "Rabi could not finish reading this persona folder. Check its storage in Rabi, then refresh.": "Rabi 读取人格目录超时，请检查 Rabi 的存储连接后刷新",
   "Pinned chats": "置顶聊天",
   "Drop here to pin": "拖到这里置顶",
@@ -2754,6 +2762,7 @@ header[class*="_header"] .bt-head{flex:1 1 auto;width:100%}
 [data-chat-running]{display:block!important;width:100%;min-height:0!important;margin:0!important;padding:0!important}
 [data-chat-running]>span:not([role=status]){display:none!important}
 [data-chat-running]:has(> .bt-typing){margin-top:var(--dsh-chat-flow-gap,12px)!important}
+.bt-rabi-hook-error{display:flex;flex-wrap:wrap;align-items:center;gap:8px;color:var(--bt-ink-2);font-size:13px;line-height:20px;padding:8px 0}
 .bt-typing{display:flex;align-items:center;gap:12px;height:36px;min-width:0;padding-inline-start:8px;transform-origin:0 50%;animation:bt-typing-in ${SPRING_TAP.duration}ms ${SPRING_TAP.easing} backwards}
 .bt-typing[data-exiting]{animation:bt-typing-out .14s cubic-bezier(.22,1,.36,1) forwards}
 .bt-typing>.bt-mark,.bt-typing>.bt-cluster{flex-shrink:0}
@@ -4688,7 +4697,7 @@ function useRunningHost(active) {
     let frame = 0;
     const find = () => {
       frame = 0;
-      const node = document.querySelector("[data-chat-flow] > [data-chat-running]");
+      const node = document.querySelector("[data-chat-flow] > [data-chat-running]") ?? document.querySelector("[data-chat-flow]");
       setHost((prev) => prev === node ? prev : node);
     };
     const observer = new MutationObserver(() => {
@@ -4750,8 +4759,9 @@ function useRowEntrances(replacing) {
     };
   }, []);
 }
-function ActivityIndicator({ sessionId, useRoster, useSessionStatus, useLive, useSession, actions }) {
+function ActivityIndicator({ sessionId, useRoster, useSessionStatus, useLive, useSession, useWork, actions }) {
   const roster = useRoster((value) => value);
+  const hook = useWork((value) => value.rabi?.[sessionId] ?? null);
   const running = useSessionStatus((map) => map.get(sessionId)?.running === true);
   const liveKey = useLive((state) => JSON.stringify(state[sessionId] ?? {}));
   const pendingInput = useSession((snapshot) => Math.max(0, ...(snapshot?.pendingSubmissions ?? []).filter((sub) => sub.placement !== "queued").map((sub) => sub.time)));
@@ -4761,12 +4771,13 @@ function ActivityIndicator({ sessionId, useRoster, useSessionStatus, useLive, us
   const streaming = entries2.some((entry) => entry.text);
   const tools = entries2.filter((entry) => !entry.text).sort((a, b) => a.at - b.at);
   const relaying = tools.some((entry) => entry.relay);
-  const visible = running && !streaming && !relaying && (bot !== void 0 || room2 !== void 0);
+  const active = running || pendingInput > 0;
+  const visible = active && !streaming && !relaying && (bot !== void 0 || room2 !== void 0);
   const tool = tools.at(-1);
   const inputRef = (0, import_react7.useRef)(0);
   const inputAt = Math.max(inputRef.current, pendingInput);
   inputRef.current = inputAt;
-  const want = !visible ? null : inputAt > (tool?.at ?? 0) ? { key: `input:${inputAt}`, pool: PHRASES.thinking, state: "thinking" } : tool ? { key: tool.label ? `tool:${tool.label}` : "working", label: tool.label, pool: PHRASES.working, state: tool.state ?? "working" } : { key: "thinking", pool: PHRASES.thinking, state: "thinking" };
+  const want = !visible ? null : hook?.state === "running" ? { key: `rabi:${hook.point}`, label: t(hook.point === "SessionStart" || hook.point === "UserPromptSubmit" ? "Connecting to Rabi and reading context" : "Synchronizing with Rabi"), state: "working" } : pendingInput > 0 && !running ? { key: "submitting", label: t("Sending message"), state: "thinking" } : inputAt > (tool?.at ?? 0) ? { key: `input:${inputAt}`, pool: PHRASES.thinking, state: "thinking" } : tool ? { key: tool.label ? `tool:${tool.label}` : "working", label: tool.label, pool: PHRASES.working, state: tool.state ?? "working" } : { key: "thinking", pool: PHRASES.thinking, state: "thinking" };
   const [shown, setShown] = (0, import_react7.useState)(null);
   const wantKey = want?.key ?? null;
   const markState = (0, import_react7.useRef)("thinking");
@@ -4820,12 +4831,19 @@ function ActivityIndicator({ sessionId, useRoster, useSessionStatus, useLive, us
     const timer = setInterval(() => setNow(Date.now()), 1e4);
     return () => clearInterval(timer);
   }, [phase]);
-  const host = useRunningHost(running);
+  const failure = hook?.state === "failed" && (hook.at ?? Infinity) >= inputAt ? hook : null;
+  const host = useRunningHost(active || failure !== null);
+  if (host && failure) return (0, import_react_dom2.createPortal)((0, import_react7.createElement)(
+    "div",
+    { className: "bt-rabi-hook-error", role: "alert" },
+    (0, import_react7.createElement)("span", null, rabiFailureMessage(failure)),
+    (0, import_react7.createElement)("button", { type: "button", className: "bt-link", onClick: () => actions.openSettings("rabi") }, t("Rabi connection settings"))
+  ), host);
   if (!host || phase === null || !shown) return null;
   const elapsed = now - shown.at >= 6e4 ? elapsedLabel(now - shown.at) : null;
   return (0, import_react_dom2.createPortal)((0, import_react7.createElement)(
     "div",
-    { className: "bt-typing", "data-exiting": phase === "out" ? "" : void 0, "aria-hidden": true },
+    { className: "bt-typing", "data-exiting": phase === "out" ? "" : void 0, role: "status", "aria-live": "polite", "aria-atomic": true },
     bot ? (0, import_react7.createElement)(BotMark, { bot, size: 28, state: markState.current, live: true, pokeable: true }) : (0, import_react7.createElement)(RoomAvatar, { room: room2, roster, size: 28 }),
     (0, import_react7.createElement)(
       "span",
@@ -4838,6 +4856,12 @@ function ActivityIndicator({ sessionId, useRoster, useSessionStatus, useLive, us
       )
     )
   ), host);
+}
+function rabiFailureMessage(status) {
+  if (status.code === "host_stopped") return t("Rabi is not running. Start Rabi, then send your message again.");
+  if (status.code === "PLAN_STORAGE_STARTUP_UNAVAILABLE") return t("Rabi is restoring its plan service. This turn has not finished synchronizing.");
+  if (status.uncertain) return t("Rabi did not confirm this operation. Check its original receipt before retrying.");
+  return t("Could not complete the Rabi connection. Check Rabi and its storage connection.");
 }
 
 // src/client/dsh-offer.js
@@ -9127,7 +9151,8 @@ function BotConversation(props) {
     (0, import_react22.createElement)(
       "section",
       { className: "bt-chat-column", "aria-label": t("Message"), style: { "--bt-placeholder": JSON.stringify(name ? t("Message {name}", { name }) : t("Message")) } },
-      renderFactorySlot("conversation.content", { variant: "embedded", phase: "active", hero: false })
+      renderFactorySlot("conversation.content", { variant: "embedded", phase: "active", hero: false }),
+      known ? (0, import_react22.createElement)(ActivityIndicator, { ...props, key: sessionId, sessionId }) : null
     ),
     known ? (0, import_react22.createElement)(
       "aside",

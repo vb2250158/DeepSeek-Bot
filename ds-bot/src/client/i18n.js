@@ -5,6 +5,15 @@
 export const NAMESPACE = 'ds-bot'
 
 const ZH = {
+  'Connecting to Rabi and reading context': '正在连接 Rabi 并读取资料',
+  'Synchronizing with Rabi': '正在同步 Rabi',
+  'Sending message': '正在提交消息',
+  'Rabi connection settings': 'Rabi 连接设置',
+  'Rabi is not running. Start Rabi, then send your message again.': 'Rabi 未启动，请先启动 Rabi，再发送消息',
+  'Rabi is restoring its plan service. This turn has not finished synchronizing.': 'Rabi 计划服务正在恢复，本轮同步尚未完成',
+  'Rabi did not confirm this operation. Check its original receipt before retrying.': 'Rabi 尚未确认本次操作结果，请先核对原回执再重试',
+  'Could not complete the Rabi connection. Check Rabi and its storage connection.': '未能完成 Rabi 连接，请检查 Rabi 及其存储连接',
+
   'Rabi could not finish reading this persona folder. Check its storage in Rabi, then refresh.': 'Rabi 读取人格目录超时，请检查 Rabi 的存储连接后刷新',
   'Pinned chats': '置顶聊天',
   'Drop here to pin': '拖到这里置顶',

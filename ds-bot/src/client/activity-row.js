@@ -27,7 +27,7 @@ function useRunningHost(active) {
     let frame = 0
     const find = () => {
       frame = 0
-      const node = document.querySelector('[data-chat-flow] > [data-chat-running]')
+      const node = document.querySelector('[data-chat-flow] > [data-chat-running]') ?? document.querySelector('[data-chat-flow]')
       setHost(prev => (prev === node ? prev : node))
     }
     const observer = new MutationObserver(() => { if (!frame) frame = requestAnimationFrame(find) })
@@ -81,8 +81,9 @@ function useRowEntrances(replacing) {
   }, [])
 }
 
-export function ActivityIndicator({ sessionId, useRoster, useSessionStatus, useLive, useSession, actions }) {
+export function ActivityIndicator({ sessionId, useRoster, useSessionStatus, useLive, useSession, useWork, actions }) {
   const roster = useRoster(value => value)
+  const hook = useWork(value => value.rabi?.[sessionId] ?? null)
   const running = useSessionStatus(map => map.get(sessionId)?.running === true)
   const liveKey = useLive(state => JSON.stringify(state[sessionId] ?? {}))
   // A queued message waits for the next turn, so only a transcript or steering
@@ -96,7 +97,8 @@ export function ActivityIndicator({ sessionId, useRoster, useSessionStatus, useL
   const tools = entries.filter(entry => !entry.text).sort((a, b) => a.at - b.at)
   // Group chats show who is typing on their own while members speak.
   const relaying = tools.some(entry => entry.relay)
-  const visible = running && !streaming && !relaying && (bot !== undefined || room !== undefined)
+  const active = running || pendingInput > 0
+  const visible = active && !streaming && !relaying && (bot !== undefined || room !== undefined)
   const tool = tools.at(-1)
   const inputRef = useRef(0)
   // A steer keeps the run going, so nothing else resets the row: fresh input is
@@ -104,6 +106,8 @@ export function ActivityIndicator({ sessionId, useRoster, useSessionStatus, useL
   const inputAt = Math.max(inputRef.current, pendingInput)
   inputRef.current = inputAt
   const want = !visible ? null
+    : hook?.state === 'running' ? { key: `rabi:${hook.point}`, label: t(hook.point === 'SessionStart' || hook.point === 'UserPromptSubmit' ? 'Connecting to Rabi and reading context' : 'Synchronizing with Rabi'), state: 'working' }
+    : pendingInput > 0 && !running ? { key: 'submitting', label: t('Sending message'), state: 'thinking' }
     : inputAt > (tool?.at ?? 0)
       ? { key: `input:${inputAt}`, pool: PHRASES.thinking, state: 'thinking' }
       : tool ? { key: tool.label ? `tool:${tool.label}` : 'working', label: tool.label, pool: PHRASES.working, state: tool.state ?? 'working' }
@@ -157,13 +161,26 @@ export function ActivityIndicator({ sessionId, useRoster, useSessionStatus, useL
     const timer = setInterval(() => setNow(Date.now()), 10000)
     return () => clearInterval(timer)
   }, [phase])
-  const host = useRunningHost(running)
+  const failure = hook?.state === 'failed' && (hook.at ?? Infinity) >= inputAt ? hook : null
+  const host = useRunningHost(active || failure !== null)
+  if (host && failure) return createPortal(h('div', { className: 'bt-rabi-hook-error', role: 'alert' },
+    h('span', null, rabiFailureMessage(failure)),
+    h('button', { type: 'button', className: 'bt-link', onClick: () => actions.openSettings('rabi') }, t('Rabi connection settings'))), host)
   if (!host || phase === null || !shown) return null
   const elapsed = now - shown.at >= 60000 ? elapsedLabel(now - shown.at) : null
-  return createPortal(h('div', { className: 'bt-typing', 'data-exiting': phase === 'out' ? '' : undefined, 'aria-hidden': true },
+  return createPortal(h('div', { className: 'bt-typing', 'data-exiting': phase === 'out' ? '' : undefined, role: 'status', 'aria-live': 'polite', 'aria-atomic': true },
     bot ? h(BotMark, { bot, size: 28, state: markState.current, live: true, pokeable: true }) : h(RoomAvatar, { room, roster, size: 28 }),
     h('span', { className: 'bt-typing-text' },
       h('span', { key: `${shown.key}:${shown.at}`, className: 'bt-typing-label' },
         h(Shimmer, null, `${shown.text}…`),
         elapsed ? h('span', { className: 'bt-typing-time' }, `· ${elapsed}`) : null))), host)
+}
+
+
+/** Localized action from the adapter's failure code; raw response text stays in diagnostics. */
+export function rabiFailureMessage(status) {
+  if (status.code === 'host_stopped') return t('Rabi is not running. Start Rabi, then send your message again.');
+  if (status.code === 'PLAN_STORAGE_STARTUP_UNAVAILABLE') return t('Rabi is restoring its plan service. This turn has not finished synchronizing.');
+  if (status.uncertain) return t('Rabi did not confirm this operation. Check its original receipt before retrying.');
+  return t('Could not complete the Rabi connection. Check Rabi and its storage connection.');
 }

@@ -39,6 +39,8 @@ test('the selected Bot uses the shared conversation factory and its existing det
   assert.deepEqual(calls, [{ name: 'conversation.content', variant: 'embedded', phase: 'active', hero: false }])
   const [chat, details] = tree.props.children
   assert.equal(chat.props.className, 'bt-chat-column')
+  assert.equal(chat.props.children[1].type.name, 'ActivityIndicator')
+  assert.equal(chat.props.children[1].props.sessionId, 'part-two')
   assert.equal(details.props.className, 'bt-info-column')
   assert.equal(details.props.children[0].props.sessionId, 'bot-one')
   assert.equal(details.props.children[0].props.startRenaming, true)

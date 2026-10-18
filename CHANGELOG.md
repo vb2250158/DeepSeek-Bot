@@ -2,6 +2,12 @@
 
 All notable changes to DS Bot are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the versions follow [Semantic Versioning](https://semver.org/). Before 1.0, a minor version can contain breaking changes.
 
+## [0.1.6-rabi.26] - 2026-10-18
+
+### Fixed
+
+- Restore the chat-tail activity indicator in the shared conversation layout. Show feedback during pending submission and Rabi Hook waits, with accessible status text; keep typed, localized stopped-Host, recovery and uncertain-result notices until the next request or unlink.
+
 ## [0.1.6-rabi.25] - 2026-10-18
 
 ### Changed

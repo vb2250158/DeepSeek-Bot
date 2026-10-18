@@ -36,6 +36,8 @@ Drag either column divider to resize the conversation list or details. Widths st
 
 Every Bot can create and change Bots and manage every group chat. Right-click a chat to pin or unpin it, or drag it to the pin region above the list. Pinned tiles are saved independently of permissions.
 
+The chat tail shows feedback as soon as a message is submitted, names active Rabi connection/synchronization waits and retains actionable failures. Bound Bots connect automatically; a stopped Rabi Host is reported explicitly and is never silently started. Hook progress requires adapter 0.13.36 or newer.
+
 ## Install
 
 For this fork's host and browser clients, follow [Host deployment](host/README.md). The instructions below install the original upstream plugin.

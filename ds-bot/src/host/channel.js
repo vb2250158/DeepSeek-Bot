@@ -75,7 +75,9 @@ export function install(rt) {
   // turn there runs; and the approvals waiting.
   const live = () => ({
     activity: rt.activityView(),
-    work: { bots: rt.workView(), rooms: rt.roomWorkView(), approvals: rt.approvalsView() },
+    work: { bots: rt.workView(), rooms: rt.roomWorkView(), approvals: rt.approvalsView(),
+      rabi: Object.fromEntries(Object.values(state.bots).filter(bot => bot.rabiPersona && bot.rabiPersona.enabled !== false)
+        .map(bot => { const id = rt.chatOf(bot.id); return [id, ctx.get?.('rabiAgentHooks')?.statusOf?.(id)] }).filter(([, status]) => status)) },
     memoryNews: rt.memoryNews(),
     memoryReviews: rt.memoryReviews(),
     connectors: rt.connectorsView(),
