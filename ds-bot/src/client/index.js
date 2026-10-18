@@ -35,6 +35,7 @@ import { USER_MESSAGE_CSS, UserMessageCell, canDrawUserMessages } from './user-m
 import { noticeApprovals } from './approval-notices.js'
 import { createSessionNavigator } from './navigation.js'
 import { createRabiWorkspaceStore } from './rabi-workspace-store.js'
+import { installTransientErrors } from './transient-errors.js'
 
 export const inject = ['sessions', 'uiWorkspace', 'uiConversation', 'slots', 'theme', 'layout']
 
@@ -788,6 +789,7 @@ export function apply(ctx) {
     yield shadow('shell.overlay', { id: 'bot-toast', order: 60, inject: face }, ErrorToast)
   }
   const installConversation = function* () {
+    yield installTransientErrors(ctx.slots)
     yield installCompiledStyles(CONVERSATION_CSS, 'conversation')
     yield installMentions()
     yield installAtMenu()

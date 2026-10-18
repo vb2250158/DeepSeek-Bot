@@ -62,3 +62,8 @@ test('stopped Rabi and incomplete plan recovery remain explicit after the run en
   assert.match(stopped.message({ code: 'PLAN_STORAGE_STARTUP_UNAVAILABLE' }), /restoring its plan service/)
   assert.match(stopped.message({ uncertain: true }), /original receipt/)
 })
+
+test('refresh does not replay an old Rabi Hook failure notice', () => {
+  assert.equal(fixture({ hook: { state: 'failed', code: 'host_stopped', at: 1 } }).view, null)
+  assert.equal(fixture({ hook: { state: 'failed', code: 'host_stopped', at: Date.now() + 1000 } }).view.node.props.role, 'alert')
+})

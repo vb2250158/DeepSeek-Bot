@@ -2,6 +2,12 @@
 
 All notable changes to DS Bot are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the versions follow [Semantic Versioning](https://semver.org/). Before 1.0, a minor version can contain breaking changes.
 
+## [0.1.6-rabi.28] - 2026-10-18
+
+### Changed
+
+- Treat terminal errors and their retry actions as page-local feedback in Bot chats. Refreshing hides failures that predate the navigation, including retained Rabi Hook notices; new failures remain visible and keep their original renderer and retry action. Interrupted-turn recovery, messages, deliverables and diagnostic history are retained.
+
 ## [0.1.6-rabi.27] - 2026-10-18
 
 ### Changed

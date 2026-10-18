@@ -12,6 +12,8 @@ The chat tail reports submitted messages and live Rabi Hook progress, with expli
 
 Rabi settings discover the service and load bindings on entry and focus without overlapping requests. Each persona switch enables or disables its confirmed binding; disabling preserves its Bot and conversation. Group feedback lists members working in that group and removes them as their work ends. A Bot's label is its work title, assigned from actual responsibilities with `update_bot`; legacy imported `Rabi` labels are removed, while other titles are preserved.
 
+Terminal errors, failed-turn retry actions and retained Rabi failure notices are visible only when they occurred during the current page navigation. Refreshing dismisses their historical presentation without changing the Session log. New failures keep the installed renderer and actions; genuine interrupted-turn recovery and other turn-tail contributions remain available. This policy is scoped to Bot conversations and is removed when leaving that surface.
+
 ## Harness panel
 
 In the maintenance fork, **DS Bot** appears below automation in the native DSH sidebar. Open it for the team and conversation list, shared DSH chat and the selected Bot or group's details. Native navigation remains available; leaving the panel restores native conversation presentation. The former floating title and memory-update pill is not mounted.

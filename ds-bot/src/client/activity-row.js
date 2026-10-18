@@ -1,5 +1,6 @@
 import { createElement as h, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { isCurrentPageFailure } from './transient-errors.js'
 import { BotMark, RoomAvatar } from './mark.js'
 import { Shimmer, PHRASES } from './cells.js'
 import { reducedMotion } from './motion.js'
@@ -162,7 +163,7 @@ export function ActivityIndicator({ sessionId, useRoster, useSessionStatus, useL
     const timer = setInterval(() => setNow(Date.now()), 10000)
     return () => clearInterval(timer)
   }, [phase])
-  const failure = hook?.state === 'failed' && (hook.at ?? Infinity) >= inputAt ? hook : null
+  const failure = hook?.state === 'failed' && (hook.at ?? Infinity) >= inputAt && isCurrentPageFailure(hook.at) ? hook : null
   const host = useRunningHost(active || failure !== null)
   if (host && failure) return createPortal(h('div', { className: 'bt-rabi-hook-error', role: 'alert' },
     h('span', null, rabiFailureMessage(failure)),
