@@ -83,6 +83,7 @@ function useRowEntrances(replacing) {
 
 export function ActivityIndicator({ sessionId, useRoster, useSessionStatus, useLive, useSession, useWork, actions }) {
   const roster = useRoster(value => value)
+  const membersWorking = useWork(value => (value.rooms?.[sessionId] ?? []).length > 0)
   const hook = useWork(value => value.rabi?.[sessionId] ?? null)
   const running = useSessionStatus(map => map.get(sessionId)?.running === true)
   const liveKey = useLive(state => JSON.stringify(state[sessionId] ?? {}))
@@ -98,7 +99,7 @@ export function ActivityIndicator({ sessionId, useRoster, useSessionStatus, useL
   // Group chats show who is typing on their own while members speak.
   const relaying = tools.some(entry => entry.relay)
   const active = running || pendingInput > 0
-  const visible = active && !streaming && !relaying && (bot !== undefined || room !== undefined)
+  const visible = active && !streaming && !relaying && !(room && membersWorking) && (bot !== undefined || room !== undefined)
   const tool = tools.at(-1)
   const inputRef = useRef(0)
   // A steer keeps the run going, so nothing else resets the row: fresh input is

@@ -17,8 +17,9 @@ export function rabiClient(ctx, timeoutMs = 8000) {
       name: TOOL, callId: `ds-bot-ui-${randomUUID()}`, signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
       arguments: { method, path, ...(body ? { bodyJson: JSON.stringify(body) } : {}), ...(headers ? { requestHeadersJson: JSON.stringify(headers) } : {}) },
     })
-    if (result.isError) rabiRefuse(result.error?.message ?? 'Rabi request failed')
+    if (result.isError) rabiRefuse(result.error?.kind === 'host_stopped' ? 'Rabi is not running. Start Rabi, then send your message again.' : result.error?.message ?? 'Rabi request failed')
     const receipt = result.value
+    if (receipt?.error?.kind === 'host_stopped') rabiRefuse('Rabi is not running. Start Rabi, then send your message again.')
     if (receipt?.uncertain) rabiRefuse('Rabi operation outcome is uncertain. Read back the original operation before retrying; it was not replayed.')
     if (method === 'GET' && !receipt?.ok && receipt?.statusCode >= 500) {
       let failure

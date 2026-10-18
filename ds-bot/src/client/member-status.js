@@ -2,7 +2,7 @@ import { createElement as h, useEffect, useLayoutEffect, useRef, useState } from
 import { BotMark, toolState } from './mark.js'
 import { Shimmer, workPhrase } from './cells.js'
 import { elapsedLabel } from './activity-row.js'
-import { t } from './i18n.js'
+import { t, language } from './i18n.js'
 
 // -------------------------------------------------------------------------
 // What a group's members are doing: above the group's composer, a row for each member
@@ -86,6 +86,14 @@ function SummaryLine({ busy, onOpen }) {
       doing ? h('span', { className: 'bt-event-name' }, h(Shimmer, null, doing)) : null))
 }
 
+/** Active members in this group, including its current speaker; approvals stay separate. */
+export function groupWorkingText(busy) {
+  const names = [...new Set(busy.filter(entry => entry.here && entry.state === 'work').map(entry => entry.bot.name))]
+  if (!names.length) return ''
+  const joined = new Intl.ListFormat(language(), { style: 'long', type: 'conjunction' }).format(names)
+  return t('{names} working…', { names: joined })
+}
+
 // Above a group's composer: who is at work here, and a line for the rest; both open the
 // details panel. Above a Bot's own composer: the groups it is at work in, while its own
 // chat is idle (a running own chat has its activity row).
@@ -103,10 +111,13 @@ export function MemberDock({ sessionId, useRoster, useWork, actions }) {
   useFlowColumn(ref, shown, sessionId)
   if (!shown) return null
   if (room) {
-    const { rows, rest } = splitBusy(busy)
+    const text = groupWorkingText(busy)
+    const rest = busy.filter(entry => !entry.here || entry.state !== 'work')
     const open = () => actions.showDetails(sessionId)
     return h('div', { ref, className: 'bt-mw-dock-stack' },
-      rows.map(entry => h(WorkRow, { key: entry.id, bot: entry.bot, doing: entry.doing, label: entry.bot.name, at: entry.doing.since, now, onOpen: open })),
+      text ? h('div', { className: 'bt-mw-row', role: 'status', 'aria-label': text, 'aria-live': 'polite', 'aria-atomic': true },
+        h('span', { className: 'bt-mw-stack', 'aria-hidden': true }, busy.filter(entry => entry.here && entry.state === 'work').slice(0, ROWS_MAX).map(entry => h(Face, { key: entry.id, entry, size: 20 }))),
+        h('span', { className: 'bt-mw-row-text', title: text }, h(Shimmer, null, text))) : null,
       rest.length > 0 ? h(SummaryLine, { busy: rest, onOpen: open }) : null)
   }
   return h('div', { ref, className: 'bt-mw-dock-stack' }, groups.slice(0, ROWS_MAX).map(item => h(WorkRow, {

@@ -190,7 +190,7 @@ export function install(rt) {
     description: 'Create a new Bot on the user\'s team. It appears in the sidebar and greets the user.',
     parameters: {
       name: { type: 'string', required: true, description: 'Short display name, e.g. "Researcher" or "Editor"' },
-      role: { type: 'string', required: true, description: 'Two-to-four character role label shown under the name' },
+      role: { type: 'string', required: true, description: 'Concise work title shown beside the name, based on actual responsibilities; never a provider or connection type' },
       instructions: { type: 'string', required: true, description: 'What this Bot is responsible for and how it should work' },
       brief: { type: 'string', description: 'Why the user wants it, passed to the new Bot as its first context' },
       model: { type: 'string', description: 'Model the Bot runs on, as provider/model or a model id. Only when the user names one; otherwise the model you run on.' },
@@ -223,7 +223,7 @@ export function install(rt) {
     parameters: {
       bot: { type: 'string', description: 'Current name of the Bot to change; leave out to change yourself' },
       name: { type: 'string', description: 'New name' },
-      role: { type: 'string', description: 'New role label' },
+      role: { type: 'string', description: 'Work title based on actual responsibilities; preserve a user-chosen title' },
       instructions: { type: 'string', description: 'Replacement instructions' },
       color: { type: 'string', description: `One of ${[...COLORS, ...EXTRA_COLORS].join(', ')}` },
       model: { type: 'string', description: 'Move the Bot to another model, as provider/model or a model id' },

@@ -25,3 +25,9 @@ test('an uncertain mutation keeps its original outcome and is never presented as
   await assert.rejects(client.json('/api/fixture', 'POST', {}), /outcome is uncertain/)
   assert.equal(calls, 1)
 })
+test('a stopped Host is reported explicitly without retrying discovery or business writes', async () => {
+  let calls = 0
+  const client = rabiClient({ tools: { get: () => ({}), execute: async () => { calls++; return { isError: false, value: { ok: false, error: { kind: 'host_stopped' } } } } } })
+  await assert.rejects(client.json('/api/personas'), /Rabi is not running/)
+  assert.equal(calls, 1)
+})

@@ -7,6 +7,8 @@
 
 # DeepSeek Bot
 
+Bot name labels are work titles, assigned from actual responsibilities through the existing Bot settings tool. Rabi imports do not use the provider name as a title. Rabi settings discover the local service automatically, and each persona has a binding switch. Group feedback names the members working in that group.
+
 The lower-left **Bot settings** button opens the Bot settings.
 
 **Remote computers:** **Settings → Computers** contains one team-wide switch, enabled by default, and a read-only list of remote computers. Use **Manage computer access in Rabi** to open Rabi WebGUI for pairing and authorization. Disabling the switch blocks Bot calls to Rabi remote-computer APIs, including group parts; ordinary DSH sessions are unchanged. The old panel preference is ignored. Other computers need only the Rabi client, without a separate DSH runtime.

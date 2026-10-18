@@ -80,6 +80,12 @@ test('ordinary Bots keep their existing behavior without contacting Rabi', async
   assert.equal(f.requests.length, 0)
 })
 
+test('importing a persona leaves its work title for actual responsibilities instead of naming its provider', async () => {
+  const f = fixture()
+  await f.call('rabi-persona-import', { roleId: 'fixture' })
+  assert.equal(f.created[0].role, '')
+})
+
 test('an invalid binding read cannot be mistaken for an unbound session and overwritten', async () => {
   const f = fixture()
   const execute = f.ctx.tools.execute

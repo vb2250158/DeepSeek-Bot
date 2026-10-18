@@ -62,6 +62,19 @@ function runtime(t, saved, config) {
   return { rt, home, statePath, warnings, dispose }
 }
 
+test('legacy Rabi provider labels are removed without changing real work titles or ordinary Bots', async (t) => {
+  const { rt, statePath } = runtime(t, { version: 1, bots: {
+    imported: { id: 'imported', role: 'Rabi', rabiPersona: { roleId: 'one' } },
+    titled: { id: 'titled', role: 'Researcher', rabiPersona: { roleId: 'two' } },
+    ordinary: { id: 'ordinary', role: 'Rabi' },
+  }, rooms: {} })
+  await rt.load()
+  assert.equal(rt.state.bots.imported.role, '')
+  assert.equal(rt.state.bots.titled.role, 'Researcher')
+  assert.equal(rt.state.bots.ordinary.role, 'Rabi')
+  assert.equal(JSON.parse(fs.readFileSync(statePath, 'utf8')).bots.imported.role, '')
+})
+
 test('a failed state write rejects and leaves the saved file unchanged', async (t) => {
   const { rt, statePath } = runtime(t)
   await rt.load()

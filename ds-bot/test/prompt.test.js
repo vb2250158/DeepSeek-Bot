@@ -44,3 +44,10 @@ test('the group relay and non-Bot sessions do not get progress instructions', (t
   assert.doesNotMatch(prompt('room'), /progress|milestone/)
   assert.equal(prompt('outside'), '')
 })
+
+test('Bots derive a work title from responsibilities and preserve user-chosen titles', t => {
+  const { ctx, prompt } = start()
+  t.after(() => ctx.dispose())
+  assert.match(prompt('worker'), /work title, not its provider or connection type/)
+  assert.match(prompt('worker'), /Preserve a title explicitly chosen by the user/)
+})

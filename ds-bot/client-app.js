@@ -39,6 +39,10 @@ module.exports = __toCommonJS(index_exports);
 // src/client/i18n.js
 var NAMESPACE = "ds-bot";
 var ZH = {
+  "Work title": "称号",
+  "Based on actual responsibilities.": "根据实际工作生成",
+  "Connect {name} automatically": "自动连接{name}",
+  "{names} working…": "{names}正在工作…",
   "Connecting to Rabi and reading context": "正在连接 Rabi 并读取资料",
   "Synchronizing with Rabi": "正在同步 Rabi",
   "Sending message": "正在提交消息",
@@ -4761,6 +4765,7 @@ function useRowEntrances(replacing) {
 }
 function ActivityIndicator({ sessionId, useRoster, useSessionStatus, useLive, useSession, useWork, actions }) {
   const roster = useRoster((value) => value);
+  const membersWorking = useWork((value) => (value.rooms?.[sessionId] ?? []).length > 0);
   const hook = useWork((value) => value.rabi?.[sessionId] ?? null);
   const running = useSessionStatus((map) => map.get(sessionId)?.running === true);
   const liveKey = useLive((state) => JSON.stringify(state[sessionId] ?? {}));
@@ -4772,7 +4777,7 @@ function ActivityIndicator({ sessionId, useRoster, useSessionStatus, useLive, us
   const tools = entries2.filter((entry) => !entry.text).sort((a, b) => a.at - b.at);
   const relaying = tools.some((entry) => entry.relay);
   const active = running || pendingInput > 0;
-  const visible = active && !streaming && !relaying && (bot !== void 0 || room2 !== void 0);
+  const visible = active && !streaming && !relaying && !(room2 && membersWorking) && (bot !== void 0 || room2 !== void 0);
   const tool = tools.at(-1);
   const inputRef = (0, import_react7.useRef)(0);
   const inputAt = Math.max(inputRef.current, pendingInput);
@@ -8131,7 +8136,7 @@ function BotSettingsForm({ bot, roster, actions, run }) {
       Card,
       { title: t("Profile") },
       (0, import_react17.createElement)(Row, { label: t("Name") }, (0, import_react17.createElement)(InlineText, { label: t("Name"), value: bot.name, placeholder: "Bob", required: true, maxLength: 40, onSave: (name) => save({ name }) })),
-      (0, import_react17.createElement)(Row, { label: t("Label"), hint: t("Optional. Shown under the name.") }, (0, import_react17.createElement)(InlineText, { label: t("Label"), value: bot.role, placeholder: t("Research, admin…"), maxLength: 24, onSave: (role) => save({ role }) }))
+      (0, import_react17.createElement)(Row, { label: t("Work title"), hint: t("Based on actual responsibilities.") }, (0, import_react17.createElement)(InlineText, { label: t("Work title"), value: bot.role, placeholder: t("Research, admin…"), maxLength: 24, onSave: (role) => save({ role }) }))
     ),
     (0, import_react17.createElement)(
       Card,
@@ -8543,6 +8548,12 @@ function SummaryLine({ busy, onOpen }) {
     )
   );
 }
+function groupWorkingText(busy) {
+  const names = [...new Set(busy.filter((entry) => entry.here && entry.state === "work").map((entry) => entry.bot.name))];
+  if (!names.length) return "";
+  const joined = new Intl.ListFormat(language(), { style: "long", type: "conjunction" }).format(names);
+  return t("{names} working…", { names: joined });
+}
 function MemberDock({ sessionId, useRoster, useWork, actions }) {
   const roster = useRoster((value) => value);
   const work = useWork((value) => value);
@@ -8557,12 +8568,18 @@ function MemberDock({ sessionId, useRoster, useWork, actions }) {
   useFlowColumn(ref, shown, sessionId);
   if (!shown) return null;
   if (room2) {
-    const { rows, rest } = splitBusy(busy);
+    const text = groupWorkingText(busy);
+    const rest = busy.filter((entry) => !entry.here || entry.state !== "work");
     const open = () => actions.showDetails(sessionId);
     return (0, import_react19.createElement)(
       "div",
       { ref, className: "bt-mw-dock-stack" },
-      rows.map((entry) => (0, import_react19.createElement)(WorkRow, { key: entry.id, bot: entry.bot, doing: entry.doing, label: entry.bot.name, at: entry.doing.since, now, onOpen: open })),
+      text ? (0, import_react19.createElement)(
+        "div",
+        { className: "bt-mw-row", role: "status", "aria-label": text, "aria-live": "polite", "aria-atomic": true },
+        (0, import_react19.createElement)("span", { className: "bt-mw-stack", "aria-hidden": true }, busy.filter((entry) => entry.here && entry.state === "work").slice(0, ROWS_MAX).map((entry) => (0, import_react19.createElement)(Face, { key: entry.id, entry, size: 20 }))),
+        (0, import_react19.createElement)("span", { className: "bt-mw-row-text", title: text }, (0, import_react19.createElement)(Shimmer, null, text))
+      ) : null,
       rest.length > 0 ? (0, import_react19.createElement)(SummaryLine, { busy: rest, onOpen: open }) : null
     );
   }
@@ -12091,16 +12108,35 @@ function RabiConnectionPage({ actions }) {
   const [error, setError] = (0, import_react34.useState)("");
   const [batch, setBatch] = (0, import_react34.useState)(null);
   const lifetime = (0, import_react34.useRef)(null);
+  const [checking, setChecking] = (0, import_react34.useState)(false);
   (0, import_react34.useEffect)(() => {
     const controller = new AbortController();
     lifetime.current = controller;
-    void actions.rabiConnection("rabi-connection-status", {}, controller.signal).then((value) => {
-      if (!controller.signal.aborted) setStatus((previous) => ({ ...previous, ...value }));
-    }).catch((failure) => {
-      if (!controller.signal.aborted) setError(t(failure.message));
-    });
+    let inFlight = false;
+    const connect = async () => {
+      if (inFlight || controller.signal.aborted) return;
+      inFlight = true;
+      setChecking(true);
+      try {
+        const value = await actions.rabiConnection("rabi-connection-status", {}, controller.signal);
+        if (!controller.signal.aborted) setStatus((previous) => ({ ...previous, ...value }));
+        if (value.available) await refresh(controller.signal);
+        if (!controller.signal.aborted) setError("");
+      } catch (failure) {
+        if (!controller.signal.aborted) {
+          setStatus((previous) => ({ ...previous, connected: false }));
+          setError(t(failure.message));
+        }
+      } finally {
+        inFlight = false;
+        if (!controller.signal.aborted) setChecking(false);
+      }
+    };
+    void connect();
+    window.addEventListener("focus", connect);
     return () => {
       controller.abort();
+      window.removeEventListener("focus", connect);
       lifetime.current = null;
     };
   }, [actions]);
@@ -12131,9 +12167,9 @@ function RabiConnectionPage({ actions }) {
         "span",
         { className: "bt-set-copy" },
         (0, import_react34.createElement)("span", null, t("Local Rabi")),
-        (0, import_react34.createElement)("span", { className: "bt-set-hint" }, t(status.connected ? "Connected" : "Not connected"))
+        (0, import_react34.createElement)("span", { className: "bt-set-hint", role: "status" }, t(status.available === null || checking ? "Connecting…" : status.connected ? "Connected" : "Not connected"))
       ),
-      (0, import_react34.createElement)(import_dsh_client_ui_primitives8.Button, { disabled: Boolean(busy) || status.available !== true, onClick: () => void run("connect", refresh) }, t(status.connected ? "Refresh personas" : "Connect local Rabi"))
+      !status.connected ? (0, import_react34.createElement)(import_dsh_client_ui_primitives8.Button, { disabled: Boolean(busy) || checking || status.available !== true, onClick: () => void run("connect", refresh) }, t("Retry")) : null
     ),
     status.available === false ? (0, import_react34.createElement)("p", { className: "bt-set-hint" }, t("Install and configure dsh-rabiroute-agent on the controller first")) : null,
     status.available && status.hooksReady === false ? (0, import_react34.createElement)("p", { className: "bt-error" }, t("Update dsh-rabiroute-agent and enable Rabi Agent Hooks before binding a Bot")) : null,
@@ -12171,14 +12207,10 @@ function RabiConnectionPage({ actions }) {
           "div",
           { className: "bt-rabi-actions" },
           persona.botId ? (0, import_react34.createElement)(import_dsh_client_ui_primitives8.Button, { disabled: Boolean(busy), onClick: () => actions.openSession(persona.botId) }, t("Open Bot")) : null,
-          !persona.linked ? (0, import_react34.createElement)(import_dsh_client_ui_primitives8.Button, { disabled: Boolean(busy) || Boolean(error) || status.hooksReady !== true, onClick: () => void run(persona.id, async (signal) => {
-            await actions.rabiConnection("rabi-persona-import", { roleId: persona.id }, signal);
+          (0, import_react34.createElement)(Switch, { on: persona.linked === true, label: t("Connect {name} automatically", { name: persona.name }), disabled: Boolean(busy) || status.hooksReady !== true, onChange: (on) => void run(persona.id, async (signal) => {
+            await actions.rabiConnection(on ? "rabi-persona-import" : "rabi-persona-unlink", on ? { roleId: persona.id } : { botId: persona.botId }, signal);
             await refresh(signal);
-          }) }, t(persona.botId ? "Relink Bot" : "Bind as Bot")) : null,
-          persona.linked ? (0, import_react34.createElement)(import_dsh_client_ui_primitives8.Button, { disabled: Boolean(busy), onClick: () => void run(persona.id, async (signal) => {
-            await actions.rabiConnection("rabi-persona-unlink", { botId: persona.botId }, signal);
-            await refresh(signal);
-          }) }, t("Unlink Bot")) : null
+          }) })
         )
       )))
     ) : null

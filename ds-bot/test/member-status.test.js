@@ -22,7 +22,7 @@ runInNewContext(bundle.outputFiles[0].text, {
     return platform[name]
   },
 })
-const { busyMembers, summaryText, splitBusy, MemberDock } = module.exports
+const { busyMembers, summaryText, splitBusy, MemberDock, groupWorkingText } = module.exports
 // Values from the bundle's realm compare by content only.
 const plain = value => JSON.parse(JSON.stringify(value))
 // Renders the dock's own parts of an element tree, and lists its rows' labels.
@@ -72,7 +72,8 @@ test('a member at work in the group gets a row; the speaker, work elsewhere and 
   const { rows, rest } = splitBusy(busy)
   assert.deepEqual(plain(rows.map(entry => [entry.bot.name, entry.doing.tool, entry.doing.roomId])), [['Anvil', 'write', 'r1']])
   assert.deepEqual(plain(rest.map(entry => [entry.bot.name, entry.state])), [['Prism', 'ask'], ['Flint', 'work']])
-  assert.deepEqual(rowLabels(dock('r1', work)), ['Anvil · Writing changes…'])
+  assert.deepEqual(rowLabels(dock('r1', work)), ['Anvil and Quill working…'])
+  assert.equal(groupWorkingText(busy), 'Anvil and Quill working…')
   assert.equal(busyMembers(team.roomsById.r2, work, team).length, 2)
 })
 
@@ -94,5 +95,15 @@ test('a row says what a member does in its call\'s own words, and that it moves 
     ] },
     approvals: [],
   }
-  assert.deepEqual(rowLabels(dock('r1', work)), ['Anvil · Download Ghidra 12.1.4 and check its hash…', 'Flint · Opening a file · dump.py…', 'Prism · Moving to a fresh conversation…', 'Quill · 解压 Ghidra，顺便写脚本…'])
+  assert.match(JSON.stringify(dock('r1', work)), /Anvil, Flint, Prism, and Quill working…/)
+})
+
+test('group feedback removes finished members and excludes work elsewhere and approval waits', () => {
+  const room = team.roomsById.r1
+  const work = { bots: { b: { roomId: 'r2' } }, rooms: { r1: [{ botId: 'a' }, { botId: 'd', speaking: true }] }, approvals: [{ botId: 'c' }] }
+  assert.equal(groupWorkingText(busyMembers(room, work, team)), 'Anvil and Quill working…')
+  work.rooms.r1.pop()
+  assert.equal(groupWorkingText(busyMembers(room, work, team)), 'Anvil working…')
+  work.rooms.r1 = []
+  assert.equal(groupWorkingText(busyMembers(room, work, team)), '')
 })

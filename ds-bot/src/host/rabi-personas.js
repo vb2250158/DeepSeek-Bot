@@ -73,7 +73,7 @@ export function install(rt) {
     if (!persona) refuse('The selected Rabi persona is no longer available. Refresh the list.')
     let bot = imported(roleId)
     if (!bot) {
-      bot = await rt.createBot({ name: uniqueName(persona.name), role: 'Rabi', pickModel: true })
+      bot = await rt.createBot({ name: uniqueName(persona.name), role: '', pickModel: true })
       // Saved before the first remote write so retries and restarts reuse this exact Bot.
       bot.rabiPersona = { roleId }
       await rt.save()

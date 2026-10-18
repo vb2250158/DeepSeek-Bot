@@ -5,6 +5,10 @@
 export const NAMESPACE = 'ds-bot'
 
 const ZH = {
+  'Work title': '称号',
+  'Based on actual responsibilities.': '根据实际工作生成',
+  'Connect {name} automatically': '自动连接{name}',
+  '{names} working…': '{names}正在工作…',
   'Connecting to Rabi and reading context': '正在连接 Rabi 并读取资料',
   'Synchronizing with Rabi': '正在同步 Rabi',
   'Sending message': '正在提交消息',

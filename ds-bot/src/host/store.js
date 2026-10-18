@@ -117,6 +117,11 @@ export function install(rt) {
       migrated = true
     }
     for (const bot of Object.values(state.bots)) {
+      // Earlier imports used the connection provider as a title.
+      if (bot.rabiPersona && bot.role === 'Rabi') {
+        bot.role = ''
+        migrated = true
+      }
       if (!Array.isArray(bot.capabilities)) {
         bot.capabilities = []
         migrated = true

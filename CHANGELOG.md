@@ -2,6 +2,14 @@
 
 All notable changes to DS Bot are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the versions follow [Semantic Versioning](https://semver.org/). Before 1.0, a minor version can contain breaking changes.
 
+## [0.1.6-rabi.27] - 2026-10-18
+
+### Changed
+
+- Discover Rabi and load persona bindings automatically on settings entry and window focus. Use a switch for each confirmed persona binding; disabling it preserves the Bot and its chat. Report a stopped Rabi explicitly.
+- Show the names of members working in the current group, including its speaker, and remove completed members from the live feedback. Keep approval waits and work elsewhere separate.
+- Treat the label beside a Bot name as its work title. Imported personas start without a provider label; remove the legacy `Rabi` label from imports while preserving other titles. Bots update their titles from actual responsibilities through `update_bot` and respect titles chosen by the user.
+
 ## [0.1.6-rabi.26] - 2026-10-18
 
 ### Fixed
