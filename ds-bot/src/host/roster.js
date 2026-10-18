@@ -310,6 +310,7 @@ export function install(rt) {
         createdAt: Date.now(),
         createdBy: createdBy ?? null,
       }
+      await rt.ensureGroupLibrary(id)
       await rt.save()
       return state.rooms[id]
     } catch (error) {

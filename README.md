@@ -7,6 +7,10 @@
 
 # DeepSeek Bot
 
+Bot chats continue interrupted turns and quota failures automatically through DSH's native continuation API, without manual retry buttons or resending user messages. Repeated failures back off; new input, explicit stops and unloading cancel pending continuation. Unknown Rabi write outcomes are not replayed. See the [plugin configuration](ds-bot/README.md) for timing options.
+
+Group chats have Details, Library and Members tabs. Add a Bot directly below the member list. Each group keeps its UTF-8 text documents in a separate folder keyed by the group ID; renaming the group keeps the same folder. Library supports creating, uploading and reading .md, .txt, .csv, .json and .yaml files, with a default 1 MiB file limit. Existing names are never overwritten. Team Bots read these references through read_group_library. Deleting a group retains its documents.
+
 Bot name labels are work titles, assigned from actual responsibilities through the existing Bot settings tool. Rabi imports do not use the provider name as a title. Rabi settings discover the local service automatically, and each persona has a binding switch. Group feedback names the members working in that group.
 
 Bot chat failures are shown for the current page visit. Refreshing clears historical error rows and their retry buttons from the chat view, while retaining messages and diagnostic records. New failures remain visible.

@@ -85,7 +85,7 @@ export function install(rt) {
   })
   // What a host that only reads the team may still answer.
   // Updates change the dsh profile, not the team, so a reading host may run them too.
-  const READS = new Set(['state', 'models', 'efforts', 'earlier', 'room-progress', 'exchange', 'usage', 'schedules', 'memory-view', 'browser-wait', 'browser-result', 'diagnostics', 'diagnostics-log', 'diagnostics-clear', 'update-check', 'update-install', 'dsh-update-install', 'repo-stars', 'approval-answer', 'rabi-connection-status', 'rabi-connect', 'rabi-personas-list', 'rabi-bot-view', 'rabi-computers-status', 'rabi-computers-list'])
+  const READS = new Set(['group-library-list', 'group-library-read', 'state', 'models', 'efforts', 'earlier', 'room-progress', 'exchange', 'usage', 'schedules', 'memory-view', 'browser-wait', 'browser-result', 'diagnostics', 'diagnostics-log', 'diagnostics-clear', 'update-check', 'update-install', 'dsh-update-install', 'repo-stars', 'approval-answer', 'rabi-connection-status', 'rabi-connect', 'rabi-personas-list', 'rabi-bot-view', 'rabi-computers-status', 'rabi-computers-list'])
 
   function setPrefs(body) {
     if (body.rabiRemoteControl !== undefined) {
@@ -116,6 +116,11 @@ export function install(rt) {
       const readOnly = rt.readOnly()
       if (readOnly !== undefined && !READS.has(endpoint)) return fail(readOnly, 'bot/read-only')
       switch (endpoint) {
+        case 'group-library-list':
+        case 'group-library-read':
+        case 'group-library-add':
+          await rt.load()
+          return ok(await rt.groupLibraryEndpoint(endpoint, body))
         case 'rabi-bot-view':
         case 'rabi-personas-list':
         case 'rabi-persona-import':

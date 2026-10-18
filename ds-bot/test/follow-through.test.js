@@ -52,16 +52,19 @@ async function start(home) {
   ctx.connection.fetch.register = (options) => { if (options.path === '/api/bot') route = options; return register(options) }
   apply(ctx, { home })
   let seq = 0
+  const logs = new Map()
   const emit = (id, type, data) => {
+    const event = { type, seq: ++seq, data }
+    logs.set(id, [...(logs.get(id) ?? []), event])
     for (const listener of ctx.listeners.get('session/event') ?? []) {
-      if (listener.length >= 2) listener({ id }, { type, seq: ++seq, data })
+      if (listener.length >= 2) listener({ id }, event)
     }
   }
   const tool = (name, args, sessionId, exec = {}) => ctx.registeredTools.get(name).execute(args, { agent: { id: sessionId }, ...exec })
   const askApproval = sessionId => ctx.listeners.get('approval/request')[0]({ agent: { session: { id: sessionId } }, toolName: 'pwsh', reason: 'escalate sandbox' }, () => 'from-dsh')
   const call = async (endpoint, payload) => (await route.fetch(new Request('http://localhost/api/bot', { method: 'POST', body: JSON.stringify({ endpoint, payload }) }))).json()
   await tool('list_bots', {}, 'a')
-  const host = { ctx, agentOf, emit, tool, call, askApproval, stop: () => ctx.dispose() }
+  const host = { ctx, agentOf, emit, tool, call, askApproval, logs, stop: () => ctx.dispose() }
   started.set(home, [...(started.get(home) ?? []), host])
   return host
 }
@@ -127,8 +130,88 @@ async function openRoomTurn(t, host) {
   void host.tool('group_relay', {}, 'r1', { callId: 'c1', signal: stop.signal }).then((value) => { result = JSON.parse(value) })
   await settle(() => host.agentOf('gb').calls.length === 1)
   run(host, 'gb', 1, host.agentOf('gb').calls[0])
-  return () => result
+  const read = () => result
+  read.stop = () => stop.abort()
+  return read
 }
+
+for (const kind of ['interrupted', 'quota']) {
+  test(`native ${kind} continuation keeps the group exchange without another user message`, async t => {
+    t.mock.timers.enable({ apis: ['setTimeout'] })
+    const home = freshHome(t)
+    const host = await start(home)
+    const result = await openRoomTurn(t, host)
+    const agent = host.agentOf('gb'), continued = []
+    agent.session.snapshotEvents = () => host.logs.get('gb')
+    agent[kind === 'quota' ? 'continueQuotaFailure' : 'continueInterrupted'] = seq => {
+      continued.push(seq)
+      host.emit('gb', 'turn/start', { turn: 2 })
+      return true
+    }
+    host.emit('gb', 'turn/end', { turn: 1, reason: kind === 'quota'
+      ? { kind: 'error', error: { code: 'QUOTA', message: 'Test quota' } } : { kind: 'interrupted' } })
+    await settle(() => true)
+    assert.equal(result(), undefined)
+    t.mock.timers.tick(1000)
+    await settle(() => continued.length === 1)
+    host.emit('gb', 'assistant/message', { message: { content: [{ type: 'text', text: 'Finished the original exchange.' }] } })
+    host.emit('gb', 'turn/end', { turn: 2, reason: { kind: 'completed' } })
+    await settle(() => result() !== undefined)
+    assert.deepEqual(result().replies.map(reply => reply.text), ['Finished the original exchange.'])
+    assert.equal(agent.calls.length, 1)
+    assert.equal(host.logs.get('gb').filter(event => event.type === 'user/message').length, 1)
+    assert.equal(host.agentOf('r1').calls.length, 0)
+    await host.stop()
+    assert.deepEqual(notes(home), { turns: {}, queued: {} })
+  })
+}
+
+for (const action of ['new input', 'group input', 'member stop', 'stop', 'unload']) {
+  test(`${action} cancels the group's pending native continuation`, async t => {
+    t.mock.timers.enable({ apis: ['setTimeout'] })
+    const host = await start(freshHome(t))
+    const result = await openRoomTurn(t, host)
+    const agent = host.agentOf('gb'), continued = []
+    agent.session.snapshotEvents = () => host.logs.get('gb')
+    agent.continueQuotaFailure = seq => { continued.push(seq); return true }
+    host.emit('gb', 'turn/end', { turn: 1, reason: { kind: 'error', error: { code: 'QUOTA' } } })
+    if (action === 'new input') host.ctx.emit('agent/inbox/inserted', { agent, message: { source: { kind: 'user' } } })
+    else if (action === 'group input') host.ctx.emit('agent/inbox/inserted', { agent: host.agentOf('r1'), message: { source: { kind: 'user' } } })
+    else if (action === 'member stop') assert.equal((await host.call('stop-member-work', { roomId: 'r1', botId: 'b' })).value, true)
+    else if (action === 'stop') result.stop()
+    else await host.stop()
+    await settle(() => result() !== undefined)
+    t.mock.timers.tick(60000)
+    await settle(() => true)
+    assert.deepEqual(continued, [])
+    assert.equal(agent.calls.length, 1)
+  })
+}
+
+test('a legacy queued exchange already claimed before a Hook failure is not resent', async t => {
+  const home = freshHome(t)
+  const first = await start(home)
+  await first.tool('message_bot', { to: 'Writer', message: 'Do not replay a failed Hook', when: 'queue' }, 'a')
+  const [message] = first.agentOf('b').calls
+  await first.stop()
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const second = await start(home)
+  let inspected = false
+  second.agentOf('b').session.snapshotEvents = () => {
+    inspected = true
+    return [
+    { type: 'agent/inbox/spliced', data: { target: 'next-turn', start: 0, inserted: [message] } },
+    { type: 'turn/start', data: { turn: 1 } },
+    { type: 'agent/inbox/spliced', data: { target: 'next-turn', start: 0, removedCount: 1, inserted: [] } },
+    { type: 'turn/end', data: { turn: 1, reason: { kind: 'error', error: { code: 'UNKNOWN', message: 'Rabi outcome is uncertain' } } } },
+    ]
+  }
+  t.mock.timers.tick(3000)
+  await settle(() => inspected)
+  await second.stop()
+  assert.equal(second.agentOf('b').calls.length, 0)
+  assert.deepEqual(notes(home), { turns: {}, queued: {} })
+})
 
 test('a group turn cut off by a restart is picked up once, and the group is told', async (t) => {
   t.mock.timers.enable({ apis: ['setTimeout'] })
@@ -234,6 +317,27 @@ test('a finished turn leaves nothing to pick up', async (t) => {
   t.mock.timers.tick(3000)
   await new Promise(resolve => setImmediate(resolve))
   assert.equal(second.agentOf('a').calls.length, 0)
+})
+
+test('restart recovery uses native continuation without another group message when the driver supports it', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const home = freshHome(t)
+  const first = await start(home)
+  run(first, 'gb', 1, { content: [{ type: 'text', text: 'Finish the group task' }],
+    source: { kind: 'bot', role: 'room', roomId: 'r1', exchangeId: 'native-group' } })
+  await settle(() => inflight(home).gb !== undefined)
+  await first.stop()
+  const second = await start(home)
+  const agent = second.agentOf('gb'), continued = []
+  agent.session.snapshotEvents = () => [
+    { type: 'turn/start', seq: 10, data: { turn: 1 } },
+    { type: 'turn/end', seq: 11, data: { reason: { kind: 'interrupted' } } },
+  ]
+  agent.continueInterrupted = seq => { continued.push(seq); return true }
+  t.mock.timers.tick(3000)
+  await settle(() => continued.length === 1)
+  assert.deepEqual(continued, [10])
+  assert.equal(agent.calls.length, 0)
 })
 
 test('a turn DSH stops as it shuts down stays noted; one the user stops does not', async (t) => {

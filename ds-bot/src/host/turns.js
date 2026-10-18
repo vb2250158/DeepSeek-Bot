@@ -5,6 +5,7 @@
 import { HANDOFF_ACK, REFERENCE_KIND, REPLY_KIND, SOURCE_KIND } from './constants.js'
 import { textOf } from './text.js'
 import { reminderText } from './schedules.js'
+import { continuationKind } from './resume.js'
 
 // A failed turn's `LlmFailure`, kept to what can be shown and logged. Like DSH's own
 // error row, an AUTH failure loses its message: providers may echo part of the key.
@@ -93,9 +94,10 @@ export function install(rt) {
   async function stopRoomTurn(sessionId, exchangeId) {
     stoppedRoomTurns.add(exchangeId)
     if (stoppedRoomTurns.size > STOPPED_KEPT) stoppedRoomTurns.delete(stoppedRoomTurns.values().next().value)
+    const entry = live.get(sessionId)
+    if (entry?.continuation?.info?.exchangeId === exchangeId) rt.cancelContinuation?.(sessionId)
     const agent = await rt.resolveAgent(sessionId).catch(() => undefined)
     if (agent === undefined) return
-    const entry = live.get(sessionId)
     if (entry?.turn !== undefined && entry.info?.exchangeId === exchangeId) {
       agent.cancel({ kind: 'hook', reason: 'ds-bot/stopped' })
       return
@@ -309,6 +311,20 @@ export function install(rt) {
     if (entry.turn === turn && !entry.opened) entry.claimed ??= message.source
   })
 
+  rt.prepareTurnContinuation = (id, info) => {
+    if (info !== undefined) liveOf(id).continuation ??= { info: { kind: SOURCE_KIND, ...info }, texts: [], shown: 0, joined: [] }
+  }
+  rt.cancelTurnContinuation = (id, failure) => {
+    const entry = live.get(id)
+    const info = entry?.continuation?.info
+    if (entry !== undefined) entry.continuation = undefined
+    if (info?.role === 'room') {
+      const waiter = roomWaiters.get(info.exchangeId)
+      if (failure !== undefined) waiter?.fail(failure)
+      else waiter?.resolve(null)
+    }
+  }
+
   ctx.on('session/event', (session, event) => {
     const id = session?.id
     if (id === undefined) return
@@ -335,25 +351,28 @@ export function install(rt) {
       case 'tool/result':
         endCall(id, entry, event.data?.callId)
         break
-      case 'turn/start':
+      case 'turn/start': {
+        const continuation = entry.continuation
+        entry.continuation = undefined
         setActivity(id, 'thinking')
         entry.turn = event.data.turn
         entry.since = event.time ?? Date.now()
-        entry.texts = []
-        entry.shown = 0
+        entry.texts = continuation?.texts ?? []
+        entry.shown = continuation?.shown ?? 0
         entry.step = undefined
-        entry.info = undefined
+        entry.info = continuation?.info
         entry.claimed = undefined
         // A turn turned away before its first step may end without a turn/end.
         entry.switched = false
         entry.answers = false
-        entry.opened = false
-        entry.joined = []
+        entry.opened = continuation !== undefined
+        entry.joined = continuation?.joined ?? []
         if (entry.pending !== undefined) {
           claimTrigger(id, entry, entry.pending)
           entry.pending = undefined
         }
         break
+      }
       case 'user/message': {
         const source = event.data?.source
         if (source?.kind === 'user' || source?.kind === REPLY_KIND || source?.kind === 'schedule') userSpoke()
@@ -450,6 +469,16 @@ export function install(rt) {
         setActivity(id, undefined)
         const info = entry.info ?? (entry.claimed?.kind === SOURCE_KIND ? entry.claimed : undefined)
         const joined = entry.joined ?? []
+        const reason = event.data?.reason
+        if (continuationKind(reason) && !entry.switched) {
+          entry.continuation = { info, texts: entry.texts, shown: entry.shown, joined }
+          entry.turn = undefined
+          entry.info = undefined
+          entry.claimed = undefined
+          entry.tool = undefined
+          entry.calls = undefined
+          break
+        }
         // What the group already saw of the turn is not posted again.
         const texts = entry.texts.slice(entry.shown)
         const { lastText, lastCalled } = entry
@@ -468,7 +497,6 @@ export function install(rt) {
         entry.calls = undefined
         entry.lastText = undefined
         entry.lastCalled = undefined
-        const reason = event.data?.reason
         const failure = reason?.kind === 'error' && !switched ? turnFailure(reason.error) : undefined
         if (failure !== undefined) noteTurnFailure(id, failure)
         const held = rt.groupOwners.has(id) ? rt.takeRoomSteps?.(id) ?? '' : ''

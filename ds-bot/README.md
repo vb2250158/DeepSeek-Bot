@@ -1,5 +1,7 @@
 # ds-bot
 
+Group chats expose Details, Library and Members. Add members directly in Members. Library stores UTF-8 text files per stable group ID under <Bot home>/groups/<group ID>/library. Configure groupLibraryPath (an absolute parent directory), groupLibraryMaxBytes (default 1048576, range 1–8388608) and groupLibraryPageSize (default 50, range 1–200) on the bot plugin. Existing groups create their folder on first library visit; new groups create it at creation. Read-only Hosts never create folders. Only regular text files are listed or read; paths, device names and links are rejected. Uploads and new documents refuse duplicate names. Group deletion retains documents. Team Bots can list and read a group library with read_group_library; file content is reference data and tool reads enter the normal Session log.
+
 The lower-left **Bot settings** button opens the Bot settings. The right panel centers the avatar, name and role above Details and Library. Details starts with the full-width shared single-line model selector, followed by schedules.
 
 The DS Bot plugin for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (dsh). It turns dsh into a team of long-lived Bots that talk to you, to each other and in group chats. See the [project page](../README.md) for an overview, install steps and screenshots.
@@ -14,7 +16,9 @@ A group member's failure before its first model step ends its typing indicator i
 
 Rabi settings discover the service and load bindings on entry and focus without overlapping requests. Each persona switch enables or disables its confirmed binding; disabling preserves its Bot and conversation. Group feedback lists members working in that group and removes them as their work ends. A Bot's label is its work title, assigned from actual responsibilities with `update_bot`; legacy imported `Rabi` labels are removed, while other titles are preserved.
 
-Terminal errors, failed-turn retry actions and retained Rabi failure notices are visible only when they occurred during the current page navigation. Refreshing dismisses their historical presentation without changing the Session log. New failures keep the installed renderer and actions; genuine interrupted-turn recovery and other turn-tail contributions remain available. This policy is scoped to Bot conversations and is removed when leaving that surface.
+Bot chats do not show manual continuation or retry buttons. Interrupted turns and quota failures continue automatically through DSH's native continuation API, without resending the user's message. Repeated quota failures back off from autoContinueDelayMs (default 1000) to autoContinueMaxDelayMs (default 60000); both are integer milliseconds, with 1 <= delay <= maximum <= 3600000. New input, explicit stops and unloading cancel pending continuation. Other errors, including unknown Rabi write outcomes, are not replayed. Existing provider request retries remain in effect. On restart, native continuation is preferred; older drivers retain the existing one-time recovery prompt.
+
+Terminal errors and retained Rabi failure notices are visible only when they occurred during the current page navigation. Refreshing dismisses their historical presentation without changing the Session log. New failures keep the installed renderer; deliverables and other turn-tail contributions remain available. This policy is scoped to Bot conversations and is removed when leaving that surface.
 
 ## Harness panel
 

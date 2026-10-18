@@ -2,16 +2,20 @@
 
 All notable changes to DS Bot are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the versions follow [Semantic Versioning](https://semver.org/). Before 1.0, a minor version can contain breaking changes.
 
-## [0.1.6-rabi.30] - 2026-10-18
+## [0.1.6-rabi.31] - 2026-10-18
 
 ### Fixed
 
 - End a group member's wait immediately when a pre-step Hook fails before `user/message` is logged. Track the claimed exchange so the group reports the original failure once, clears typing and does not resend the failed message after a restart.
+- Preserve exchange ownership when native interruption or quota continuation resumes a group member without inserting a user message. New input, explicit stops and unloading cancel pending continuation; other failures and uncertain outcomes are not replayed.
 
-## [0.1.6-rabi.29] - 2026-10-18
+### Added
+
+- Group Details, Library and Members tabs, direct member addition, and independent persistent text-document folders. Add or upload documents without overwriting existing files; team Bots read references through read_group_library.
 
 ### Changed
 
+- Remove manual continuation buttons from Bot chats. Automatically continue interrupted turns and quota failures through the native driver with bounded backoff.
 - Combine Rabi connection and computers under one Rabi page, with Connection first and computers available after connecting. Replace expected offline diagnostics with installed, stopped, starting and undiscovered states and an explicit Start Rabi action.
 - Offer the Rabi GitHub repository and an explicit setup request to the existing Bot when discovery is unavailable. The request asks installation directory, personas and preferences before installation; it does not launch an installer itself. Requires dsh-rabiroute-agent 0.13.37 for lifecycle discovery.
 

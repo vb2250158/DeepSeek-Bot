@@ -1,7 +1,7 @@
 import { createElement as h, Fragment, useEffect, useRef, useState } from 'react'
 import { isMainOf } from './sources.js'
 import { HEADER, currentPart, stripHeader, usageOf } from './text.js'
-import { PlusIcon, ShareIcon, CloseIcon, ChevronLeftIcon, GearIcon } from './icons.js'
+import { PlusIcon, ShareIcon, CloseIcon, ChevronLeftIcon, GearIcon, InfoIcon, FolderIcon, PeopleIcon } from './icons.js'
 import { botState, BotMark, BotAvatar, RoomAvatar } from './mark.js'
 import { GlobeIcon, Favicon } from './browser-pane.js'
 import { useEscape } from './overlay-hooks.js'
@@ -12,7 +12,8 @@ import { FolderMenu } from './folder-menu.js'
 import { MemoryRow } from './memory-panel.js'
 import { ScheduleSummary } from './schedules.js'
 import { Segmented, useGlide, useMorph } from './motion.js'
-import { MemberWork, useMemberWork } from './member-status.js'
+import { GroupMembers } from './group-members.js'
+import { GroupLibrary } from './group-library.js'
 import { t } from './i18n.js'
 import { RabiWorkspace } from './rabi-workspace.js'
 
@@ -28,7 +29,7 @@ function transcriptOf(list, id, name, hiddenTurns = []) {
   return lines.join('\n\n')
 }
 
-const TAB_LABELS = { details: 'Details', browser: 'Browser', library: 'Library' }
+const TAB_LABELS = { details: 'Details', browser: 'Browser', library: 'Library', members: 'Members' }
 
 const hostOf = (url) => { try { return new URL(url).hostname.replace(/^www\./, '') } catch { return '' } }
 const shortUrl = url => String(url ?? '').replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/$/, '')
@@ -112,27 +113,11 @@ function About({ text, title = 'About' }) {
     long ? h('button', { type: 'button', className: 'bt-more', onClick: () => setOpen(value => !value) }, open ? t('Show less') : t('Show more')) : null)
 }
 
-// A group's overview: what members read, who is in it, and who answers. Changes are
-// made in its settings.
-function GroupOverview({ room, roster, actions, usage, useWork, openSettings }) {
-  const members = room.members.map(id => roster.byId[id]).filter(Boolean)
-  const { entries, now } = useMemberWork(room, useWork)
+function GroupOverview({ room, roster, usage, openSettings }) {
   return [
     room.notice
       ? h(About, { key: 'notice', title: 'Notice', text: room.notice })
       : h('button', { key: 'notice', type: 'button', className: 'bt-more', onClick: openSettings }, t('Add a notice in group settings')),
-    h('div', { key: 'members' },
-      h('div', { className: 'bt-section-title' }, t('Members · {count}', { count: members.length })),
-      h('div', { className: 'bt-members', role: 'list' }, members.map((member) => {
-        const entry = entries.find(item => item.id === member.id)
-        return h('div', { key: member.id, role: 'listitem' },
-          h('div', { className: 'bt-member' },
-            h('button', { type: 'button', className: 'bt-member-name', title: t("Open {name}'s chat", { name: member.name }), onClick: () => actions.openSession(member.id) },
-              h(BotAvatar, { bot: member, size: 26, main: isMainOf(roster, member.id), admin: room.admin === member.id, live: false }),
-              h('span', null, member.name)),
-            room.admin === member.id ? h('span', { className: 'bt-chip bt-chip-admin' }, t('Admin')) : null),
-          entry ? h(MemberWork, { entry, bot: member, room, roster, actions, now }) : null)
-      }))),
     h('div', { key: 'mode' }, h('div', { className: 'bt-section-title' }, t('Who answers')),
       h('div', { className: 'bt-kv' }, h('span', null, t(ROOM_MODES.find(([id]) => id === shownMode(room, roster))?.[1] ?? 'Everyone')))),
     usage ? h('div', { key: 'usage' }, h('div', { className: 'bt-section-title' }, t('Usage')),
@@ -208,8 +193,7 @@ export function DetailsDrawer({ sessionId, startRenaming, startTab, hasStrip, co
     if (room) await run(actions.updateRoom(room.id, { name: next }))
   }
   const subtitle = bot ? bot.role : roomSubtitle(room, roster)
-  // Tab sets: a 1:1 Bot has Details and Browser; a group has Details.
-  const tabs = bot ? (compact ? ['details', 'library'] : ['details', 'browser']) : ['details']
+  const tabs = bot ? (compact ? ['details', 'library'] : ['details', 'browser']) : ['details', 'library', 'members']
   return [h(Fragment, { key: 'top' }, top),
     h('div', { key: 'id', className: 'bt-drawer-id', 'data-move': side },
       bot ? h(BotAvatar, { bot, size: 64, state: botState(running, doing, roster.questions?.[part] !== undefined), main: isMainBot, badge: false, gaze: true, pokeable: true })
@@ -225,11 +209,14 @@ export function DetailsDrawer({ sessionId, startRenaming, startTab, hasStrip, co
       subtitle ? h('span', { className: 'bt-drawer-role' }, subtitle) : null),
     h('div', { key: 'tabs', ref: glide.box, className: 'bt-tabs', role: 'tablist', 'data-move': side },
       h('span', { ref: glide.thumb, className: 'bt-thumb', 'aria-hidden': true }),
-      tabs.map(key => h('button', { key, type: 'button', role: 'tab', className: 'bt-tab', 'aria-selected': tab === key, onClick: () => setTab(key) }, t(TAB_LABELS[key])))),
+      tabs.map(key => h('button', { key, type: 'button', role: 'tab', className: 'bt-tab', 'aria-selected': tab === key, onClick: () => setTab(key) },
+        ...(room ? [h(({ details: InfoIcon, library: FolderIcon, members: PeopleIcon })[key]), t(TAB_LABELS[key])] : [t(TAB_LABELS[key])])))),
     h('div', { key: `body:${tab}`, className: 'bt-drawer-body', 'data-move': move },
       bot && compact && tab === 'details' ? h('div', { className: 'bt-drawer-current-model', 'aria-label': t('Model') }, h(BotModelControl, { bot, roster, actions, run })) : null,
       errorLine,
       room && tab === 'details' ? h(GroupOverview, { room, roster, actions, usage, useWork, openSettings: () => setView('settings') }) : null,
+      room && tab === 'library' ? h(GroupLibrary, { key: room.id, room, roster, actions }) : null,
+      room && tab === 'members' ? h(GroupMembers, { key: room.id, room, roster, actions, useWork, run }) : null,
       bot && tab === 'details' && !compact ? [
         h('div', { key: 'model', className: 'bt-drawer-model' },
           h('div', { className: 'bt-section-title' }, t('Model')),

@@ -1,0 +1,8 @@
+{
+  "wide:details": { "tabs": ["Details", "Library", "Members"], "selected": ["Details"], "content": ["GroupOverview"] },
+  "wide:library": { "tabs": ["Details", "Library", "Members"], "selected": ["Library"], "content": ["GroupLibrary"] },
+  "wide:members": { "tabs": ["Details", "Library", "Members"], "selected": ["Members"], "content": ["GroupMembers"] },
+  "compact:details": { "tabs": ["Details", "Library", "Members"], "selected": ["Details"], "content": ["GroupOverview"] },
+  "compact:library": { "tabs": ["Details", "Library", "Members"], "selected": ["Library"], "content": ["GroupLibrary"] },
+  "compact:members": { "tabs": ["Details", "Library", "Members"], "selected": ["Members"], "content": ["GroupMembers"] }
+}
