@@ -1,6 +1,6 @@
 {
-  "details": { "tabs": ["Details", "Library"], "models": 1, "resources": 0 },
-  "library": { "tabs": ["Details", "Library"], "models": 1, "resources": 1 },
+  "details": { "tabs": ["Details", "Library"], "models": 1, "resources": 0, "firstContent": "bt-drawer-current-model", "avatarSize": 64 },
+  "library": { "tabs": ["Details", "Library"], "models": 0, "resources": 1, "avatarSize": 64 },
   "memory": {
     "tabs": ["Memory", "Plans", "Role skills", "Persona"],
     "sections": ["recent", "consolidated", "archived"],

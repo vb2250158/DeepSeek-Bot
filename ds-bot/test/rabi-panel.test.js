@@ -25,16 +25,19 @@ runInNewContext(outputFiles[0].text, {
 })
 const nodes = value => !value || typeof value !== 'object' ? [] : Array.isArray(value) ? value.flatMap(nodes) : [value, ...nodes(value.props?.children)]
 
-test('the compact panel shows its model in both tabs and gives Rabi resources one home', () => {
+test('the panel keeps model selection first in Details and Rabi resources in Library', () => {
   const bot = { id: 'fixture', name: 'Fixture', role: 'Rabi', rabiPersona: { roleId: 'fixture' } }
   const roster = { byId: { fixture: bot }, roomsById: {}, exchangeTurns: {}, models: [] }
   const observed = {}
   for (tab of ['details', 'library']) {
     stateIndex = 0
-    const tree = nodes(module.exports.DetailsDrawer({ sessionId: bot.id, compact: true, roster, actions: {}, useSessionStatus: pick => pick(new Map()), useActivity: pick => pick({}), useSessions: () => '', useWork: noop }))
+    const panel = module.exports.DetailsDrawer({ sessionId: bot.id, compact: true, roster, actions: {}, useSessionStatus: pick => pick(new Map()), useActivity: pick => pick({}), useSessions: () => '', useWork: noop })
+    const tree = nodes(panel)
     observed[tab] = {
       tabs: tree.filter(node => node.props?.role === 'tab').map(node => node.props.children[0]),
       models: tree.filter(node => node.type?.name === 'BotModelControl').length,
+      firstContent: panel.find(node => node.props?.className === 'bt-drawer-body').props.children.find(Boolean)?.props?.className,
+      avatarSize: tree.find(node => node.type?.name === 'BotAvatar')?.props.size,
       resources: tree.filter(node => node.type?.name === 'RabiWorkspace').length,
     }
   }

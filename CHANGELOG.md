@@ -2,6 +2,12 @@
 
 All notable changes to DS Bot are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the versions follow [Semantic Versioning](https://semver.org/). Before 1.0, a minor version can contain breaking changes.
 
+## [0.1.6-rabi.24] - 2026-10-18
+
+### Changed
+
+- Restore the centered avatar, name and role in conversation details. Put the reused single-line model selector first inside Details, above schedules; Library keeps its resource navigation.
+
 ## [0.1.6-rabi.23] - 2026-10-18
 
 ### Changed

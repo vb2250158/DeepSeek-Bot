@@ -2370,18 +2370,14 @@ body[data-ds-dark-theme] .bt-scrim{background:rgba(0,0,0,.5)}
 .bt-set-section h3{font-size:13px;line-height:18px;font-weight:600;margin:0 0 8px;padding:0 4px}
 .bt-set-card{border:1px solid var(--bt-line);border-radius:12px;background:var(--bt-card);display:flex;flex-direction:column}
 .bt-rabi-actions{display:flex;gap:6px;flex-wrap:wrap}
-.bt-drawer-current-model{width:100%;max-width:280px;margin-top:12px}
+.bt-drawer-current-model{width:100%;min-width:0;margin:0}
 .bt-info-column>.bt-drawer-top{min-height:32px;padding:4px 10px 0;gap:4px}
 .bt-info-column>.bt-drawer-top .bt-round{width:28px;height:28px}
-.bt-info-column>.bt-drawer-id{display:grid;grid-template-columns:36px minmax(0,1fr) auto;gap:2px 8px;align-items:center;padding:4px 10px 0}
-.bt-info-column>.bt-drawer-id>.bt-mark{grid-column:1;grid-row:1/3;margin:0}
-.bt-info-column>.bt-drawer-id>.bt-drawer-name,.bt-info-column>.bt-drawer-id>.bt-drawer-name-input{grid-column:2;grid-row:1;justify-self:start;text-align:left;font-size:14px;line-height:20px;padding:0}
-.bt-info-column>.bt-drawer-id>.bt-drawer-role{grid-column:3;grid-row:1;margin:0;font-size:11px;color:var(--bt-ink-2)}
-.bt-info-column .bt-drawer-current-model{grid-column:2/4;grid-row:2;max-width:none;min-width:0;margin:0}
+.bt-info-column .bt-drawer-current-model{max-width:none;min-width:0;margin:0}
 .bt-info-column .bt-drawer-current-model>div{min-width:0;max-width:100%}
 .bt-info-column .bt-drawer-current-model button[aria-haspopup]{max-width:100%;min-height:28px}
-.bt-info-column>.bt-tabs{margin:8px 10px 0}
-.bt-info-column>.bt-drawer-body{padding:10px;gap:12px}
+.bt-info-column>.bt-tabs{margin:16px 16px 0}
+.bt-info-column>.bt-drawer-body{padding:16px;gap:12px}
 .bt-info-column .bt-rabi-workspace{gap:12px}
 .bt-info-column .bt-rabi-resources{padding:2px;gap:2px}
 .bt-info-column .bt-rabi-resources>button{min-width:0;padding:5px 2px;font-size:12px}
@@ -8932,7 +8928,7 @@ function DetailsDrawer({ sessionId, startRenaming, startTab, hasStrip, compact: 
     (0, import_react20.createElement)(
       "div",
       { key: "id", className: "bt-drawer-id", "data-move": side },
-      bot ? (0, import_react20.createElement)(BotAvatar, { bot, size: compact2 ? 36 : 64, state: botState(running, doing, roster.questions?.[part] !== void 0), main: isMainBot, badge: false, gaze: true, pokeable: true }) : (0, import_react20.createElement)(RoomAvatar, { room: room2, roster, size: 64 }),
+      bot ? (0, import_react20.createElement)(BotAvatar, { bot, size: 64, state: botState(running, doing, roster.questions?.[part] !== void 0), main: isMainBot, badge: false, gaze: true, pokeable: true }) : (0, import_react20.createElement)(RoomAvatar, { room: room2, roster, size: 64 }),
       editing ? (0, import_react20.createElement)("input", {
         className: "bt-drawer-name-input",
         autoFocus: true,
@@ -8952,8 +8948,7 @@ function DetailsDrawer({ sessionId, startRenaming, startTab, hasStrip, compact: 
         setDraftName(room2 && !room2.named ? "" : current);
         setEditing(true);
       } }, current),
-      subtitle ? (0, import_react20.createElement)("span", { className: "bt-drawer-role" }, subtitle) : null,
-      compact2 && bot ? (0, import_react20.createElement)("div", { className: "bt-drawer-current-model", "aria-label": t("Model") }, (0, import_react20.createElement)(BotModelControl, { bot, roster, actions, run })) : null
+      subtitle ? (0, import_react20.createElement)("span", { className: "bt-drawer-role" }, subtitle) : null
     ),
     (0, import_react20.createElement)(
       "div",
@@ -8964,6 +8959,7 @@ function DetailsDrawer({ sessionId, startRenaming, startTab, hasStrip, compact: 
     (0, import_react20.createElement)(
       "div",
       { key: `body:${tab}`, className: "bt-drawer-body", "data-move": move },
+      bot && compact2 && tab === "details" ? (0, import_react20.createElement)("div", { className: "bt-drawer-current-model", "aria-label": t("Model") }, (0, import_react20.createElement)(BotModelControl, { bot, roster, actions, run })) : null,
       errorLine,
       room2 && tab === "details" ? (0, import_react20.createElement)(GroupOverview, { room: room2, roster, actions, usage, useWork, openSettings: () => setView("settings") }) : null,
       bot && tab === "details" && !compact2 ? [
