@@ -2,6 +2,13 @@
 
 All notable changes to DS Bot are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the versions follow [Semantic Versioning](https://semver.org/). Before 1.0, a minor version can contain breaking changes.
 
+## [0.1.6-rabi.29] - 2026-10-18
+
+### Changed
+
+- Combine Rabi connection and computers under one Rabi page, with Connection first and computers available after connecting. Replace expected offline diagnostics with installed, stopped, starting and undiscovered states and an explicit Start Rabi action.
+- Offer the Rabi GitHub repository and an explicit setup request to the existing Bot when discovery is unavailable. The request asks installation directory, personas and preferences before installation; it does not launch an installer itself. Requires dsh-rabiroute-agent 0.13.37 for lifecycle discovery.
+
 ## [0.1.6-rabi.28] - 2026-10-18
 
 ### Changed
@@ -55,7 +62,6 @@ All notable changes to DS Bot are listed here. The format follows [Keep a Change
 - Remove Main Bot selectors, promotion actions and badges. Every registered Bot can manage Bots, groups, shared capabilities and memory; existing folder and executable approvals remain in force. Legacy role ids are read only as a landing preference.
 - Pin any Bot or group with its context menu or by dragging it above the chat list. Pinned tiles persist across reload and never inherit a Main Bot role. Pinning also unhides a conversation and retains working and unread indicators.
 - Let persona reads wait for the Manager’s bounded read timeout instead of aborting after eight seconds; report storage read timeouts with a storage-specific action. Uncertain writes remain blocked without replay.
-
 ## [0.1.6-rabi.19] - 2026-10-17
 
 ### Changed

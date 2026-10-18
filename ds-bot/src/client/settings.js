@@ -1,7 +1,7 @@
 import { createElement as h, useCallback, useEffect, useRef, useState } from 'react'
 import { ACCENT_INKS, INKS } from './inks.js'
 import { allThemes } from './themes.js'
-import { CloseIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, ConnectorIcon, InfoIcon, PlugIcon, PlusIcon, SlidersIcon, SETTINGS_ICONS } from './icons.js'
+import { CloseIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, ConnectorIcon, InfoIcon, PlugIcon, PlusIcon, SETTINGS_ICONS } from './icons.js'
 import { AdminStar, BotAvatar, RoomAvatar } from './mark.js'
 import { useEscape } from './overlay-hooks.js'
 import { BotSettingsForm } from './bot-settings.js'
@@ -16,27 +16,14 @@ import { SchedulesPage } from './schedules.js'
 import { FeedbackIcon, FeedbackPage } from './feedback.js'
 import { AboutPage } from './about.js'
 import { t } from './i18n.js'
-import { RabiComputersPage } from './rabi-computers.js'
 import { RabiConnectionPage } from './rabi-connection.js'
-
-/** Defer Rabi panel mount one frame so opening Settings never sync-blocks on Manager work. */
-function LazyRabiComputersPage(props) {
-  const [ready, setReady] = useState(false)
-  useEffect(() => {
-    let alive = true
-    const id = requestAnimationFrame(() => { if (alive) setReady(true) })
-    return () => { alive = false; cancelAnimationFrame(id) }
-  }, [])
-  if (!ready) return h('p', { className: 'bt-set-hint' }, t('Loading…'))
-  return h(RabiComputersPage, props)
-}
 
 const capitalize = word => word[0].toUpperCase() + word.slice(1)
 
 // Settings dialog: a 198px page list beside the page. Bots and group chats each list
 // their members, and one opens on its own settings form. Usage widens the dialog.
-const SETTINGS_PAGES = [['general', 'General'], ['bots', 'Bots'], ['groups', 'Group chats'], ['rabi', 'Rabi connection'], ['computers', 'Computers'], ['connectors', 'Bot connectors'], ['capabilities', 'Capabilities'], ['schedules', 'Bot tasks'], ['usage', 'Bot usage'], ['secrets', 'Secrets'], ['feedback', 'Feedback'], ['about', 'About DS Bot']]
-const PAGE_ICONS = { ...SETTINGS_ICONS, rabi: ConnectorIcon, computers: SlidersIcon, connectors: ConnectorIcon, capabilities: PlugIcon, schedules: ClockIcon, secrets: KeyIcon, feedback: FeedbackIcon, about: InfoIcon }
+const SETTINGS_PAGES = [['general', 'General'], ['bots', 'Bots'], ['groups', 'Group chats'], ['rabi', 'Rabi'], ['connectors', 'Bot connectors'], ['capabilities', 'Capabilities'], ['schedules', 'Bot tasks'], ['usage', 'Bot usage'], ['secrets', 'Secrets'], ['feedback', 'Feedback'], ['about', 'About DS Bot']]
+const PAGE_ICONS = { ...SETTINGS_ICONS, rabi: ConnectorIcon, connectors: ConnectorIcon, capabilities: PlugIcon, schedules: ClockIcon, secrets: KeyIcon, feedback: FeedbackIcon, about: InfoIcon }
 
 function SetSection({ title, children }) {
   return h('section', { className: 'bt-set-section' }, h('h3', null, title), h('div', { className: 'bt-set-card' }, children))
@@ -141,7 +128,7 @@ export function SettingsDialog({ page, id, roster, actions, useUpdate, leaving =
   // A Bot or group deleted while its form is open leaves its page on the list.
   const bot = page === 'bots' && id ? roster.byId[id] : undefined
   const room = page === 'groups' && id ? roster.roomsById[id] : undefined
-  const shown = SETTINGS_PAGES.some(([key]) => key === page) ? page : 'general'
+  const shown = page === 'computers' ? 'rabi' : SETTINGS_PAGES.some(([key]) => key === page) ? page : 'general'
   const usageFocus = shown === 'usage' && id ? id : null
   const label = t(SETTINGS_PAGES.find(([key]) => key === shown)[1])
   const back = bot ? t('Back to Bots') : room ? t('Back to group chats') : usageFocus ? t('All usage') : null
@@ -176,12 +163,11 @@ export function SettingsDialog({ page, id, roster, actions, useUpdate, leaving =
         shown === 'usage' ? null : h('div', { key: pageKey, className: 'bt-settings-scroll bt-settings-page', 'data-move': last.current.move },
           errorLine,
           shown === 'general' ? h(GeneralPage, { roster, actions, run }) : null,
-          shown === 'rabi' ? h(RabiConnectionPage, { actions }) : null,
+          shown === 'rabi' ? h(RabiConnectionPage, { roster, actions }) : null,
           bot ? h('div', { className: 'bt-settings-form' }, h(BotSettingsForm, { key: bot.id, bot, roster, actions, run })) : null,
           shown === 'bots' && !bot ? h(BotsPage, { roster, actions, run }) : null,
           room ? h('div', { className: 'bt-settings-form' }, h(GroupSettingsForm, { key: room.id, room, roster, actions, run })) : null,
           shown === 'groups' && !room ? h(GroupsPage, { roster, actions, run }) : null,
-          shown === 'computers' ? h(LazyRabiComputersPage, { roster, actions }) : null,
           shown === 'connectors' ? h(ConnectorsPage, { roster, actions }) : null,
           shown === 'capabilities' ? h(CapabilitiesPage, { roster, actions, run }) : null,
           shown === 'schedules' ? h(SchedulesPage, { roster, actions, start: id ?? undefined }) : null,

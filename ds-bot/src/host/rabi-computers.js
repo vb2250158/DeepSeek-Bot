@@ -53,7 +53,8 @@ export function install(rt) {
       const computers = result.instances.filter(item => !item.local).map(item => ({ instanceId: item.instanceId, name: item.name, platform: item.platform, connected: item.connected }))
       return { computers, managementUrl, available: available(), enabled: enabled() }
     } catch (error) {
-      return { computers: [], managementUrl, error: error?.message ?? String(error), available: available(), enabled: enabled() }
+      const connection = await rt.rabiSetupStatus?.(signal)
+      return { computers: [], managementUrl, connection, error: error?.message ?? String(error), available: available(), enabled: enabled() }
     }
   }
 }

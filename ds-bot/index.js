@@ -32,6 +32,7 @@ import * as dshUpdate from './src/host/dsh-update.js'
 import * as channel from './src/host/channel.js'
 import * as rabiComputers from './src/host/rabi-computers.js'
 import * as rabiPersonas from './src/host/rabi-personas.js'
+import * as rabiSetup from './src/host/rabi-setup.js'
 
 export { COLORS } from './src/host/constants.js'
 
@@ -42,7 +43,7 @@ export const inject = ['llm', 'tools', 'systemPrompt', 'sessionController', 'ses
 // the functions other modules call; they call them through `rt` at run time, never during
 // install. Listeners run and tools are listed in registration order, so this order holds:
 // usage meters model requests after every listener that rewrites them.
-const MODULES = [diagnostics, store, models, permissions, turns, delivery, roster, folders, agents, prompt, timeContext, tools, chatIndex, groups, approvals, resume, memory, rabiPersonas, parts, images, secrets, connectors, capabilities, schedules, browser, usage, update, dshUpdate, rabiComputers, channel]
+const MODULES = [diagnostics, store, models, permissions, turns, delivery, roster, folders, agents, prompt, timeContext, tools, chatIndex, groups, approvals, resume, memory, rabiPersonas, rabiSetup, parts, images, secrets, connectors, capabilities, schedules, browser, usage, update, dshUpdate, rabiComputers, channel]
 
 export function apply(ctx, config = {}) {
   createRuntime(ctx, config)

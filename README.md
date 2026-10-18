@@ -13,7 +13,9 @@ Bot chat failures are shown for the current page visit. Refreshing clears histor
 
 The lower-left **Bot settings** button opens the Bot settings.
 
-**Remote computers:** **Settings → Computers** contains one team-wide switch, enabled by default, and a read-only list of remote computers. Use **Manage computer access in Rabi** to open Rabi WebGUI for pairing and authorization. Disabling the switch blocks Bot calls to Rabi remote-computer APIs, including group parts; ordinary DSH sessions are unchanged. The old panel preference is ignored. Other computers need only the Rabi client, without a separate DSH runtime.
+**Settings → Rabi** opens Connection first, then Computers after connecting. A discovered but stopped Rabi shows **Start Rabi**; after it starts, retry the connection. If the installation cannot be found, open the Rabi GitHub repository or ask the existing Bot to install and configure it. That request asks your installation directory, personas and preferences before making installation changes. Local discovery and startup require `dsh-rabiroute-agent` 0.13.37 or newer.
+
+**Remote computers:** **Settings → Rabi → Computers** contains one team-wide switch, enabled by default, and a read-only list of remote computers. Use **Manage computer access in Rabi** to open Rabi WebGUI for pairing and authorization. Disabling the switch blocks Bot calls to Rabi remote-computer APIs, including group parts; ordinary DSH sessions are unchanged. The old panel preference is ignored. Other computers need only the Rabi client, without a separate DSH runtime.
 
 English | [中文](README.zh.md)
 
@@ -31,10 +33,9 @@ DS Bot follows the active DSH skin by default, including light and dark mode. **
 
 Manage plugins through the native **Plugins** entry. The team footer opens **Bot settings** directly, where Bot usage, connectors and tasks remain available. Bot usage includes Bots and group chats; global usage stays in Harness settings.
 
-**Rabi binding:** open **Bot settings → Rabi connection**, connect local Rabi, then choose **Bind as Bot** or **Bind all personas**. Binding reuses an existing Bot and waits for model selection. With `dsh-rabiroute-agent` 0.13.34 or newer and Agent Hooks enabled, the original DSH session uses Rabi’s persona, memories, plans, role skills and lifecycle decisions. Avatar images are read from Rabi; the Bot’s library displays Rabi memory, plans, skills and persona. The bound Bot stops using DS Bot’s independent memory and review. Data and changes stay in Rabi; connection or binding failures stop dependent work. Unlink keeps the Bot and restores its ordinary mode.
+**Rabi binding:** open **Bot settings → Rabi → Connect**, connect local Rabi, then choose **Bind as Bot** or **Bind all personas**. Binding reuses an existing Bot and waits for model selection. With `dsh-rabiroute-agent` 0.13.34 or newer and Agent Hooks enabled, the original DSH session uses Rabi’s persona, memories, plans, role skills and lifecycle decisions. Avatar images are read from Rabi; the Bot’s library displays Rabi memory, plans, skills and persona. The bound Bot stops using DS Bot’s independent memory and review. Data and changes stay in Rabi; connection or binding failures stop dependent work. Unlink keeps the Bot and restores its ordinary mode.
 
 The right panel centers the avatar, name and role above Details and Library. Details starts with the full-width single-line model selector, followed by schedules; Rabi resources live in Library. A window-local cache separates Bot, persona, resource and item reads, keeps in-flight requests alive across navigation, and refreshes retained content in the background on return. Duplicate reads share one request. Pages append and resume; memory categories appear together without nested menus or manual refresh. The cache retains up to 64 views and about 4 MiB of inactive content, never enters browser storage, and never supplies Agent context.
-
 
 Drag either column divider to resize the conversation list or details. Widths stay on this browser; double-click resets a column, and the focused divider accepts arrow keys. Narrow panels hide details and then compact the list to keep the chat usable.
 

@@ -3,7 +3,7 @@ import { Button, Switch } from '@deepseek-ai/dsh-client-ui-primitives'
 import { t } from './i18n.js'
 
 /** One team switch and a read-only Rabi catalog; device permissions are managed in Rabi WebGUI. */
-export function RabiComputersPage({ roster, actions }) {
+export function RabiComputersPage({ roster, actions, onDisconnected }) {
   const [status, setStatus] = useState(null)
   const [computers, setComputers] = useState([])
   const [managementUrl, setManagementUrl] = useState('')
@@ -22,15 +22,19 @@ export function RabiComputersPage({ roster, actions }) {
       const result = await call('rabi-computers-list', {}, signal)
       if (signal?.aborted) return
       setManagementUrl(result.managementUrl)
-      if (result.error) { setError(result.error); return }
+      if (result.error) {
+        if (result.connection && result.connection.state !== 'ready') onDisconnected?.(result.connection)
+        else setError(t('Could not read remote computers. Retry or check Rabi.'))
+        return
+      }
       setComputers(result.computers)
       setError('')
-    } catch (failure) {
-      if (!signal?.aborted) setError(failure.message)
+    } catch {
+      if (!signal?.aborted) setError(t('Could not read remote computers. Retry or check Rabi.'))
     } finally {
       if (!signal?.aborted) setListing(false)
     }
-  }, [call, enabled])
+  }, [call, enabled, onDisconnected])
   useEffect(() => {
     const abort = new AbortController()
     if (!enabled) { setComputers([]); setManagementUrl(''); setError('') }

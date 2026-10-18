@@ -14,7 +14,7 @@ test('Rabi connects on entry and focus without overlapping requests, and removes
     module, exports: module.exports, AbortController,
     window: { addEventListener: (name, fn) => listeners.set(name, fn), removeEventListener: name => listeners.delete(name) },
     require: name => name === 'react' ? {
-      createElement: () => null, useState: initial => [initial, () => {}], useRef: initial => ({ current: initial }), useEffect: fn => effects.push(fn),
+      createElement: () => null, useState: initial => [initial, () => {}], useRef: initial => ({ current: initial }), useEffect: fn => effects.push(fn), useCallback: fn => fn,
     } : {},
   })
   module.exports.RabiConnectionPage({ actions: { async rabiConnection(endpoint, body, signal) {
@@ -28,7 +28,7 @@ test('Rabi connects on entry and focus without overlapping requests, and removes
   assert.deepEqual(calls.map(call => call.endpoint), ['rabi-connection-status'])
   finish()
   await new Promise(resolve => setImmediate(resolve))
-  assert.deepEqual(calls.map(call => call.endpoint), ['rabi-connection-status', 'rabi-personas-list'])
+  assert.deepEqual(calls.map(call => call.endpoint), ['rabi-connection-status', 'rabi-connect'])
   await focus()
   assert.equal(calls.length, 4)
   cleanup()
@@ -46,17 +46,17 @@ test('persona switches use confirmed binding operations and retain the original 
       require: name => name === 'react' ? {
         createElement: (type, props, ...children) => ({ type, props, children }),
         useState: initial => [initial?.personas ? { available: true, hooksReady: true, connected: true, personas: [persona] } : initial, () => {}],
-        useRef: () => ({ current: { signal: new AbortController().signal } }), useEffect() {},
+        useRef: () => ({ current: { signal: new AbortController().signal } }), useEffect() {}, useCallback: fn => fn,
       } : {},
     })
     const tree = module.exports.RabiConnectionPage({ actions: { async rabiConnection(endpoint, body) { calls.push({ endpoint, body }); return { personas: [persona] } } } })
-    const find = node => !node || typeof node !== 'object' ? null : node.type?.name === 'Switch' ? node : [node.children].flat(Infinity).map(find).find(Boolean)
+    const find = node => !node || typeof node !== 'object' ? null : node.props?.label === 'Connect Fixture automatically' ? node : [node.children].flat(Infinity).map(find).find(Boolean)
     const toggle = find(tree)
     assert.equal(toggle.props.on, linked)
     assert.equal(toggle.props.label, 'Connect Fixture automatically')
     toggle.props.onChange(!linked)
     await new Promise(resolve => setImmediate(resolve))
-    assert.deepEqual(calls.map(call => call.endpoint), [linked ? 'rabi-persona-unlink' : 'rabi-persona-import', 'rabi-personas-list'])
+    assert.deepEqual(calls.map(call => call.endpoint), [linked ? 'rabi-persona-unlink' : 'rabi-persona-import', 'rabi-connect'])
     assert.equal(JSON.stringify(calls[0].body), JSON.stringify(linked ? { botId: 'original' } : { roleId: 'persona' }))
   }
 })

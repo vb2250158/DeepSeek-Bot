@@ -55,6 +55,31 @@ var ZH = {
   "Pinned chats": "置顶聊天",
   "Drop here to pin": "拖到这里置顶",
   "Setting up your Bots…": "正在设置 Bot…",
+  Rabi: "Rabi",
+  "Rabi settings": "Rabi 设置",
+  "Connect Rabi first": "请先连接 Rabi",
+  "Checking Rabi…": "正在检查 Rabi…",
+  "Rabi is not running": "Rabi 未启动",
+  "Rabi is starting": "Rabi 正在启动",
+  "Rabi is running": "Rabi 已启动",
+  "Rabi installation was not found": "未发现 Rabi 安装位置",
+  "Rabi status is unavailable": "暂时无法确认 Rabi 状态",
+  "Rabi adapter is not installed": "尚未安装 Rabi 连接插件",
+  "Update the Rabi adapter": "需要更新 Rabi 连接插件",
+  "Start Rabi": "启动 Rabi",
+  "Retry connection": "连接重试",
+  "No Rabi installation path was found. Rabi may be uninstalled, unconfigured, or undiscoverable.": "未找到 Rabi 的安装路径，可能尚未安装、未配置路径或无法自动发现。",
+  "Visit Rabi on GitHub": "访问 GitHub 主页",
+  "Ask Bot to install and configure": "让 Bot 安装配置",
+  "Update dsh-rabiroute-agent to use Rabi startup and discovery.": "请更新 Rabi 连接插件，以使用启动和自动发现功能。",
+  "After Rabi starts, retry the connection.": "Rabi 启动后，点击“连接重试”。",
+  "Rabi works, but its location could not be saved. Check the local adapter settings.": "未能保存 Rabi 的位置，请检查本机连接插件设置。",
+  "Could not read Rabi personas. Retry the connection.": "暂时无法读取 Rabi 人格，请重试连接。",
+  "Choose a model for the Bot before requesting Rabi setup": "请先为 Bot 选择模型，再请求安装 Rabi。",
+  "Create a Bot before requesting Rabi setup": "请先创建 Bot，再请求安装 Rabi。",
+  "The operation did not complete. Reconnect to verify its result.": "操作未完成，请重新连接并核对结果。",
+  "Binding could not be confirmed. Refresh to check its state.": "绑定结果待确认，请刷新后核对。",
+  "Could not read remote computers. Retry or check Rabi.": "暂时无法读取远端电脑，请重试或到 Rabi 检查。",
   "Computers": "电脑",
   Retry: "重试",
   "Allow all Bots to use remote computers": "允许所有 Bot 使用远端电脑",
@@ -2382,6 +2407,7 @@ body[data-ds-dark-theme] .bt-scrim{background:rgba(0,0,0,.5)}
 .bt-set-section h3{font-size:13px;line-height:18px;font-weight:600;margin:0 0 8px;padding:0 4px}
 .bt-set-card{border:1px solid var(--bt-line);border-radius:12px;background:var(--bt-card);display:flex;flex-direction:column}
 .bt-rabi-actions{display:flex;gap:6px;flex-wrap:wrap}
+.bt-rabi-tabs{justify-content:flex-start;margin:0 0 16px}
 .bt-drawer-current-model{width:100%;min-width:0;margin:0}
 .bt-info-column>.bt-drawer-top{min-height:32px;padding:4px 10px 0;gap:4px}
 .bt-info-column>.bt-drawer-top .bt-round{width:28px;height:28px}
@@ -12045,7 +12071,7 @@ body:not([data-bt-motion=quiet]) .bt-about-mark:hover .bt-mark[data-live][data-s
 // src/client/rabi-computers.js
 var import_react34 = require("react");
 var import_dsh_client_ui_primitives7 = require("@deepseek-ai/dsh-client-ui-primitives");
-function RabiComputersPage({ roster, actions }) {
+function RabiComputersPage({ roster, actions, onDisconnected }) {
   const [status, setStatus] = (0, import_react34.useState)(null);
   const [computers, setComputers] = (0, import_react34.useState)([]);
   const [managementUrl, setManagementUrl] = (0, import_react34.useState)("");
@@ -12065,17 +12091,18 @@ function RabiComputersPage({ roster, actions }) {
       if (signal?.aborted) return;
       setManagementUrl(result.managementUrl);
       if (result.error) {
-        setError(result.error);
+        if (result.connection && result.connection.state !== "ready") onDisconnected?.(result.connection);
+        else setError(t("Could not read remote computers. Retry or check Rabi."));
         return;
       }
       setComputers(result.computers);
       setError("");
-    } catch (failure) {
-      if (!signal?.aborted) setError(failure.message);
+    } catch {
+      if (!signal?.aborted) setError(t("Could not read remote computers. Retry or check Rabi."));
     } finally {
       if (!signal?.aborted) setListing(false);
     }
-  }, [call2, enabled]);
+  }, [call2, enabled, onDisconnected]);
   (0, import_react34.useEffect)(() => {
     const abort = new AbortController();
     if (!enabled) {
@@ -12150,12 +12177,18 @@ function RabiComputersPage({ roster, actions }) {
 // src/client/rabi-connection.js
 var import_react35 = require("react");
 var import_dsh_client_ui_primitives8 = require("@deepseek-ai/dsh-client-ui-primitives");
-function RabiConnectionPage({ actions }) {
-  const [status, setStatus] = (0, import_react35.useState)({ available: null, connected: false, personas: [] });
+function RabiConnectionPage({ roster, actions }) {
+  const [tab, setTab] = (0, import_react35.useState)("connection");
+  const [status, setStatus] = (0, import_react35.useState)({ state: "checking", available: null, connected: false, personas: [] });
+  const installRequest = (0, import_react35.useRef)(null);
   const [busy, setBusy] = (0, import_react35.useState)("");
   const [error, setError] = (0, import_react35.useState)("");
   const [batch, setBatch] = (0, import_react35.useState)(null);
   const lifetime = (0, import_react35.useRef)(null);
+  const disconnected = (0, import_react35.useCallback)((value) => {
+    setStatus(value);
+    setTab("connection");
+  }, []);
   const [checking, setChecking] = (0, import_react35.useState)(false);
   (0, import_react35.useEffect)(() => {
     const controller = new AbortController();
@@ -12170,10 +12203,10 @@ function RabiConnectionPage({ actions }) {
         if (!controller.signal.aborted) setStatus((previous) => ({ ...previous, ...value }));
         if (value.available) await refresh(controller.signal);
         if (!controller.signal.aborted) setError("");
-      } catch (failure) {
+      } catch {
         if (!controller.signal.aborted) {
-          setStatus((previous) => ({ ...previous, connected: false }));
-          setError(t(failure.message));
+          setStatus((previous) => ({ ...previous, state: "unavailable", connected: false }));
+          setError(t("The operation did not complete. Reconnect to verify its result."));
         }
       } finally {
         inFlight = false;
@@ -12189,7 +12222,7 @@ function RabiConnectionPage({ actions }) {
     };
   }, [actions]);
   const refresh = async (signal) => {
-    const value = await actions.rabiConnection("rabi-personas-list", {}, signal);
+    const value = await actions.rabiConnection("rabi-connect", {}, signal);
     if (!signal.aborted) setStatus(value);
   };
   const run = async (key, action) => {
@@ -12200,91 +12233,126 @@ function RabiConnectionPage({ actions }) {
     try {
       await action(signal);
     } catch (failure) {
-      if (!signal.aborted) setError(t(failure.message));
+      if (!signal.aborted) {
+        if (failure.code === "bot/rabi-setup-model") setError(t("Choose a model for the Bot before requesting Rabi setup"));
+        else if (failure.code === "bot/rabi-setup-main") setError(t("Create a Bot before requesting Rabi setup"));
+        else {
+          const current = await actions.rabiConnection("rabi-connection-status", {}, signal).catch(() => ({ state: "unavailable", connected: false, personas: [] }));
+          if (!signal.aborted) {
+            setStatus(current);
+            setError(t("The operation did not complete. Reconnect to verify its result."));
+          }
+        }
+      }
     } finally {
       if (!signal.aborted) setBusy("");
     }
   };
+  const stateLabel = checking ? "Connecting…" : status.connected ? "Connected" : { checking: "Checking Rabi…", stopped: "Rabi is not running", starting: "Rabi is starting", ready: "Rabi is running", "not-found": "Rabi installation was not found", unavailable: "Rabi status is unavailable", "adapter-missing": "Rabi adapter is not installed", "adapter-update": "Update the Rabi adapter" }[status.state] ?? "Rabi status is unavailable";
+  const missing = ["not-found", "adapter-missing"].includes(status.state) || status.state === "unavailable" && !status.installed;
+  const install = () => run("install", async (signal) => {
+    installRequest.current ??= crypto.randomUUID();
+    const receipt = await actions.rabiConnection("rabi-install-request", { botId: roster.mainBotId, requestId: installRequest.current, locale: language() }, signal);
+    if (receipt.delivered && !signal.aborted) {
+      actions.closeSettings();
+      actions.openSession(receipt.botId);
+    }
+  });
   return (0, import_react35.createElement)(
     "div",
     { className: "bt-set-page" },
     (0, import_react35.createElement)(
       "div",
-      { className: "bt-set-row" },
-      (0, import_react35.createElement)(
-        "span",
-        { className: "bt-set-copy" },
-        (0, import_react35.createElement)("span", null, t("Local Rabi")),
-        (0, import_react35.createElement)("span", { className: "bt-set-hint", role: "status" }, t(status.available === null || checking ? "Connecting…" : status.connected ? "Connected" : "Not connected"))
-      ),
-      !status.connected ? (0, import_react35.createElement)(import_dsh_client_ui_primitives8.Button, { disabled: Boolean(busy) || checking || status.available !== true, onClick: () => void run("connect", refresh) }, t("Retry")) : null
+      { className: "bt-tabs bt-rabi-tabs", role: "tablist", "aria-label": t("Rabi settings") },
+      (0, import_react35.createElement)("button", { type: "button", className: "bt-tab", role: "tab", "aria-selected": tab === "connection", onClick: () => setTab("connection") }, t("Connect")),
+      (0, import_react35.createElement)("button", { type: "button", className: "bt-tab", role: "tab", "aria-selected": tab === "computers", disabled: !status.connected, title: status.connected ? void 0 : t("Connect Rabi first"), onClick: () => setTab("computers") }, t("Computers"))
     ),
-    status.available === false ? (0, import_react35.createElement)("p", { className: "bt-set-hint" }, t("Install and configure dsh-rabiroute-agent on the controller first")) : null,
-    status.available && status.hooksReady === false ? (0, import_react35.createElement)("p", { className: "bt-error" }, t("Update dsh-rabiroute-agent and enable Rabi Agent Hooks before binding a Bot")) : null,
-    error ? (0, import_react35.createElement)("p", { className: "bt-error", role: "alert" }, error) : null,
-    status.connected ? (0, import_react35.createElement)(
+    tab === "computers" && status.connected ? (0, import_react35.createElement)(RabiComputersPage, { roster, actions, onDisconnected: disconnected }) : null,
+    (0, import_react35.createElement)(
       "div",
-      { className: "bt-set-section" },
+      { hidden: tab !== "connection" },
       (0, import_react35.createElement)(
         "div",
-        { className: "bt-set-row" },
-        (0, import_react35.createElement)("span", { className: "bt-set-hint" }, t("Persona, memory, plans and skills come from Rabi.")),
-        (0, import_react35.createElement)(import_dsh_client_ui_primitives8.Button, { disabled: Boolean(busy) || Boolean(error) || status.hooksReady !== true || status.personas.length === 0, onClick: () => void run("all", async (signal) => {
-          setBatch(null);
-          const value = await actions.rabiConnection("rabi-personas-import-all", {}, signal);
-          if (!signal.aborted) setBatch(value.results);
-          await refresh(signal);
-        }) }, t(busy === "all" ? "Binding personas…" : "Bind all personas"))
-      ),
-      batch ? (0, import_react35.createElement)(
-        "div",
-        { role: "status" },
-        (0, import_react35.createElement)("p", { className: "bt-set-hint" }, t("Bound {success} · Failed {failed}", { success: batch.filter((item) => item.ok).length, failed: batch.filter((item) => !item.ok).length })),
-        batch.filter((item) => !item.ok).map((item) => (0, import_react35.createElement)("p", { className: "bt-error", key: item.roleId }, `${item.name}: ${t(item.error)}`))
-      ) : null,
-      status.personas.length === 0 ? (0, import_react35.createElement)("p", { className: "bt-set-hint" }, t("No personas in Rabi.")) : (0, import_react35.createElement)("div", { className: "bt-set-card" }, status.personas.map((persona) => (0, import_react35.createElement)(
-        "div",
-        { className: "bt-set-row", key: persona.id },
+        { className: "bt-set-card" },
         (0, import_react35.createElement)(
-          "span",
-          { className: "bt-set-copy" },
-          (0, import_react35.createElement)("span", null, persona.name),
-          persona.botId ? (0, import_react35.createElement)("span", { className: "bt-set-hint" }, persona.linked ? t("Linked to {name}", { name: persona.botName }) : t("Not linked · {name}", { name: persona.botName })) : null
-        ),
+          "div",
+          { className: "bt-set-row" },
+          (0, import_react35.createElement)("span", { className: "bt-set-copy" }, (0, import_react35.createElement)("span", null, t("Local Rabi")), (0, import_react35.createElement)("span", { className: "bt-set-hint", role: "status" }, t(stateLabel))),
+          (0, import_react35.createElement)(
+            "div",
+            { className: "bt-rabi-actions" },
+            status.state === "stopped" && status.canStart ? (0, import_react35.createElement)(import_dsh_client_ui_primitives8.Button, { disabled: Boolean(busy), onClick: () => void run("start", async (signal) => setStatus(await actions.rabiConnection("rabi-start", {}, signal))) }, t("Start Rabi")) : null,
+            !status.connected && !missing && status.state !== "checking" ? (0, import_react35.createElement)(import_dsh_client_ui_primitives8.Button, { disabled: checking || Boolean(busy) || status.available === false, onClick: () => void run("connect", refresh) }, t(status.connected ? "Refresh personas" : status.state === "starting" ? "Retry connection" : "Connect local Rabi")) : null
+          )
+        )
+      ),
+      missing ? (0, import_react35.createElement)(
+        "div",
+        { className: "bt-set-section" },
+        (0, import_react35.createElement)("p", { className: "bt-set-hint" }, t("No Rabi installation path was found. Rabi may be uninstalled, unconfigured, or undiscoverable.")),
+        (0, import_react35.createElement)("p", { className: "bt-set-hint" }, status.repositoryUrl),
         (0, import_react35.createElement)(
           "div",
           { className: "bt-rabi-actions" },
-          persona.botId ? (0, import_react35.createElement)(import_dsh_client_ui_primitives8.Button, { disabled: Boolean(busy), onClick: () => actions.openSession(persona.botId) }, t("Open Bot")) : null,
-          (0, import_react35.createElement)(Switch, { on: persona.linked === true, label: t("Connect {name} automatically", { name: persona.name }), disabled: Boolean(busy) || status.hooksReady !== true, onChange: (on) => void run(persona.id, async (signal) => {
-            await actions.rabiConnection(on ? "rabi-persona-import" : "rabi-persona-unlink", on ? { roleId: persona.id } : { botId: persona.botId }, signal);
-            await refresh(signal);
-          }) })
+          (0, import_react35.createElement)(import_dsh_client_ui_primitives8.Button, { disabled: !status.repositoryUrl, onClick: () => window.open(status.repositoryUrl, "_blank", "noopener,noreferrer") }, t("Visit Rabi on GitHub")),
+          (0, import_react35.createElement)(import_dsh_client_ui_primitives8.Button, { disabled: Boolean(busy), onClick: () => void install() }, t("Ask Bot to install and configure"))
         )
-      )))
-    ) : null
+      ) : null,
+      status.state === "adapter-update" ? (0, import_react35.createElement)("p", { className: "bt-set-hint" }, t("Update dsh-rabiroute-agent to use Rabi startup and discovery.")) : null,
+      status.state === "starting" ? (0, import_react35.createElement)("p", { className: "bt-set-hint" }, t("After Rabi starts, retry the connection.")) : null,
+      status.locationRemembered === false ? (0, import_react35.createElement)("p", { className: "bt-set-hint" }, t("Rabi works, but its location could not be saved. Check the local adapter settings.")) : null,
+      status.connectionIssue ? (0, import_react35.createElement)("p", { className: "bt-set-hint" }, t("Could not read Rabi personas. Retry the connection.")) : null,
+      status.available && status.hooksReady === false ? (0, import_react35.createElement)("p", { className: "bt-set-hint" }, t("Update dsh-rabiroute-agent and enable Rabi Agent Hooks before binding a Bot")) : null,
+      error ? (0, import_react35.createElement)("p", { className: "bt-error", role: "alert" }, error) : null,
+      status.connected ? (0, import_react35.createElement)(
+        "div",
+        { className: "bt-set-section" },
+        (0, import_react35.createElement)(
+          "div",
+          { className: "bt-set-row" },
+          (0, import_react35.createElement)("span", { className: "bt-set-hint" }, t("Persona, memory, plans and skills come from Rabi.")),
+          (0, import_react35.createElement)(import_dsh_client_ui_primitives8.Button, { disabled: Boolean(busy) || Boolean(error) || status.hooksReady !== true || status.personas.length === 0, onClick: () => void run("all", async (signal) => {
+            setBatch(null);
+            const value = await actions.rabiConnection("rabi-personas-import-all", {}, signal);
+            if (!signal.aborted) setBatch(value.results);
+            await refresh(signal);
+          }) }, t(busy === "all" ? "Binding personas…" : "Bind all personas"))
+        ),
+        batch ? (0, import_react35.createElement)(
+          "div",
+          { role: "status" },
+          (0, import_react35.createElement)("p", { className: "bt-set-hint" }, t("Bound {success} · Failed {failed}", { success: batch.filter((item) => item.ok).length, failed: batch.filter((item) => !item.ok).length })),
+          batch.filter((item) => !item.ok).map((item) => (0, import_react35.createElement)("p", { className: "bt-error", key: item.roleId }, `${item.name}: ${t("Binding could not be confirmed. Refresh to check its state.")}`))
+        ) : null,
+        status.personas.length === 0 ? (0, import_react35.createElement)("p", { className: "bt-set-hint" }, t("No personas in Rabi.")) : (0, import_react35.createElement)("div", { className: "bt-set-card" }, status.personas.map((persona) => (0, import_react35.createElement)(
+          "div",
+          { className: "bt-set-row", key: persona.id },
+          (0, import_react35.createElement)(
+            "span",
+            { className: "bt-set-copy" },
+            (0, import_react35.createElement)("span", null, persona.name),
+            persona.botId ? (0, import_react35.createElement)("span", { className: "bt-set-hint" }, persona.linked ? t("Linked to {name}", { name: persona.botName }) : t("Not linked · {name}", { name: persona.botName })) : null
+          ),
+          (0, import_react35.createElement)(
+            "div",
+            { className: "bt-rabi-actions" },
+            persona.botId ? (0, import_react35.createElement)(import_dsh_client_ui_primitives8.Button, { disabled: Boolean(busy), onClick: () => actions.openSession(persona.botId) }, t("Open Bot")) : null,
+            (0, import_react35.createElement)(Switch, { on: persona.linked === true, label: t("Connect {name} automatically", { name: persona.name }), disabled: Boolean(busy) || status.hooksReady !== true, onChange: (on) => void run(persona.id, async (signal) => {
+              await actions.rabiConnection(on ? "rabi-persona-import" : "rabi-persona-unlink", on ? { roleId: persona.id } : { botId: persona.botId }, signal);
+              await refresh(signal);
+            }) })
+          )
+        )))
+      ) : null
+    )
   );
 }
 
 // src/client/settings.js
 var import_react36 = require("react");
-function LazyRabiComputersPage(props) {
-  const [ready, setReady] = (0, import_react36.useState)(false);
-  (0, import_react36.useEffect)(() => {
-    let alive = true;
-    const id = requestAnimationFrame(() => {
-      if (alive) setReady(true);
-    });
-    return () => {
-      alive = false;
-      cancelAnimationFrame(id);
-    };
-  }, []);
-  if (!ready) return (0, import_react36.createElement)("p", { className: "bt-set-hint" }, t("Loading…"));
-  return (0, import_react36.createElement)(RabiComputersPage, props);
-}
 var capitalize2 = (word) => word[0].toUpperCase() + word.slice(1);
-var SETTINGS_PAGES = [["general", "General"], ["bots", "Bots"], ["groups", "Group chats"], ["rabi", "Rabi connection"], ["computers", "Computers"], ["connectors", "Bot connectors"], ["capabilities", "Capabilities"], ["schedules", "Bot tasks"], ["usage", "Bot usage"], ["secrets", "Secrets"], ["feedback", "Feedback"], ["about", "About DS Bot"]];
-var PAGE_ICONS = { ...SETTINGS_ICONS, rabi: ConnectorIcon, computers: SlidersIcon, connectors: ConnectorIcon, capabilities: PlugIcon, schedules: ClockIcon, secrets: KeyIcon, feedback: FeedbackIcon, about: InfoIcon };
+var SETTINGS_PAGES = [["general", "General"], ["bots", "Bots"], ["groups", "Group chats"], ["rabi", "Rabi"], ["connectors", "Bot connectors"], ["capabilities", "Capabilities"], ["schedules", "Bot tasks"], ["usage", "Bot usage"], ["secrets", "Secrets"], ["feedback", "Feedback"], ["about", "About DS Bot"]];
+var PAGE_ICONS = { ...SETTINGS_ICONS, rabi: ConnectorIcon, connectors: ConnectorIcon, capabilities: PlugIcon, schedules: ClockIcon, secrets: KeyIcon, feedback: FeedbackIcon, about: InfoIcon };
 function SetSection({ title, children }) {
   return (0, import_react36.createElement)("section", { className: "bt-set-section" }, (0, import_react36.createElement)("h3", null, title), (0, import_react36.createElement)("div", { className: "bt-set-card" }, children));
 }
@@ -12440,7 +12508,7 @@ function SettingsDialog({ page, id, roster, actions, useUpdate, leaving = false 
   });
   const bot = page === "bots" && id ? roster.byId[id] : void 0;
   const room2 = page === "groups" && id ? roster.roomsById[id] : void 0;
-  const shown = SETTINGS_PAGES.some(([key]) => key === page) ? page : "general";
+  const shown = page === "computers" ? "rabi" : SETTINGS_PAGES.some(([key]) => key === page) ? page : "general";
   const usageFocus = shown === "usage" && id ? id : null;
   const label = t(SETTINGS_PAGES.find(([key]) => key === shown)[1]);
   const back = bot ? t("Back to Bots") : room2 ? t("Back to group chats") : usageFocus ? t("All usage") : null;
@@ -12487,12 +12555,11 @@ function SettingsDialog({ page, id, roster, actions, useUpdate, leaving = false 
           { key: pageKey, className: "bt-settings-scroll bt-settings-page", "data-move": last.current.move },
           errorLine,
           shown === "general" ? (0, import_react36.createElement)(GeneralPage, { roster, actions, run }) : null,
-          shown === "rabi" ? (0, import_react36.createElement)(RabiConnectionPage, { actions }) : null,
+          shown === "rabi" ? (0, import_react36.createElement)(RabiConnectionPage, { roster, actions }) : null,
           bot ? (0, import_react36.createElement)("div", { className: "bt-settings-form" }, (0, import_react36.createElement)(BotSettingsForm, { key: bot.id, bot, roster, actions, run })) : null,
           shown === "bots" && !bot ? (0, import_react36.createElement)(BotsPage, { roster, actions, run }) : null,
           room2 ? (0, import_react36.createElement)("div", { className: "bt-settings-form" }, (0, import_react36.createElement)(GroupSettingsForm, { key: room2.id, room: room2, roster, actions, run })) : null,
           shown === "groups" && !room2 ? (0, import_react36.createElement)(GroupsPage, { roster, actions, run }) : null,
-          shown === "computers" ? (0, import_react36.createElement)(LazyRabiComputersPage, { roster, actions }) : null,
           shown === "connectors" ? (0, import_react36.createElement)(ConnectorsPage, { roster, actions }) : null,
           shown === "capabilities" ? (0, import_react36.createElement)(CapabilitiesPage, { roster, actions, run }) : null,
           shown === "schedules" ? (0, import_react36.createElement)(SchedulesPage, { roster, actions, start: id ?? void 0 }) : null,

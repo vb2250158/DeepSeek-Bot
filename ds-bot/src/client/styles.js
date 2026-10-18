@@ -458,6 +458,7 @@ body[data-ds-dark-theme] .bt-scrim{background:rgba(0,0,0,.5)}
 .bt-set-section h3{font-size:13px;line-height:18px;font-weight:600;margin:0 0 8px;padding:0 4px}
 .bt-set-card{border:1px solid var(--bt-line);border-radius:12px;background:var(--bt-card);display:flex;flex-direction:column}
 .bt-rabi-actions{display:flex;gap:6px;flex-wrap:wrap}
+.bt-rabi-tabs{justify-content:flex-start;margin:0 0 16px}
 .bt-drawer-current-model{width:100%;min-width:0;margin:0}
 .bt-info-column>.bt-drawer-top{min-height:32px;padding:4px 10px 0;gap:4px}
 .bt-info-column>.bt-drawer-top .bt-round{width:28px;height:28px}
