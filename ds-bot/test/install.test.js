@@ -36,6 +36,7 @@ test('apply registers listeners, tools, and effects in a fixed order', (t) => {
   assert.deepEqual(ctx.calls, [
     'effect ds-bot: state lock',
     'on llm/adapters-updated',
+    'on agent/inbox/claimed',
     'on session/event',
     'effect ds-bot: agent tool restrict retry',
     'on agent/created',
@@ -69,6 +70,7 @@ test('apply registers listeners, tools, and effects in a fixed order', (t) => {
     'on llm/stream',
     'on approval/request (prepend)',
     'on agent/inbox/discarded',
+    'on agent/inbox/claimed',
     'on session/event',
     'effect ds-bot: resume interrupted turns',
     'effect ds-bot: memory section',

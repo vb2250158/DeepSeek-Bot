@@ -10,6 +10,8 @@ Tested with dsh `0.2.0-rc.2` (Web and Desktop) on Linux.
 
 The chat tail reports submitted messages and live Rabi Hook progress, with explicit stopped-Host, recovery and uncertain-result notices. Bound Bots discover Rabi automatically; progress codes require adapter 0.13.36 or newer.
 
+A group member's failure before its first model step ends its typing indicator immediately and reports the error in the round. Messages already claimed by that member are not resent after a restart.
+
 Rabi settings discover the service and load bindings on entry and focus without overlapping requests. Each persona switch enables or disables its confirmed binding; disabling preserves its Bot and conversation. Group feedback lists members working in that group and removes them as their work ends. A Bot's label is its work title, assigned from actual responsibilities with `update_bot`; legacy imported `Rabi` labels are removed, while other titles are preserved.
 
 Terminal errors, failed-turn retry actions and retained Rabi failure notices are visible only when they occurred during the current page navigation. Refreshing dismisses their historical presentation without changing the Session log. New failures keep the installed renderer and actions; genuine interrupted-turn recovery and other turn-tail contributions remain available. This policy is scoped to Bot conversations and is removed when leaving that surface.

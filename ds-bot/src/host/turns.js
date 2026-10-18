@@ -301,6 +301,14 @@ export function install(rt) {
     })
   }
 
+  // A pre-step Hook can fail after the inbox claim but before user/message is logged.
+  ctx.on('agent/inbox/claimed', ({ agent, message, turn }) => {
+    const id = agent.session.id
+    if (!rt.isBotSession(id)) return
+    const entry = liveOf(id)
+    if (entry.turn === turn && !entry.opened) entry.claimed ??= message.source
+  })
+
   ctx.on('session/event', (session, event) => {
     const id = session?.id
     if (id === undefined) return
@@ -335,6 +343,7 @@ export function install(rt) {
         entry.shown = 0
         entry.step = undefined
         entry.info = undefined
+        entry.claimed = undefined
         // A turn turned away before its first step may end without a turn/end.
         entry.switched = false
         entry.answers = false
@@ -439,7 +448,7 @@ export function install(rt) {
       }
       case 'turn/end': {
         setActivity(id, undefined)
-        const info = entry.info
+        const info = entry.info ?? (entry.claimed?.kind === SOURCE_KIND ? entry.claimed : undefined)
         const joined = entry.joined ?? []
         // What the group already saw of the turn is not posted again.
         const texts = entry.texts.slice(entry.shown)
@@ -448,6 +457,7 @@ export function install(rt) {
         const switched = entry.switched === true
         entry.turn = undefined
         entry.info = undefined
+        entry.claimed = undefined
         entry.texts = []
         entry.shown = 0
         entry.step = undefined

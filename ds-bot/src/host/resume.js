@@ -124,6 +124,16 @@ export function install(rt) {
   // picked up. A turn that ends, or still runs, before one starts here outlived the
   // last run: only DS Bot restarted (the plugin reloaded) and DSH went on.
   let firstTurn = Object.keys(interrupted.turns).length > 0 ? new Map() : undefined
+  ctx.on('agent/inbox/claimed', ({ agent, message, turn }) => {
+    const source = message.source
+    if (source?.kind !== SOURCE_KIND || !source.exchangeId) return
+    taken?.add(source.exchangeId)
+    forgetQueued(source.exchangeId)
+    const id = agent.session.id
+    if (rt.live.get(id)?.turn !== turn) return
+    update(id, record => (record === undefined || record.trigger !== undefined ? record
+      : { ...record, trigger: triggerOf(source), ...(source.resumed ? { resumed: true } : {}) }))
+  })
   ctx.on('session/event', (session, event) => {
     const id = session?.id
     if (id === undefined) return

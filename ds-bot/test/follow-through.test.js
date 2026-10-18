@@ -89,8 +89,35 @@ const inflight = home => notes(home).turns ?? {}
 // A message as DSH would replay it: the turn starts and takes it up.
 const run = (host, sessionId, turn, message) => {
   host.emit(sessionId, 'turn/start', { turn })
+  host.ctx.emit('agent/inbox/claimed', { agent: host.agentOf(sessionId), message, turn })
   host.emit(sessionId, 'user/message', { content: message.content, source: message.source })
 }
+
+test('a group member failing before its first step ends the wait and is not replayed after restart', async (t) => {
+  const home = freshHome(t)
+  const host = await start(home)
+  let result
+  const stop = new AbortController()
+  t.after(() => stop.abort())
+  void host.tool('group_relay', {}, 'r1', { callId: 'pre-step', signal: stop.signal }).then(value => { result = JSON.parse(value) })
+  await settle(() => host.agentOf('gb').calls.length === 1)
+  const message = host.agentOf('gb').calls[0]
+  host.emit('gb', 'turn/start', { turn: 1 })
+  host.ctx.emit('agent/inbox/claimed', { agent: host.agentOf('gb'), message, turn: 1 })
+  host.emit('gb', 'turn/end', { turn: 1, reason: { kind: 'error', error: { code: 'UNKNOWN', message: 'Rabi binding UserPromptSubmit failed: Manager read exceeded 45000 ms.' } } })
+  await settle(() => result !== undefined)
+  assert.deepEqual(result.replies.map(reply => [reply.kind, reply.name, reply.code]), [['failed', 'Writer', 'UNKNOWN']])
+  assert.match(result.replies[0].text, /UserPromptSubmit/)
+  assert.deepEqual((await host.call('state', {})).value.work.rooms.r1, undefined)
+  await host.stop()
+  assert.deepEqual(notes(home), { turns: {}, queued: {} })
+  assert.equal(host.agentOf('r1').calls.length, 0)
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const next = await start(home)
+  t.mock.timers.tick(3000)
+  await settle(() => true)
+  assert.equal(next.agentOf('gb').calls.length, 0)
+})
 
 // Starts a round in 'r1' and opens Writer's turn in 'gb'.
 async function openRoomTurn(t, host) {
