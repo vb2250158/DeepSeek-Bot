@@ -2,6 +2,14 @@
 
 All notable changes to DS Bot are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the versions follow [Semantic Versioning](https://semver.org/). Before 1.0, a minor version can contain breaking changes.
 
+## [0.1.6-rabi.22] - 2026-10-18
+
+### Changed
+
+- Show the selected model in the compact right panel and keep Rabi resources only in Library. Display memory categories together without nested menus or a refresh button.
+- Keep bounded, window-local resource views across navigation, merge concurrent reads, refresh existing content in the background and retain loaded pages. Failed refreshes keep the previous view visible. No persona content is persisted in browser storage or reused as Agent context.
+- Require adapter 0.13.34 for configured request budgets without a hidden 12-second cutoff.
+
 ## [0.1.6-rabi.21] - 2026-10-18
 
 ### Changed

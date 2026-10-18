@@ -458,6 +458,14 @@ body[data-ds-dark-theme] .bt-scrim{background:rgba(0,0,0,.5)}
 .bt-set-section h3{font-size:13px;line-height:18px;font-weight:600;margin:0 0 8px;padding:0 4px}
 .bt-set-card{border:1px solid var(--bt-line);border-radius:12px;background:var(--bt-card);display:flex;flex-direction:column}
 .bt-rabi-actions{display:flex;gap:6px;flex-wrap:wrap}
+.bt-drawer-current-model{width:100%;max-width:280px;margin-top:12px}
+.bt-rabi-workspace{display:flex;flex-direction:column;gap:20px;min-width:0}
+.bt-rabi-resources{display:flex;flex-wrap:wrap;gap:4px;padding:4px;border-radius:10px;background:var(--bt-hover)}
+.bt-rabi-resources>button{flex:1;min-width:56px;padding:7px 4px;border:0;border-radius:8px;background:transparent;color:var(--bt-ink-2);font:inherit;font-size:13px;cursor:pointer}
+.bt-rabi-resources>button[aria-selected=true]{background:var(--bt-hover);color:var(--bt-ink)}
+.bt-rabi-resource{position:relative;min-width:0;display:flex;flex-direction:column;gap:8px}
+.bt-rabi-resource>.bt-section-title{margin:0;font-weight:500}
+.bt-rabi-updating{align-self:flex-end;font-size:12px;color:var(--bt-ink-3)}
 .bt-rabi-dialog{width:min(800px,calc(100vw - 32px))}
 .bt-rabi-document{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.6}
 .bt-rabi-actions button[aria-pressed=true]{outline:1px solid var(--bt-line)}

@@ -222,7 +222,8 @@ export function DetailsDrawer({ sessionId, startRenaming, startTab, hasStrip, co
             onKeyDown: (event) => { if (event.key === 'Enter') void saveName(); if (event.key === 'Escape') { event.stopPropagation(); setEditing(false) } },
           })
         : h('button', { type: 'button', className: 'bt-drawer-name', 'aria-label': t('Rename {name}', { name: current }), title: t('Rename'), onClick: () => { setDraftName(room && !room.named ? '' : current); setEditing(true) } }, current),
-      subtitle ? h('span', { className: 'bt-drawer-role' }, subtitle) : null),
+      subtitle ? h('span', { className: 'bt-drawer-role' }, subtitle) : null,
+      compact && bot ? h('div', { className: 'bt-drawer-current-model', 'aria-label': t('Model') }, h(ModelMenu, { bot, roster, actions, run, wide: true })) : null),
     h('div', { key: 'tabs', ref: glide.box, className: 'bt-tabs', role: 'tablist', 'data-move': side },
       h('span', { ref: glide.thumb, className: 'bt-thumb', 'aria-hidden': true }),
       tabs.map(key => h('button', { key, type: 'button', role: 'tab', className: 'bt-tab', 'aria-selected': tab === key, onClick: () => setTab(key) }, t(TAB_LABELS[key])))),
@@ -246,7 +247,7 @@ export function DetailsDrawer({ sessionId, startRenaming, startTab, hasStrip, co
           h('div', { className: 'bt-kv' }, h('span', null, bot.name), h('span', null, usage))) : null,
         h(ScheduleSummary, { key: 'routines', bot, actions }),
       ] : null,
-      bot && compact && tab === 'details' ? bot.rabiPersona && bot.rabiPersona.enabled !== false ? h(RabiWorkspace, { bot, actions }) : h(ScheduleSummary, { bot, actions }) : null,
+      bot && compact && tab === 'details' ? h(ScheduleSummary, { bot, actions }) : null,
       bot && tab === 'library' ? bot.rabiPersona && bot.rabiPersona.enabled !== false ? h(RabiWorkspace, { bot, actions }) : [h(MemoryRow, { key: 'memory', bot, actions }), h(BrowserCards, { key: 'browser', bot, sessionId, roster, actions, useBrowserTabs, useBrowserPages })] : null,
       bot && tab === 'browser' ? h(BrowserCards, { bot, sessionId, roster, actions, useBrowserTabs, useBrowserPages }) : null)]
 }

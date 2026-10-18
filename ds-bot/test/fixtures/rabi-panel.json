@@ -1,0 +1,9 @@
+{
+  "details": { "tabs": ["Details", "Library"], "models": 1, "resources": 0 },
+  "library": { "tabs": ["Details", "Library"], "models": 1, "resources": 1 },
+  "memory": {
+    "tabs": ["Memory", "Plans", "Role skills", "Persona"],
+    "sections": ["recent", "consolidated", "archived"],
+    "buttons": ["Memory", "Plans", "Role skills", "Persona"]
+  }
+}

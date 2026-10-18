@@ -34,12 +34,15 @@ import { MEMBER_CSS, MemberDock } from './member-status.js'
 import { USER_MESSAGE_CSS, UserMessageCell, canDrawUserMessages } from './user-message.js'
 import { noticeApprovals } from './approval-notices.js'
 import { createSessionNavigator } from './navigation.js'
+import { createRabiWorkspaceStore } from './rabi-workspace-store.js'
 
 export const inject = ['sessions', 'uiWorkspace', 'uiConversation', 'slots', 'theme', 'layout']
 
 export function apply(ctx) {
   ctx.effect(() => installLocale(ctx.get('locale')), 'ds-bot: interface copy')
   const roster = createSource(EMPTY_ROSTER)
+  const rabiWorkspace = createRabiWorkspaceStore((payload, signal) => call('rabi-bot-view', payload, signal))
+  ctx.effect(() => () => rabiWorkspace.dispose(), 'ds-bot: Rabi resource reads')
   migrateStorage()
   const UNREAD_KEY = STORAGE.unread
   let savedUnread = {}
@@ -523,8 +526,9 @@ export function apply(ctx) {
     duplicateBot: id => after(call('duplicate-bot', { id })),
     setPrefs: prefs => after(call('set-prefs', prefs)),
     rabiComputers: (endpoint, payload, signal) => call(endpoint, payload, signal),
+    rabiWorkspace,
     rabiConnection: (endpoint, payload, signal) => endpoint === 'rabi-persona-import' || endpoint === 'rabi-personas-import-all' || endpoint === 'rabi-persona-unlink'
-      ? after(call(endpoint, payload, signal)) : call(endpoint, payload, signal),
+      ? after(call(endpoint, payload, signal)).then(value => { if (payload?.botId) rabiWorkspace.invalidateBot(payload.botId); return value }) : call(endpoint, payload, signal),
     setMain: (id, main = true, options = {}) => after(call('set-main', { id, main, ...options })),
     updateRoom: (id, patch) => after(call('update-room', { id, ...patch })),
     send: (sessionId, text) => after(call('send', { sessionId: partFor(sessionId), text })),

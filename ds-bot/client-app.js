@@ -371,6 +371,8 @@ var ZH = {
   "Archived memory": "归档记忆",
   "Managed by Rabi": "由 Rabi 管理",
   "Rabi resources": "Rabi 资料",
+  "Load more": "加载更多",
+  "Showing saved view from {time}": "显示 {time} 的已加载内容",
   "No items in Rabi.": "Rabi 中暂无记录",
   "Next page": "下一页",
   "Update dsh-rabiroute-agent and enable Rabi Agent Hooks before binding a Bot": "请更新 dsh-rabiroute-agent 并启用 Rabi Agent Hooks 后再绑定 Bot",
@@ -2368,6 +2370,14 @@ body[data-ds-dark-theme] .bt-scrim{background:rgba(0,0,0,.5)}
 .bt-set-section h3{font-size:13px;line-height:18px;font-weight:600;margin:0 0 8px;padding:0 4px}
 .bt-set-card{border:1px solid var(--bt-line);border-radius:12px;background:var(--bt-card);display:flex;flex-direction:column}
 .bt-rabi-actions{display:flex;gap:6px;flex-wrap:wrap}
+.bt-drawer-current-model{width:100%;max-width:280px;margin-top:12px}
+.bt-rabi-workspace{display:flex;flex-direction:column;gap:20px;min-width:0}
+.bt-rabi-resources{display:flex;flex-wrap:wrap;gap:4px;padding:4px;border-radius:10px;background:var(--bt-hover)}
+.bt-rabi-resources>button{flex:1;min-width:56px;padding:7px 4px;border:0;border-radius:8px;background:transparent;color:var(--bt-ink-2);font:inherit;font-size:13px;cursor:pointer}
+.bt-rabi-resources>button[aria-selected=true]{background:var(--bt-hover);color:var(--bt-ink)}
+.bt-rabi-resource{position:relative;min-width:0;display:flex;flex-direction:column;gap:8px}
+.bt-rabi-resource>.bt-section-title{margin:0;font-weight:500}
+.bt-rabi-updating{align-self:flex-end;font-size:12px;color:var(--bt-ink-3)}
 .bt-rabi-dialog{width:min(800px,calc(100vw - 32px))}
 .bt-rabi-document{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.6}
 .bt-rabi-actions button[aria-pressed=true]{outline:1px solid var(--bt-line)}
@@ -7333,58 +7343,29 @@ function BotCapabilitiesCard({ bot, roster, actions, run, Card: Card2, SwitchRow
 var import_react15 = require("react");
 var import_dsh_client_ui_primitives3 = require("@deepseek-ai/dsh-client-ui-primitives");
 var RESOURCES = [["memory", "Memory"], ["plans", "Plans"], ["skills", "Role skills"], ["persona", "Persona"]];
-function RabiWorkspace({ bot, actions }) {
-  const [resource, setResource] = (0, import_react15.useState)("memory");
-  const [kind, setKind] = (0, import_react15.useState)("recent");
-  const [query, setQuery] = (0, import_react15.useState)({});
-  const [view, setView] = (0, import_react15.useState)(null);
-  const [error, setError] = (0, import_react15.useState)("");
-  const [pending, setPending] = (0, import_react15.useState)(false);
+var MEMORY = [["recent", "Recent memory"], ["consolidated", "Consolidated memory"], ["archived", "Archived memory"]];
+function Resource({ bot, actions, resource, kind, itemId, open, back, label }) {
+  const store = actions.rabiWorkspace;
+  const roleId = bot.rabiPersona.roleId;
+  const scope = { botId: bot.id, roleId, resource, ...kind ? { kind } : {}, ...itemId ? { itemId } : {} };
+  const subscribe = (0, import_react15.useCallback)((listener) => store.subscribe(scope, listener), [store, bot.id, roleId, resource, kind, itemId]);
+  const snapshot = (0, import_react15.useCallback)(() => store.snapshot(scope), [store, bot.id, roleId, resource, kind, itemId]);
+  const { value: view, pending, error, updatedAt } = (0, import_react15.useSyncExternalStore)(subscribe, snapshot);
   (0, import_react15.useEffect)(() => {
-    const controller = new AbortController();
-    setPending(true);
-    setError("");
-    void actions.rabiConnection("rabi-bot-view", { botId: bot.id, resource, kind, ...query }, controller.signal).then((value) => {
-      if (!controller.signal.aborted) setView(value);
-    }).catch((failure) => {
-      if (!controller.signal.aborted) setError(hostText(failure.message));
-    }).finally(() => {
-      if (!controller.signal.aborted) setPending(false);
-    });
-    return () => controller.abort();
-  }, [bot.id, resource, kind, query, actions]);
-  const select = (value) => {
-    setView(null);
-    setResource(value);
-    setQuery({});
-  };
+    void store.visit(scope);
+  }, [store, bot.id, roleId, resource, kind, itemId]);
   const detail = view?.detail;
   const text = view?.text ?? detail?.content ?? detail?.description ?? detail?.text;
   return (0, import_react15.createElement)(
-    "div",
-    { className: "bt-set-page" },
-    (0, import_react15.createElement)(
-      "div",
-      { className: "bt-rabi-actions", role: "group", "aria-label": t("Rabi resources") },
-      RESOURCES.map(([value, label]) => (0, import_react15.createElement)(import_dsh_client_ui_primitives3.Button, { key: value, "aria-pressed": resource === value, onClick: () => select(value) }, t(label)))
-    ),
-    resource === "memory" ? (0, import_react15.createElement)("div", { className: "bt-rabi-actions" }, [["recent", "Recent memory"], ["consolidated", "Consolidated memory"], ["archived", "Archived memory"]].map(([value, label]) => (0, import_react15.createElement)(import_dsh_client_ui_primitives3.Button, { key: value, "aria-pressed": kind === value, onClick: () => {
-      setKind(value);
-      setView(null);
-      setQuery({});
-    } }, t(label)))) : null,
-    (0, import_react15.createElement)(
-      "div",
-      { className: "bt-rabi-actions" },
-      query.itemId ? (0, import_react15.createElement)(import_dsh_client_ui_primitives3.Button, { onClick: () => {
-        setView(null);
-        setQuery({});
-      } }, t("Back")) : null,
-      (0, import_react15.createElement)(import_dsh_client_ui_primitives3.Button, { disabled: pending, onClick: () => setQuery((previous) => ({ ...previous })) }, t("Refresh"))
-    ),
-    error ? (0, import_react15.createElement)("p", { className: "bt-error", role: "alert" }, error) : null,
-    pending ? (0, import_react15.createElement)("div", { className: "bt-mem-skel", "aria-busy": true, "aria-label": t("Loading…") }, (0, import_react15.createElement)("span"), (0, import_react15.createElement)("span")) : null,
-    view && !pending ? (0, import_react15.createElement)(
+    "section",
+    { className: "bt-rabi-resource", "aria-label": t(label), "aria-busy": pending },
+    label && resource === "memory" && !itemId ? (0, import_react15.createElement)("h3", { className: "bt-section-title" }, t(label)) : null,
+    itemId ? (0, import_react15.createElement)(import_dsh_client_ui_primitives3.Button, { onClick: back }, t("Back")) : null,
+    error ? (0, import_react15.createElement)("p", { className: "bt-error", role: "alert" }, hostText(error.message)) : null,
+    view && pending ? (0, import_react15.createElement)("span", { className: "bt-rabi-updating", role: "status" }, t("Updating…")) : null,
+    view && error && updatedAt ? (0, import_react15.createElement)("span", { className: "bt-set-hint" }, t("Showing saved view from {time}", { time: new Date(updatedAt).toLocaleTimeString() })) : null,
+    !view && !error ? (0, import_react15.createElement)("div", { className: "bt-mem-skel", "aria-label": t("Loading…") }, (0, import_react15.createElement)("span"), (0, import_react15.createElement)("span")) : null,
+    view ? (0, import_react15.createElement)(
       "div",
       null,
       detail?.title ? (0, import_react15.createElement)("h3", null, detail.title) : null,
@@ -7394,16 +7375,35 @@ function RabiWorkspace({ bot, actions }) {
         "div",
         { className: "bt-set-row", key: item.id },
         (0, import_react15.createElement)("span", { className: "bt-set-copy" }, (0, import_react15.createElement)("span", null, item.title ?? item.id), item.summary ? (0, import_react15.createElement)("span", { className: "bt-set-hint" }, item.summary) : null, item.status ? (0, import_react15.createElement)("span", { className: "bt-set-hint" }, item.status) : null),
-        resource === "memory" && kind === "archived" ? null : (0, import_react15.createElement)(import_dsh_client_ui_primitives3.Button, { onClick: () => {
-          setView(null);
-          setQuery({ itemId: item.id });
-        } }, t("View"))
+        kind === "archived" ? null : (0, import_react15.createElement)(import_dsh_client_ui_primitives3.Button, { onClick: () => open({ itemId: item.id, kind }) }, t("View"))
       ))) : !detail && !text ? (0, import_react15.createElement)("p", { className: "bt-set-hint" }, t("No items in Rabi.")) : null,
-      view.nextCursor ? (0, import_react15.createElement)(import_dsh_client_ui_primitives3.Button, { onClick: () => {
-        setView(null);
-        setQuery({ cursor: view.nextCursor });
-      } }, t("Next page")) : null
+      view.nextCursor ? (0, import_react15.createElement)(import_dsh_client_ui_primitives3.Button, { disabled: pending, onClick: () => void store.more(scope) }, t("Load more")) : null
     ) : null
+  );
+}
+function RabiWorkspace({ bot, actions }) {
+  const store = actions.rabiWorkspace;
+  const [{ resource, query }, setSelection] = (0, import_react15.useState)(() => store.selection(bot.id, bot.rabiPersona.roleId));
+  const save = (value) => {
+    store.select(bot.id, bot.rabiPersona.roleId, value);
+    setSelection(value);
+  };
+  const setQuery = (value) => save({ resource, query: value });
+  const select = (value) => {
+    if (value === resource && !query.itemId) {
+      for (const kind of value === "memory" ? MEMORY.map(([id]) => id) : [void 0]) void store.visit({ botId: bot.id, roleId: bot.rabiPersona.roleId, resource, ...kind ? { kind } : {} });
+    }
+    save({ resource: value, query: {} });
+  };
+  return (0, import_react15.createElement)(
+    "div",
+    { className: "bt-rabi-workspace" },
+    (0, import_react15.createElement)(
+      "div",
+      { className: "bt-rabi-resources", role: "tablist", "aria-label": t("Rabi resources") },
+      RESOURCES.map(([value, label]) => (0, import_react15.createElement)("button", { key: value, type: "button", role: "tab", "aria-selected": resource === value, onClick: () => select(value) }, t(label)))
+    ),
+    resource === "memory" && !query.itemId ? MEMORY.map(([kind, label]) => (0, import_react15.createElement)(Resource, { key: `${bot.id}:${kind}`, bot, actions, resource, kind, label, open: setQuery })) : (0, import_react15.createElement)(Resource, { key: `${bot.id}:${resource}:${query.itemId ?? ""}`, bot, actions, resource, ...query, label: RESOURCES.find(([value]) => value === resource)[1], open: setQuery, back: () => setQuery({}) })
   );
 }
 function RabiWorkspaceDialog({ bot, actions }) {
@@ -8922,7 +8922,8 @@ function DetailsDrawer({ sessionId, startRenaming, startTab, hasStrip, compact: 
         setDraftName(room2 && !room2.named ? "" : current);
         setEditing(true);
       } }, current),
-      subtitle ? (0, import_react20.createElement)("span", { className: "bt-drawer-role" }, subtitle) : null
+      subtitle ? (0, import_react20.createElement)("span", { className: "bt-drawer-role" }, subtitle) : null,
+      compact2 && bot ? (0, import_react20.createElement)("div", { className: "bt-drawer-current-model", "aria-label": t("Model") }, (0, import_react20.createElement)(ModelMenu, { bot, roster, actions, run, wide: true })) : null
     ),
     (0, import_react20.createElement)(
       "div",
@@ -8960,7 +8961,7 @@ function DetailsDrawer({ sessionId, startRenaming, startTab, hasStrip, compact: 
         ) : null,
         (0, import_react20.createElement)(ScheduleSummary, { key: "routines", bot, actions })
       ] : null,
-      bot && compact2 && tab === "details" ? bot.rabiPersona && bot.rabiPersona.enabled !== false ? (0, import_react20.createElement)(RabiWorkspace, { bot, actions }) : (0, import_react20.createElement)(ScheduleSummary, { bot, actions }) : null,
+      bot && compact2 && tab === "details" ? (0, import_react20.createElement)(ScheduleSummary, { bot, actions }) : null,
       bot && tab === "library" ? bot.rabiPersona && bot.rabiPersona.enabled !== false ? (0, import_react20.createElement)(RabiWorkspace, { bot, actions }) : [(0, import_react20.createElement)(MemoryRow, { key: "memory", bot, actions }), (0, import_react20.createElement)(BrowserCards, { key: "browser", bot, sessionId, roster, actions, useBrowserTabs, useBrowserPages })] : null,
       bot && tab === "browser" ? (0, import_react20.createElement)(BrowserCards, { bot, sessionId, roster, actions, useBrowserTabs, useBrowserPages }) : null
     )
@@ -13551,11 +13552,129 @@ function createSessionNavigator({ sessions, openSession, onError }) {
   };
 }
 
+// src/client/rabi-workspace-store.js
+function createRabiWorkspaceStore(request, { capacity = 64, maxBytes = 4 * 1024 * 1024, concurrency = 2 } = {}) {
+  const entries2 = /* @__PURE__ */ new Map(), selections = /* @__PURE__ */ new Map(), queue = [], lifetime = new AbortController();
+  let active = 0;
+  const keyOf = (scope) => JSON.stringify([scope.botId, scope.roleId, scope.resource, scope.kind ?? "", scope.itemId ?? ""]);
+  const notify = (entry) => {
+    for (const listener of entry.listeners) listener();
+  };
+  const prune = () => {
+    let bytes = [...entries2.values()].reduce((sum, entry) => sum + entry.bytes, 0);
+    for (const [key, entry] of entries2) {
+      if (entries2.size <= capacity && bytes <= maxBytes) break;
+      if (entry.promise || entry.listeners.size) continue;
+      bytes -= entry.bytes;
+      entries2.delete(key);
+    }
+  };
+  const entryOf = (scope) => {
+    const key = keyOf(scope);
+    let entry = entries2.get(key);
+    if (!entry) entry = { scope, listeners: /* @__PURE__ */ new Set(), snapshot: { value: null, pending: false, error: null, updatedAt: null }, pages: [], bytes: 0 };
+    entries2.delete(key);
+    entries2.set(key, entry);
+    return entry;
+  };
+  const drain = () => {
+    while (active < concurrency && queue.length) {
+      const job = queue.shift();
+      active++;
+      void job().finally(() => {
+        active--;
+        drain();
+      });
+    }
+  };
+  const load = (scope, more = false) => {
+    const entry = entryOf(scope);
+    if (entry.promise) return entry.promise;
+    if (lifetime.signal.aborted) return Promise.resolve();
+    const cursor = more ? entry.snapshot.value?.nextCursor : void 0;
+    if (more && !cursor) return Promise.resolve();
+    entry.snapshot = { ...entry.snapshot, pending: true, error: null };
+    let resolve;
+    const promise = entry.promise = new Promise((done) => {
+      resolve = done;
+    });
+    const epoch = entry.epoch;
+    queue.push(async () => {
+      try {
+        lifetime.signal.throwIfAborted();
+        if (entry.epoch !== epoch) return;
+        const value = await request({ ...scope, ...cursor ? { cursor } : {} }, lifetime.signal);
+        if (lifetime.signal.aborted || entries2.get(keyOf(scope)) !== entry || entry.epoch !== epoch) return;
+        if (value.roleId !== scope.roleId) throw new Error("Rabi persona binding changed. Check the Bot in Rabi connection before continuing.");
+        if (cursor) entry.pages.push(value);
+        else {
+          const tail = entry.pages[0]?.nextCursor === value.nextCursor ? entry.pages.slice(1) : [];
+          entry.pages = [value, ...tail];
+        }
+        const items = /* @__PURE__ */ new Map();
+        for (const page of entry.pages) for (const item of page.items ?? []) items.set(item.id, item);
+        const merged = { ...value, ...Array.isArray(value.items) ? { items: [...items.values()], nextCursor: entry.pages.at(-1).nextCursor } : {} };
+        entry.bytes = JSON.stringify(merged).length * 2;
+        entry.snapshot = { value: merged, pending: false, error: null, updatedAt: Date.now() };
+      } catch (error) {
+        if (!lifetime.signal.aborted && entries2.get(keyOf(scope)) === entry && entry.epoch === epoch) entry.snapshot = { ...entry.snapshot, pending: false, error };
+      } finally {
+        if (entry.epoch !== epoch) entry.snapshot = { ...entry.snapshot, pending: false };
+        entry.promise = null;
+        notify(entry);
+        resolve();
+        prune();
+      }
+    });
+    notify(entry);
+    drain();
+    return promise;
+  };
+  return {
+    selection(botId, roleId) {
+      return selections.get(JSON.stringify([botId, roleId])) ?? { resource: "memory", query: {} };
+    },
+    select(botId, roleId, value) {
+      const key = JSON.stringify([botId, roleId]);
+      selections.delete(key);
+      selections.set(key, value);
+      if (selections.size > capacity) selections.delete(selections.keys().next().value);
+    },
+    snapshot: (scope) => entryOf(scope).snapshot,
+    subscribe(scope, listener) {
+      const entry = entryOf(scope);
+      entry.listeners.add(listener);
+      return () => {
+        entry.listeners.delete(listener);
+        prune();
+      };
+    },
+    visit: (scope) => load(scope),
+    more: (scope) => load(scope, true),
+    invalidateBot(botId) {
+      for (const entry of entries2.values()) if (entry.scope.botId === botId) {
+        entry.epoch = (entry.epoch ?? 0) + 1;
+        entry.pages = [];
+        entry.bytes = 0;
+        entry.snapshot = { value: null, pending: Boolean(entry.promise), error: null, updatedAt: null };
+        notify(entry);
+      }
+    },
+    dispose() {
+      lifetime.abort();
+      entries2.clear();
+      selections.clear();
+    }
+  };
+}
+
 // src/client/index.js
 var inject = ["sessions", "uiWorkspace", "uiConversation", "slots", "theme", "layout"];
 function apply(ctx) {
   ctx.effect(() => installLocale(ctx.get("locale")), "ds-bot: interface copy");
   const roster = createSource(EMPTY_ROSTER);
+  const rabiWorkspace = createRabiWorkspaceStore((payload, signal) => call("rabi-bot-view", payload, signal));
+  ctx.effect(() => () => rabiWorkspace.dispose(), "ds-bot: Rabi resource reads");
   migrateStorage();
   const UNREAD_KEY = STORAGE.unread;
   let savedUnread = {};
@@ -14106,7 +14225,11 @@ function apply(ctx) {
     duplicateBot: (id) => after(call("duplicate-bot", { id })),
     setPrefs: (prefs) => after(call("set-prefs", prefs)),
     rabiComputers: (endpoint, payload, signal) => call(endpoint, payload, signal),
-    rabiConnection: (endpoint, payload, signal) => endpoint === "rabi-persona-import" || endpoint === "rabi-personas-import-all" || endpoint === "rabi-persona-unlink" ? after(call(endpoint, payload, signal)) : call(endpoint, payload, signal),
+    rabiWorkspace,
+    rabiConnection: (endpoint, payload, signal) => endpoint === "rabi-persona-import" || endpoint === "rabi-personas-import-all" || endpoint === "rabi-persona-unlink" ? after(call(endpoint, payload, signal)).then((value) => {
+      if (payload?.botId) rabiWorkspace.invalidateBot(payload.botId);
+      return value;
+    }) : call(endpoint, payload, signal),
     setMain: (id, main = true, options = {}) => after(call("set-main", { id, main, ...options })),
     updateRoom: (id, patch) => after(call("update-room", { id, ...patch })),
     send: (sessionId, text) => after(call("send", { sessionId: partFor(sessionId), text })),

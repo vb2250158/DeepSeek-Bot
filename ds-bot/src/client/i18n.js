@@ -314,6 +314,8 @@ const ZH = {
   "Archived memory": "归档记忆",
   "Managed by Rabi": "由 Rabi 管理",
   "Rabi resources": "Rabi 资料",
+  "Load more": "加载更多",
+  "Showing saved view from {time}": "显示 {time} 的已加载内容",
   "No items in Rabi.": "Rabi 中暂无记录",
   "Next page": "下一页",
   "Update dsh-rabiroute-agent and enable Rabi Agent Hooks before binding a Bot": "请更新 dsh-rabiroute-agent 并启用 Rabi Agent Hooks 后再绑定 Bot",
