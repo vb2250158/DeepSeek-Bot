@@ -2,6 +2,11 @@
 
 All notable changes to DS Bot are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the versions follow [Semantic Versioning](https://semver.org/). Before 1.0, a minor version can contain breaking changes.
 
+## [0.1.7-rabi.2] - 2026-10-20
+
+- Retire the upstream sidebar takeover assertions after integration with the native DSH panel. Keep native panel and compiled-client regression coverage; runtime behavior is unchanged.
+- 原生 DSH 面板沿用现有回归覆盖，移除针对旧侧栏接管方式的失效断言；运行逻辑不变。
+
 ## [0.1.7-rabi.1] - 2026-10-20
 
 - Integrate upstream 0.1.7 handoff trees, file reading, message history, concurrency and lifecycle fixes. Preserve the native DSH panel, shared team management, Rabi persona bindings and per-group activity feedback.
