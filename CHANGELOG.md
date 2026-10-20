@@ -2,6 +2,12 @@
 
 All notable changes to DS Bot are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the versions follow [Semantic Versioning](https://semver.org/). Before 1.0, a minor version can contain breaking changes.
 
+## [0.1.7-rabi.1] - 2026-10-20
+
+- Integrate upstream 0.1.7 handoff trees, file reading, message history, concurrency and lifecycle fixes. Preserve the native DSH panel, shared team management, Rabi persona bindings and per-group activity feedback.
+- 合入上游交接树、文件阅读、消息历史、并发与生命周期修复；保留原生面板、共享管理权限、Rabi 人格绑定和群内工作反馈。
+- Validate 704 tests, client build consistency and lint against DSH 0.2.1-rc.2.
+
 ## [0.1.6-rabi.27] - 2026-10-18
 
 ### Changed
@@ -145,6 +151,54 @@ All notable changes to DS Bot are listed here. The format follows [Keep a Change
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-10-16
+
+### Added
+
+- **Bots see what their teammates are doing**: `list_bots` says what each other Bot is doing now: waiting for your approval, moving to a fresh conversation, working (in its own chat or which group, for how long, for whom, on which tool), or waiting for teammates to hand back work, and whether a question card waits for you or messages wait unread. `message_bot` says the same about the Bot it messages. ([#262](https://github.com/Fei2411/DeepSeek-Bot/issues/262))
+- **Hand-offs that come back**: a Bot that hands part of a request on to other Bots, or posts in a group and asks for the replies, answers the Bot that asked only once all of it is back, and its answer carries what came back. A Bot can take part in the same work more than once, for example one designs, another builds, a third reviews and the first accepts. ([#262](https://github.com/Fei2411/DeepSeek-Bot/issues/262))
+- A Bot's character shows when it waits for teammates to hand back work: it sways with its eyes circling, without the working dot, and its sidebar row says whom it waits for. ([#262](https://github.com/Fei2411/DeepSeek-Bot/issues/262))
+- **Docker image**: run DS Bot on a NAS or another always-on machine, with a Compose file you configure inline, a Linux start script, and a setting to change who owns the data. See `docker/README.md`.
+
+### Changed
+
+- Bots are no longer stopped by counts: a chain of six forwarded messages, 10 unread messages, three rounds a Bot starts in one group, and 40 Bot messages since you last wrote no longer apply. The only message refused is one to the Bot that waits for the result of the current work, since the result goes to it by itself. Messages a Bot has not read yet from the same Bot, for the same work, join into one message that it answers once. ([#262](https://github.com/Fei2411/DeepSeek-Bot/issues/262))
+- Work handed out in a group chat stays in that group: Bots called there with `message_bot` work in the group, as with @Name, and Bots outside the group are no longer pulled in through their own chats. ([#165](https://github.com/Fei2411/DeepSeek-Bot/issues/165))
+- Long messages: a Bot's message or group post past 20,000 characters goes as a file the other Bots read; long messages in the chat fold to their first lines with **Show all**, also in the Bot exchange dialog; and they no longer make the team file grow and slow down every save. ([#206](https://github.com/Fei2411/DeepSeek-Bot/issues/206))
+- The reasoning above a Bot's answer shows its last five lines and scrolls for the rest, instead of opening the whole chain of thought.
+- The settings dialog keeps one size on every page, the Usage page's, so it no longer grows when you open Usage.
+- Unread dots, the "New" divider and the new-messages pill take your accent color, and text on the accent turns dark when that reads better.
+- Danger actions and error messages use one red.
+
+### Fixed
+
+- Files you send in a group chat, such as PDFs, now reach the Bots there, and they can read them as in a private chat. ([#176](https://github.com/Fei2411/DeepSeek-Bot/issues/176))
+- A Bot that asks a group member for work now always hears when the work is done, also when the member's result came out as its first message. ([#185](https://github.com/Fei2411/DeepSeek-Bot/issues/185))
+- Deleting a Bot while it works no longer leaves it shown as thinking, and Bots that were waiting for its reply are told it was deleted. ([#124](https://github.com/Fei2411/DeepSeek-Bot/issues/124))
+- A group member whose conversation in the group cannot be opened now shows "could not answer" in the group and gets a new conversation there, instead of staying silent. ([#163](https://github.com/Fei2411/DeepSeek-Bot/issues/163))
+- Deleting a Bot while a group is made or changed no longer leaves it in the group; two changes to one group at once no longer drop each other's members; a group left with one Bot can still change its settings. ([#200](https://github.com/Fei2411/DeepSeek-Bot/issues/200), [#205](https://github.com/Fei2411/DeepSeek-Bot/issues/205))
+- Bots and group chats created at the same time can no longer end up with the same name. ([#148](https://github.com/Fei2411/DeepSeek-Bot/issues/148), [#199](https://github.com/Fei2411/DeepSeek-Bot/issues/199))
+- A Bot can no longer be named "User" or "You", which group chats use for you. ([#178](https://github.com/Fei2411/DeepSeek-Bot/issues/178))
+- A model you pick for a Bot while it starts a new part of its conversation now applies to that part and every part after it. ([#159](https://github.com/Fei2411/DeepSeek-Bot/issues/159))
+- When a Bot's or a group's working folder is deleted or renamed, the Bot goes on in the team workspace instead of falling silent, and a group round no longer waits minutes for a member whose turn failed before it started. ([#209](https://github.com/Fei2411/DeepSeek-Bot/issues/209))
+- A relative file link that a Bot posts in a group chat with a working folder, or sends to another Bot, now opens. ([#217](https://github.com/Fei2411/DeepSeek-Bot/issues/217))
+- A reaction on a message in a group chat now stays on that message only. ([#212](https://github.com/Fei2411/DeepSeek-Bot/issues/212))
+- Reactions and unread marks set in one DSH tab or window now stay when you use another one, and show there at once. ([#215](https://github.com/Fei2411/DeepSeek-Bot/issues/215))
+- `web_search` uses the model's own search again on OpenCode and OpenCode Go routes, instead of always falling back to the keyless results page. ([#184](https://github.com/Fei2411/DeepSeek-Bot/issues/184))
+- Switching to classic Agent mode now removes the whole Bot skin even when another plugin shadows the same controls, such as dsh-codex-subscription's model picker. ([#149](https://github.com/Fei2411/DeepSeek-Bot/issues/149))
+- The right sidebar (workspace files, terminals) has a button in Bot mode again, at the right of the conversation header. ([#172](https://github.com/Fei2411/DeepSeek-Bot/issues/172))
+- In Bot mode, the sidebar can be collapsed with a button and brought back after a narrow window collapses it, also under the Windows title bar. ([#211](https://github.com/Fei2411/DeepSeek-Bot/issues/211))
+- In Bot mode, entries that other plugins add to the sidebar footer get a row each, instead of squeezing Connect plugins. ([#164](https://github.com/Fei2411/DeepSeek-Bot/issues/164))
+- **Report on GitHub** in Settings → Feedback opens the new issue in your browser from DSH Desktop too. ([#182](https://github.com/Fei2411/DeepSeek-Bot/issues/182))
+- Preset accent colors use their dark shade in dark mode, so Charcoal, Graphite and Cobalt stay visible.
+- DS Bot no longer writes its diagnostics log after it stops. ([#226](https://github.com/Fei2411/DeepSeek-Bot/issues/226))
+
+## [0.1.6] - 2026-10-15
+
+### Added
+
+- **Group permissions**: a group chat can run all its members with one permission preset (Read only, Workspace or Full access) in place of each member's own. Turn on **Same for every member** under Permissions in the group's settings; the group's details show the preset while it is on. Members' conversations in the group change at once, and a member's later conversations there start on it. Turned off, each member works with its own preset again.
+
 ### Changed
 
 - A Bot at work in a group chat no longer stays silent until it is done: it says what it will do, keeps the group posted as it goes, and ends with the result.
@@ -158,6 +212,9 @@ All notable changes to DS Bot are listed here. The format follows [Keep a Change
 - Group chats now relay messages to their Bots with the `ptc` agent preset, DSH Desktop's default. New Bot chats, group chats and conversation parts use the `standard` preset. A group chat made under `ptc` still relays, but each of its rounds is limited by DSH's time limit for a program run, about 10 minutes. ([#37](https://github.com/Fei2411/DeepSeek-Bot/issues/37))
 - Bot chats and group chats no longer run DeepSeek Harness goals. A goal started there with `/goal` is stopped at once with a short note, so a group chat no longer runs round after round, and the chat shows no goal rounds. ([#133](https://github.com/Fei2411/DeepSeek-Bot/issues/133))
 - With a plugin that re-skins DSH's composer or sidebar installed alongside, such as `@michengai/dsh-codex-ui`, a Bot chat's message box keeps its one-line height, its button spacing and its "Message <Bot>" placeholder, and the sidebar footer keeps the account button and Connect plugins on one row. ([#127](https://github.com/Fei2411/DeepSeek-Bot/issues/127))
+- Opening and closing the details panel no longer stutters in a long chat, most of all in a group chat. On every frame of the glide the whole conversation was styled again, because of a width that DSH writes on the conversation at every resize and that Bot chats do not use. The conversation still glides with the panel, and each frame now restyles only what changes.
+- In a group chat, each member at work had a row of its own above the message box, which ran over the messages behind it. One capsule above the message box now says who waits for your approval and who is at work, and opens the group's details. A Bot's own chat shows the groups it works in the same way.
+- A group's details panel no longer puts badges on the members' marks or a member's work on a loose line under its row. Each member has one row with its mark, name, Admin tag and what it is doing, Stop beside it while it works in the group, and the approvals it waits on below. The group shows its first members side by side, and the tab row that only held Details is gone.
 
 ## [0.1.5] - 2026-10-13
 
@@ -301,7 +358,9 @@ If you used the legacy `dsh-bot` package, remove it before you install `ds-bot`.
 - Only one DSH can change a team at a time; a second DSH on the same DSH home opens it read-only ([Data and backups](ds-bot/README.md#data-and-backups)).
 - Group chats use many tokens: each member reads the group and answers in turn.
 
-[Unreleased]: https://github.com/Fei2411/DeepSeek-Bot/compare/v0.1.5...HEAD
+[Unreleased]: https://github.com/Fei2411/DeepSeek-Bot/compare/v0.1.7...HEAD
+[0.1.7]: https://github.com/Fei2411/DeepSeek-Bot/compare/v0.1.6...v0.1.7
+[0.1.6]: https://github.com/Fei2411/DeepSeek-Bot/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/Fei2411/DeepSeek-Bot/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/Fei2411/DeepSeek-Bot/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/Fei2411/DeepSeek-Bot/compare/v0.1.2...v0.1.3

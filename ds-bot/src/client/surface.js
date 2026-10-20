@@ -20,9 +20,13 @@ function disposeAll(disposers, label) {
 
 // Keeps the mounted groups in step with `groupsFor`. The conversation group sits on
 // the shell's styles and tokens, so it comes off before the shell and goes on after.
-// A group's list is cleared before it is disposed, and a failed install leaves it
-// empty, so a throw never makes a later reconcile believe the group is mounted.
-export function surfaceGroups(install) {
+// A group's list is cleared before it is disposed, so a throw never makes a later
+// reconcile believe the group is mounted.
+//
+// `install[group]()` lists the group's steps; each step mounts one thing and returns
+// its disposer. A group goes on whole or not at all: when a step throws, the steps
+// before it are withdrawn, so Agent mode never keeps a half-installed Bot skin.
+export function surfaceGroups(install, { onError } = {}) {
   const mounted = { shell: [], conversation: [] }
   let reconciling = false
   let pending = null
@@ -45,11 +49,13 @@ export function surfaceGroups(install) {
           for (const group of GROUPS) {
             if (!next[group] || mounted[group].length > 0 || failed.has(group)) continue
             try {
-              for (const dispose of install[group]()) mounted[group].push(dispose)
+              for (const step of install[group]()) if (step) mounted[group].push(step())
             } catch (error) {
               failed.add(group)
               withdraw(group)
               console.warn(`[ds-bot] install ${group}`, error)
+              onError?.(group, error)
+              break
             }
           }
         }
@@ -59,6 +65,17 @@ export function surfaceGroups(install) {
     },
     dispose() { for (const group of [...GROUPS].reverse()) withdraw(group) },
   }
+}
+
+// The priority that puts an entry below every other entry of its cell (lowest
+// renders). Another plugin that shadows the same cell at the same priority would
+// make the registration throw; in a Bot surface the cell is DS Bot's.
+export function freePriority(entries, { priority, key, id }) {
+  if (priority === undefined) return undefined
+  const taken = entries
+    .filter(entry => (key === undefined || entry.options?.key === key) && (id === undefined || entry.options?.id === id))
+    .map(entry => (entry.options?.priority ?? 0) - 1)
+  return Math.min(priority, ...taken)
 }
 
 export function readMode(storage = globalThis.localStorage) {
