@@ -2,7 +2,7 @@ import { createElement as h, Fragment, useEffect, useRef, useState } from 'react
 import { isMainOf } from './sources.js'
 import { HEADER, currentPart, stripHeader, usageOf } from './text.js'
 import { PlusIcon, ShareIcon, CloseIcon, ChevronLeftIcon, GearIcon, InfoIcon, FolderIcon, PeopleIcon } from './icons.js'
-import { botState, BotMark, BotAvatar, RoomAvatar } from './mark.js'
+import { botState, BotMark, BotAvatar } from './mark.js'
 import { GlobeIcon, Favicon } from './browser-pane.js'
 import { useEscape } from './overlay-hooks.js'
 import { BotSettingsForm } from './bot-settings.js'
@@ -11,9 +11,10 @@ import { BotModelControl, ModelMenu, modelOf } from './model-menu.js'
 import { FolderMenu } from './folder-menu.js'
 import { MemoryRow } from './memory-panel.js'
 import { ScheduleSummary } from './schedules.js'
-import { Segmented, useGlide, useMorph } from './motion.js'
+import { useGlide, useMorph } from './motion.js'
 import { GroupMembers } from './group-members.js'
 import { GroupLibrary } from './group-library.js'
+import { PermissionPicker, presetDanger, presetName } from './permission-picker.js'
 import { t } from './i18n.js'
 import { RabiWorkspace } from './rabi-workspace.js'
 
@@ -35,35 +36,18 @@ const hostOf = (url) => { try { return new URL(url).hostname.replace(/^www\./, '
 const shortUrl = url => String(url ?? '').replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/$/, '')
 const EMPTY_TABS = { ids: [], active: null }
 
-// The Bot's browser inside the details page: its tabs as small window cards on
-// Desktop, a pointer there on web.
-const PERMISSION_LABELS = { 'read-only': 'Read only', 'workspace-write': 'Workspace', 'danger-full-access': 'Full access' }
-const DANGER = new Set(['danger-full-access'])
-
 // The Bot's permission preset, from the presets DeepSeek Harness offers.
 function PermissionRow({ bot, roster, actions, run }) {
-  const [pending, setPending] = useState(null)
   const catalog = roster.permissions
-  const saved = bot.permission ?? catalog?.defaultPreset
-  useEffect(() => { if (pending === saved) setPending(null) }, [pending, saved])
   if (!catalog?.options?.length) return null
-  const current = pending ?? saved
-  const pick = (value) => {
-    // A Bot without its own preset may run on another one set in DSH, so its first pick always applies.
-    if (value === current && bot.permission !== undefined) return
-    setPending(value)
-    void run(actions.updateBot(bot.id, { permission: value })).catch(() => setPending(null))
-  }
   return h('div', { className: 'bt-drawer-permission' },
     h('div', { className: 'bt-section-title' }, t('Permissions')),
-    h(Segmented, { label: t('Permissions'), value: current },
-      catalog.options.map(option => h('button', {
-        key: option.value, type: 'button', 'aria-pressed': option.value === current,
-        title: option.description, onClick: () => pick(option.value),
-        className: DANGER.has(option.value) ? 'bt-perm-danger' : undefined,
-      }, PERMISSION_LABELS[option.value] ? t(PERMISSION_LABELS[option.value]) : option.name))))
+    // A Bot without its own preset may run on another one set in DSH, so its first pick always applies.
+    h(PermissionPicker, { catalog, saved: bot.permission ?? catalog.defaultPreset, repick: bot.permission === undefined, onPick: permission => run(actions.updateBot(bot.id, { permission })) }))
 }
 
+// The Bot's browser inside the details page: its tabs as small window cards on
+// Desktop, a pointer there on web.
 function BrowserCards({ bot, sessionId, roster, actions, useBrowserTabs, useBrowserPages }) {
   const state = useBrowserTabs(map => map[bot.id] ?? EMPTY_TABS)
   const pages = useBrowserPages(map => map)
@@ -113,6 +97,18 @@ function About({ text, title = 'About' }) {
     long ? h('button', { type: 'button', className: 'bt-more', onClick: () => setOpen(value => !value) }, open ? t('Show less') : t('Show more')) : null)
 }
 
+// A group's face in its details: its first members side by side, each on a disc that
+// cuts into the one before, and how many more there are.
+const PILE_MAX = 4
+function MemberPile({ room, roster }) {
+  const members = room.members.map(id => roster.byId[id]).filter(Boolean)
+  const shown = members.length > PILE_MAX ? members.slice(0, PILE_MAX - 1) : members
+  const more = members.length - shown.length
+  return h('span', { className: 'bt-pile', 'aria-hidden': true },
+    shown.map((bot, index) => h('span', { key: bot.id, className: 'bt-pile-face', style: { animationDelay: `${index * 40}ms` } }, h(BotMark, { bot, size: 44, live: true }))),
+    more > 0 ? h('span', { key: 'more', className: 'bt-pile-face bt-pile-more', style: { animationDelay: `${shown.length * 40}ms` } }, `+${more}`) : null)
+}
+
 function GroupOverview({ room, roster, usage, openSettings }) {
   return [
     room.notice
@@ -120,6 +116,8 @@ function GroupOverview({ room, roster, usage, openSettings }) {
       : h('button', { key: 'notice', type: 'button', className: 'bt-more', onClick: openSettings }, t('Add a notice in group settings')),
     h('div', { key: 'mode' }, h('div', { className: 'bt-section-title' }, t('Who answers')),
       h('div', { className: 'bt-kv' }, h('span', null, t(ROOM_MODES.find(([id]) => id === shownMode(room, roster))?.[1] ?? 'Everyone')))),
+    room.permission ? h('div', { key: 'permission' }, h('div', { className: 'bt-section-title' }, t('Permissions')),
+      h('div', { className: 'bt-kv' }, h('span', { className: presetDanger(room.permission) ? 'bt-perm-danger' : undefined }, presetName(room.permission, roster.permissions)))) : null,
     usage ? h('div', { key: 'usage' }, h('div', { className: 'bt-section-title' }, t('Usage')),
       h('div', { className: 'bt-kv' }, h('span', null, room.name), h('span', null, usage))) : null,
   ]
@@ -197,7 +195,7 @@ export function DetailsDrawer({ sessionId, startRenaming, startTab, hasStrip, co
   return [h(Fragment, { key: 'top' }, top),
     h('div', { key: 'id', className: 'bt-drawer-id', 'data-move': side },
       bot ? h(BotAvatar, { bot, size: 64, state: botState(running, doing, roster.questions?.[part] !== undefined), main: isMainBot, badge: false, gaze: true, pokeable: true })
-        : h(RoomAvatar, { room, roster, size: 64 }),
+        : h(MemberPile, { room, roster }),
       editing
         ? h('input', {
             className: 'bt-drawer-name-input', autoFocus: true, value: draftName, 'aria-label': bot ? t('Bot name') : t('Group name'),
@@ -207,10 +205,10 @@ export function DetailsDrawer({ sessionId, startRenaming, startTab, hasStrip, co
           })
         : h('button', { type: 'button', className: 'bt-drawer-name', 'aria-label': t('Rename {name}', { name: current }), title: t('Rename'), onClick: () => { setDraftName(room && !room.named ? '' : current); setEditing(true) } }, current),
       subtitle ? h('span', { className: 'bt-drawer-role' }, subtitle) : null),
-    h('div', { key: 'tabs', ref: glide.box, className: 'bt-tabs', role: 'tablist', 'data-move': side },
+    tabs.length > 1 ? h('div', { key: 'tabs', ref: glide.box, className: 'bt-tabs', role: 'tablist', 'data-move': side },
       h('span', { ref: glide.thumb, className: 'bt-thumb', 'aria-hidden': true }),
       tabs.map(key => h('button', { key, type: 'button', role: 'tab', className: 'bt-tab', 'aria-selected': tab === key, onClick: () => setTab(key) },
-        ...(room ? [h(({ details: InfoIcon, library: FolderIcon, members: PeopleIcon })[key]), t(TAB_LABELS[key])] : [t(TAB_LABELS[key])])))),
+        ...(room ? [h(({ details: InfoIcon, library: FolderIcon, members: PeopleIcon })[key]), t(TAB_LABELS[key])] : [t(TAB_LABELS[key])])))) : null,
     h('div', { key: `body:${tab}`, className: 'bt-drawer-body', 'data-move': move },
       bot && compact && tab === 'details' ? h('div', { className: 'bt-drawer-current-model', 'aria-label': t('Model') }, h(BotModelControl, { bot, roster, actions, run })) : null,
       errorLine,

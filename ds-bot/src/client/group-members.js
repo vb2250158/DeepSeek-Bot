@@ -2,7 +2,7 @@ import { createElement as h, useState } from 'react'
 import { Button, Input } from '@deepseek-ai/dsh-client-ui-primitives'
 import { BotAvatar } from './mark.js'
 import { PlusIcon } from './icons.js'
-import { MemberWork, useMemberWork } from './member-status.js'
+import { MemberApprovals, MemberState, StopMemberWork, useMemberWork } from './member-status.js'
 import { t } from './i18n.js'
 
 /** Member changes use the same group command as Settings. */
@@ -30,7 +30,10 @@ export function GroupMembers({ room, roster, actions, useWork, run }) {
           h('button', { type: 'button', className: 'bt-member-name', title: t("Open {name}'s chat", { name: member.name }), onClick: () => actions.openSession(member.id) },
             h(BotAvatar, { bot: member, size: 26, admin: room.admin === member.id, live: false }), h('span', null, member.name)),
           room.admin === member.id ? h('span', { className: 'bt-chip bt-chip-admin' }, t('Admin')) : null),
-        entry ? h(MemberWork, { entry, bot: member, room, roster, actions, now }) : null)
+        entry ? h('div', null,
+          h(MemberState, { entry, bot: member, room, roster, now }),
+          h(StopMemberWork, { entry, bot: member, room, actions }),
+          h(MemberApprovals, { entry, bot: member, actions })) : null)
     })),
     adding ? h('div', { className: 'bt-group-add', onKeyDown: event => { if (event.key === 'Escape') { event.stopPropagation(); if (!busy) setAdding(false) } } },
       h(Input, { autoFocus: true, value: query, disabled: busy, placeholder: t('Search Bots'), 'aria-label': t('Search Bots'), onChange: event => setQuery(event.target.value) }),

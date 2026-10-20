@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { test } from 'node:test'
@@ -297,6 +297,50 @@ test('every Bot can set a group\'s folder with approval', async (t) => {
   assert.equal(requests.at(-1).displayReason.zh, `允许群聊「Ops」的成员在 ${project} 中工作吗？之后可以修改这个文件夹里的文件。`)
 })
 
+test('a group\'s permissions hold for every member there in place of its own, until the user clears them', async (t) => {
+  // The preset each Session runs on, as DSH keeps it.
+  const presetOf = new Map()
+  const PRESETS = ['read-only', 'workspace-write', 'danger-full-access']
+  const permissionPresets = {
+    catalog: () => ({ options: PRESETS.map(value => ({ value, name: value })), defaultPreset: 'workspace-write' }),
+    resolve: (name) => { if (!PRESETS.includes(name)) throw new Error(`permission: unknown preset "${name}"`) },
+    set: (session, name) => { presetOf.set(session.id, name) },
+  }
+  const { call, tool, preStep, project, state, stop } = await start({ services: { ...approvalServices('allowed-once').services, permissionPresets } })
+  t.after(stop)
+
+  // A preset DSH does not offer changes nothing, not even the rest of the change; the
+  // next change that saves would keep it.
+  assert.equal((await call('update-room', { id: 'r1', notice: 'Ship it', permission: 'everything' })).ok, false)
+  assert.equal(presetOf.size, 0)
+
+  const set = await call('update-room', { id: 'r1', permission: 'read-only' })
+  assert.deepEqual(set.value.changes, ['every member now works with the read-only permissions here'])
+  assert.equal(state().rooms.r1.notice, undefined)
+  assert.equal(set.value.room.permission, 'read-only')
+  assert.equal(presetOf.get('gb'), 'read-only')
+  assert.match(await tool('list_bots', {}, 'a'), /"Ops" — .*; members work with the read-only permissions here/)
+
+  // Writer has no preset of its own, so its group Session goes back to DSH's default.
+  assert.deepEqual((await call('update-room', { id: 'r1', permission: null })).value.changes, ['every member uses its own permissions again'])
+  assert.equal(state().rooms.r1.permission, undefined)
+  assert.equal(presetOf.get('gb'), 'workspace-write')
+
+  // While the group sets one, Writer's own preset reaches its own chat only.
+  await call('update-room', { id: 'r1', permission: 'read-only' })
+  assert.equal((await call('update-bot', { id: 'b', permission: 'danger-full-access' })).ok, true)
+  assert.deepEqual([presetOf.get('b'), presetOf.get('gb')], ['danger-full-access', 'read-only'])
+
+  // A fresh part of the group conversation starts on the group's preset.
+  await call('update-room', { id: 'r1', workDir: project })
+  assert.deepEqual(await preStep('gb'), { kind: 'reject' })
+  await until(() => state().rooms.r1.sessions.b === 's1')
+  assert.equal(presetOf.get('s1'), 'read-only')
+
+  await call('update-room', { id: 'r1', permission: null })
+  assert.equal(presetOf.get('s1'), 'danger-full-access')
+})
+
 test('the approval counts every Session that would work in the folder', async (t) => {
   // Writer's own chat and new Sessions only read; its conversation in Ops may write.
   const group = approvalServices('allowed-once', { mode: 'read-only', modes: { gb: 'workspace-write' } })
@@ -397,4 +441,141 @@ test('a Bot the Main Bot creates runs on its creator\'s model unless one is name
   assert.equal(made('Editor').model, 'deepseek/v4')
   assert.equal(await env.tool('create_bot', { name: 'Tester', role: 'Test', instructions: 'Test', model: 'official/pro' }, 'a'), 'Created Tester. It is greeting the user now.')
   assert.equal(made('Tester').model, 'official/pro')
+})
+
+// 公开#159: the fresh part took the model of the earlier part's last request, so a model
+// the user picked during the handoff never reached it, nor any part after it.
+const MODELS = {
+  listProviders: () => [{ id: 'deepseek', name: 'DeepSeek' }],
+  listModels: async () => [{ id: 'flash' }, { id: 'v4-pro' }],
+  resolveModelInfo: async () => ({}),
+}
+const onModel = (model, appliedModel = model) => ({ ...TEAM, bots: { ...TEAM.bots, b: { ...TEAM.bots.b, model, appliedModel } } })
+const recordSelections = (env) => {
+  const selected = []
+  env.ctx.sessionController.selectModel = async (request) => { selected.push([request.sessionId, request.model]) }
+  // The earlier part's last request went to flash.
+  env.agentOf('b').session.requestHeader = () => ({ config: { provider: 'deepseek', model: 'flash' } })
+  return selected
+}
+
+test('a fresh part runs on the Bot\'s model, not on the earlier part\'s last request', async (t) => {
+  const env = await start({ llm: MODELS, team: onModel('deepseek/v4-pro') })
+  t.after(env.stop)
+  const selected = recordSelections(env)
+  assert.equal((await env.call('update-bot', { id: 'b', workDir: env.project })).ok, true)
+  await until(() => env.state().bots.b.sessionId === 's1')
+  await until(() => handoffOf(env.agentOf('s1')) !== undefined)
+  assert.deepEqual(selected.filter(([sessionId]) => sessionId === 's1'), [['s1', 'v4-pro']])
+})
+
+test('a model the user picks while the fresh part is made reaches the fresh part', async (t) => {
+  const env = await start({ llm: MODELS, team: onModel('deepseek/flash') })
+  t.after(env.stop)
+  const selected = recordSelections(env)
+  const select = env.ctx.sessionController.selectModel
+  env.ctx.sessionController.selectModel = async (request) => {
+    await select(request)
+    if (request.sessionId !== 's1' || selected.length > 1) return
+    // The user switches models after the fresh part got the old one, before it is the Bot's.
+    void env.call('update-bot', { id: 'b', model: 'deepseek/v4-pro' })
+    await until(() => env.state().bots.b.model === 'deepseek/v4-pro')
+  }
+  assert.equal((await env.call('update-bot', { id: 'b', workDir: env.project })).ok, true)
+  await until(() => env.state().bots.b.sessionId === 's1')
+  await until(() => selected.some(([sessionId, model]) => sessionId === 'b' && model === 'v4-pro'))
+  await until(() => handoffOf(env.agentOf('s1')) !== undefined)
+  assert.deepEqual(selected.filter(([sessionId]) => sessionId === 's1'), [['s1', 'flash'], ['s1', 'v4-pro']])
+})
+
+test('a Bot without a model of its own goes on with the earlier part\'s route', async (t) => {
+  const env = await start({ llm: MODELS })
+  t.after(env.stop)
+  const selected = recordSelections(env)
+  assert.equal((await env.call('update-bot', { id: 'b', workDir: env.project })).ok, true)
+  await until(() => env.state().bots.b.sessionId === 's1')
+  await until(() => handoffOf(env.agentOf('s1')) !== undefined)
+  assert.deepEqual(selected.filter(([sessionId]) => sessionId === 's1'), [['s1', 'flash']])
+})
+
+// #209: DSH 0.2.1 checks a Session's folder as it puts a model request together, before
+// agent/pre-step, and fails the turn when the folder and the one the Session was made in
+// are gone. Its documented way out is to change the Session's folder first.
+function folderService() {
+  const dirs = new Map()
+  const sets = []
+  return {
+    sets,
+    service: {
+      get: session => dirs.get(session.id) ?? session.header.cwd,
+      set: async (agent, path) => { sets.push([agent.id, path]); dirs.set(agent.session.id, path) },
+    },
+  }
+}
+const assemble = (ctx, agent) => {
+  let passed = false
+  const run = ctx.listeners.get('system-prompt/assemble').at(-1)({ contexts: [] }, { agent, signal: AbortSignal.timeout(60_000) }, async () => { passed = true })
+  return run.then(() => passed)
+}
+
+test('a Bot whose folder is gone changes to the team folder before DSH checks it, then moves to a fresh part there', async (t) => {
+  const { sets, service } = folderService()
+  const { ctx, call, agentOf, created, project, team, state, preStep, stop } = await start({ services: { workingDirectory: service } })
+  t.after(stop)
+  assert.equal((await call('update-bot', { id: 'b', workDir: project })).ok, true)
+  await until(() => state().bots.b.sessionId === 's1')
+  await until(() => handoffOf(agentOf('s1')) !== undefined)
+  rmSync(project, { recursive: true, force: true })
+
+  assert.equal(await assemble(ctx, agentOf('s1')), true)
+  assert.deepEqual(sets, [['s1', team]])
+  // The pre-step then moves the Bot on to a fresh part in the team workspace. DSH's notice
+  // of the change is about the old part, so it stays behind.
+  const notice = { id: 'm0', role: 'user', content: [{ type: 'text', text: 'The working directory is now the team folder.' }], source: { kind: 'working-directory' } }
+  const input = { id: 'm1', role: 'user', content: [{ type: 'text', text: 'Still there?' }], source: { kind: 'user' } }
+  assert.deepEqual(await preStep('s1', [notice, input]), { kind: 'reject' })
+  await until(() => state().bots.b.sessionId === 's2')
+  assert.deepEqual(created.at(-1), { workspaceId: 'w1' })
+  await until(() => agentOf('s2').calls.length >= 2)
+  assert.deepEqual(agentOf('s2').calls.map(([kind, message]) => [kind, message.source.role ?? textOf(message)]), [['followup', 'handoff'], ['followup', 'Still there?']])
+  // A folder that is there is left as it is.
+  assert.equal(await assemble(ctx, agentOf('a')), true)
+  assert.equal(sets.length, 1)
+})
+
+test('a team folder that was deleted is made again before DSH checks it', async (t) => {
+  const { sets, service } = folderService()
+  const { ctx, agentOf, team, stop } = await start({ services: { workingDirectory: service } })
+  t.after(stop)
+  rmSync(team, { recursive: true, force: true })
+  assert.equal(await assemble(ctx, agentOf('a')), true)
+  assert.equal(existsSync(team), true)
+  assert.deepEqual(sets, [])
+})
+
+// A fresh part takes several awaits; a Bot deleted meanwhile must not leave it behind.
+test('a Bot deleted while its chat moves to a new folder leaves no fresh part behind', async (t) => {
+  const { ctx, call, agentOf, project, state, stop } = await start()
+  t.after(stop)
+  const archived = []
+  ctx.workspaceRegistry.archiveSession = async (sessionId) => { archived.push(sessionId) }
+  let release
+  const gate = new Promise(resolve => { release = resolve })
+  let made
+  const making = new Promise(resolve => { made = resolve })
+  const create = ctx.sessionController.create
+  ctx.sessionController.create = async (options) => {
+    const result = await create(options)
+    made(result.sessionId)
+    await gate
+    return result
+  }
+  assert.equal((await call('update-bot', { id: 'b', workDir: project })).ok, true)
+  const fresh = await making
+  assert.equal((await call('delete-bot', { id: 'b' })).ok, true)
+  release()
+  await until(() => archived.includes(fresh))
+  await settle()
+  assert.equal(state().bots.b, undefined)
+  assert.equal(handoffOf(agentOf(fresh)), undefined)
 })

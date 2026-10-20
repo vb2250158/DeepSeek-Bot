@@ -212,6 +212,35 @@ export function useMemberWork(room, useWork) {
   return { entries, now }
 }
 
+export const workState = doing => (doing?.switching ? 'thinking' : toolState(doing?.tool ?? ''))
+
+export function MemberState({ entry, bot, room, roster, now }) {
+  if (entry?.state === 'ask') return h('span', { className: 'bt-member-state bt-mw-ask' }, `${t('Waiting for your approval')}${since(now, entry.approvals[0].at)}`)
+  if (entry?.state !== 'work') return bot.role ? h('span', { className: 'bt-member-state' }, bot.role) : null
+  const where = entry.doing.roomId === room.id ? ''
+    : entry.doing.roomId ? t('in {name}', { name: roster.roomsById[entry.doing.roomId]?.name ?? t('a group chat') })
+      : t('in its own chat')
+  return h('span', { className: 'bt-member-state' },
+    h(Shimmer, null, `${workPhrase(entry.doing)}…`), where ? ` ${where}` : '', since(now, entry.doing.since))
+}
+
+export function StopMemberWork({ entry, bot, room, actions }) {
+  const [stopping, setStopping] = useState(false)
+  if (entry?.state !== 'work' || !entry.here) return null
+  const stop = () => {
+    setStopping(true)
+    void Promise.resolve(actions.stopMemberWork(room.id, bot.id))
+      .catch(error => actions.reportError(error, 'stop'))
+      .finally(() => setStopping(false))
+  }
+  return h('button', { type: 'button', className: 'bt-member-stop', disabled: stopping, 'aria-label': `${t('Stop')} · ${bot.name}`, onClick: stop }, t('Stop'))
+}
+
+export function MemberApprovals({ entry, bot, actions }) {
+  if (entry?.state !== 'ask') return null
+  return h('div', { className: 'bt-member-cards' }, entry.approvals.map(approval => h(ApprovalCard, { key: approval.id, approval, bot, actions })))
+}
+
 export const MEMBER_CSS = `
 .bt-mw-dock-stack{box-sizing:border-box;display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:var(--dsh-chat-content-width,min(960px,100%));margin:0 auto 6px;pointer-events:none}
 .bt-mw-dock-stack>.bt-event.bt-mw-dock{align-self:stretch;margin:0}
