@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs'
 import { build } from 'esbuild'
 
 const { outputFiles } = await build({
-  stdin: { contents: "export { DetailsDrawer } from './src/client/details-drawer.js'; export { RabiWorkspace } from './src/client/rabi-workspace.js'", resolveDir: fileURLToPath(new URL('..', import.meta.url)) },
+  stdin: { contents: "export { DetailsDrawer } from './src/client/details-drawer.js'; export { RabiWorkspace } from './src/client/rabi-workspace.js'; export { Overlays } from './src/client/overlays.js'", resolveDir: fileURLToPath(new URL('..', import.meta.url)) },
   bundle: true, format: 'cjs', platform: 'browser', write: false, logLevel: 'silent',
   external: ['react', 'react-dom', '@deepseek-ai/dsh-client-ui-primitives'],
 })
@@ -15,7 +15,7 @@ const module = { exports: {} }
 const h = (type, props, ...children) => ({ type, props: { ...props, children } })
 const noop = () => {}
 runInNewContext(outputFiles[0].text, {
-  module, exports: module.exports,
+  module, exports: module.exports, document: { body: {} },
   require: name => name === 'react' ? {
     createElement: h, Fragment: 'fragment', useEffect: noop, useLayoutEffect: noop,
     useRef: value => ({ current: value }), useCallback: value => value,
@@ -49,4 +49,31 @@ test('the panel keeps model selection first in Details and Rabi resources in Lib
     buttons: tree.filter(node => node.type === 'button').map(node => node.props.children[0]),
   }
   assert.deepEqual(JSON.parse(JSON.stringify(observed)), JSON.parse(readFileSync(new URL('./fixtures/rabi-panel.json', import.meta.url), 'utf8')))
+})
+
+test('opening Rabi memory retains the binding and routes to its workspace dialog', () => {
+  const bot = { id: 'bound', name: 'Bound', rabiPersona: { roleId: 'role' } }
+  const roster = { byId: { bound: bot }, roomsById: {} }
+  stateIndex = 1
+  const tree = nodes(module.exports.Overlays({
+    useRoster: pick => pick(roster), useUi: pick => pick({ memory: bot.id }),
+    useRegistry: noop, useSessions: pick => pick({ byId: {} }), actions: {},
+  }))
+  const dialog = tree.find(node => node.type?.name === 'MemoryDialog')
+  assert.equal(dialog.props.owner, bot)
+  const routed = dialog.type(dialog.props)
+  assert.equal(routed.type.name, 'RabiWorkspaceDialog')
+  assert.equal(routed.props.bot, bot)
+})
+
+test('the wide Rabi memory row retains its owner and managed-memory label', () => {
+  const bot = { id: 'bound', name: 'Bound', rabiPersona: { roleId: 'role' } }
+  const roster = { byId: { bound: bot }, roomsById: {}, exchangeTurns: {}, models: [] }
+  tab = 'details'; stateIndex = 0
+  const tree = nodes(module.exports.DetailsDrawer({ sessionId: bot.id, roster, actions: {}, useSessionStatus: pick => pick(new Map()), useActivity: pick => pick({}), useSessions: () => '', useWork: noop }))
+  const row = tree.find(node => node.type?.name === 'MemoryRow')
+  assert.equal(row.props.owner, bot)
+  stateIndex = 1
+  const rendered = row.type(row.props)
+  assert.ok(nodes(rendered).some(node => node.props?.children?.includes('Managed by Rabi')))
 })

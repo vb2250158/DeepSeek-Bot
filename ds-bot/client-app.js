@@ -10778,7 +10778,7 @@ function DetailsDrawer({ sessionId, startRenaming, startTab, hasStrip, compact: 
           (0, import_react27.createElement)(FolderMenu, { value: bot.workDir, actions, run, wide: true, onPick: (workDir) => run(actions.updateBot(bot.id, { workDir })) })
         ),
         bot.instructions ? (0, import_react27.createElement)(About, { key: "about", text: bot.instructions }) : (0, import_react27.createElement)("button", { key: "about", type: "button", className: "bt-more", onClick: () => setView("settings") }, t("Add instructions in Bot settings")),
-        roster.memory === false ? null : (0, import_react27.createElement)(MemoryRow, { key: "memory", owner: { id: bot.id, name: bot.name }, actions }),
+        roster.memory === false ? null : (0, import_react27.createElement)(MemoryRow, { key: "memory", owner: bot, actions }),
         usage ? (0, import_react27.createElement)(
           "div",
           { key: "usage" },
@@ -15094,7 +15094,7 @@ function Overlays({ useRoster, useUi, useSessions, useSessionStatus, useActivity
   const [settings, settingsLeaving] = useLinger(ui2.settings, DIALOG_EXIT_MS);
   const memoryOwner = (id) => {
     const bot = roster.byId[id];
-    if (bot) return { id: bot.id, name: bot.name };
+    if (bot) return bot;
     const room2 = roster.roomsById[id];
     return room2 ? { id: room2.id, name: room2.name, group: true } : null;
   };

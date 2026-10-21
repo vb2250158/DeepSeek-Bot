@@ -9,6 +9,8 @@
 
 `0.2.0-rabi.1` integrates upstream 0.2.0: group-scoped memory, structured view cards, photos, thinking levels and live turn metrics. This fork keeps equal team-management rights, independent pinned chats, the native Bot panel, Rabi-owned context and memory, group libraries and interrupted-turn recovery.
 
+`0.2.0-rabi.2` retains Rabi bindings when the shared memory overlay opens and keeps the managed-memory label in wide Bot details.
+
 Restoring a Bot chat requests only that Session's metadata on paged DSH hosts. Older hosts retain the full catalog refresh used for navigation.
 
 Bot chats continue interrupted turns and quota failures automatically through DSH's native continuation API, without manual retry buttons or resending user messages. Repeated failures back off; new input, explicit stops and unloading cancel pending continuation. Unknown Rabi write outcomes are not replayed. See the [plugin configuration](ds-bot/README.md) for timing options.
