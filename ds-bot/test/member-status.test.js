@@ -22,7 +22,7 @@ runInNewContext(bundle.outputFiles[0].text, {
     return platform[name]
   },
 })
-const { busyMembers, summaryText, splitBusy, MemberDock, groupWorkingText } = module.exports
+const { busyMembers, summaryText, splitBusy, MemberDock, groupWorkingText, MemberState, StopMemberWork } = module.exports
 // Values from the bundle's realm compare by content only.
 const plain = value => JSON.parse(JSON.stringify(value))
 // Renders the dock's own parts of an element tree, and lists its rows' labels.
@@ -59,6 +59,42 @@ const team = {
   byId: Object.fromEntries(Object.entries(names).map(([id, name]) => [id, { id, name }])),
   roomsById: { r1: { id: 'r1', name: 'Ops', members: ['a', 'b', 'c', 'd'] }, r2: { id: 'r2', name: 'Docs', members: ['a', 'b'] } },
 }
+
+// #156: a member waiting for an approval keeps its work here, so Stop stays.
+test('a member waiting for approval in this group can still be stopped', async () => {
+  const stopped = []
+  const room = team.roomsById.r1
+  const entry = busyMembers(room, { rooms: { r1: [{ botId: 'a', since: 1 }] }, approvals: [{ botId: 'a', roomId: 'r1', at: 1 }] }, team)[0]
+  assert.equal(entry.state, 'ask')
+  const node = StopMemberWork({ entry, bot: team.byId.a, room, actions: { stopMemberWork: (...args) => stopped.push(args) } })
+  assert.ok(node, 'waiting for approval must not hide Stop')
+  node.props.onClick()
+  await Promise.resolve()
+  assert.deepEqual(stopped, [['r1', 'a']])
+})
+
+test('an approval for work elsewhere never offers to stop work in this group', () => {
+  const room = team.roomsById.r1
+  const entry = busyMembers(room, { rooms: { r2: [{ botId: 'a', since: 1 }] }, approvals: [{ botId: 'a', roomId: 'r2', at: 1 }] }, team)[0]
+  assert.equal(StopMemberWork({ entry, bot: team.byId.a, room, actions: {} }), null)
+  // Work here stays stoppable while it runs.
+  const working = busyMembers(room, { rooms: { r1: [{ botId: 'a', since: 1 }] }, approvals: [] }, team)[0]
+  assert.ok(StopMemberWork({ entry: working, bot: team.byId.a, room, actions: {} }))
+})
+
+test('a failed stop is reported and never answers the approval', async () => {
+  const reported = []
+  const room = team.roomsById.r1
+  const entry = busyMembers(room, { rooms: { r1: [{ botId: 'a', since: 1 }] }, approvals: [{ botId: 'a', roomId: 'r1', at: 1 }] }, team)[0]
+  const node = StopMemberWork({ entry, bot: team.byId.a, room, actions: {
+    stopMemberWork: () => Promise.reject(new Error('connection lost')),
+    reportError: (error, action) => reported.push([error.message, action]),
+  } })
+  assert.ok(node)
+  node.props.onClick()
+  await new Promise(resolve => setImmediate(resolve))
+  assert.deepEqual(reported, [['connection lost', 'stop']])
+})
 const dock = (sessionId, work) => expand(MemberDock({ sessionId, useRoster: pick => pick(team), useWork: pick => pick(work), actions: {} }))
 
 test('a member at work in the group gets a row; the speaker, work elsewhere and approvals do not', () => {
@@ -106,4 +142,15 @@ test('group feedback removes finished members and excludes work elsewhere and ap
   assert.equal(groupWorkingText(busyMembers(room, work, team)), 'Anvil working…')
   work.rooms.r1 = []
   assert.equal(groupWorkingText(busyMembers(room, work, team)), '')
+})
+
+test('a member\'s line runs a clock from its turn\'s start or its approval\'s', () => {
+  // The clock renders as `{since}` here; it ticks on its own.
+  const flat = node => (node === null || node === '' ? '' : typeof node === 'string' ? node
+    : node.props.at !== undefined ? `{${node.props.at}}` : node.children.map(flat).join(''))
+  const stateText = entry => flat(MemberState({ entry, bot: { id: 'a', name: 'Anvil' }, room: { id: 'r1' }, roster: team }))
+  assert.equal(stateText({ state: 'work', doing: { roomId: 'r1', tool: 'pwsh', since: 1_000 } }), 'Running shell commands…{1000}')
+  assert.equal(stateText({ state: 'work', doing: { roomId: 'r2', tool: 'pwsh', since: 1_000 } }), 'Running shell commands… in Docs{1000}')
+  assert.equal(stateText({ state: 'ask', approvals: [{ at: 2_000 }] }), 'Waiting for your approval{2000}')
+  assert.equal(flat(MemberState({ entry: { state: 'idle' }, bot: { id: 'a', name: 'Anvil', role: 'Writer' }, room: { id: 'r1' }, roster: team })), 'Writer')
 })

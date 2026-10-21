@@ -2,9 +2,10 @@ import { createElement as h, useEffect, useLayoutEffect, useMemo, useRef, useSta
 import { createPortal } from 'react-dom'
 import { isCurrentPageFailure } from './transient-errors.js'
 import { BotMark, RoomAvatar } from './mark.js'
-import { Shimmer, PHRASES } from './cells.js'
+import { Elapsed, Shimmer, PHRASES } from './cells.js'
 import { reducedMotion } from './motion.js'
 import { t } from './i18n.js'
+export { elapsedLabel } from './text.js'
 
 // -------------------------------------------------------------------------
 // The activity row: the Bot's mark and a shimmering phrase at the transcript
@@ -13,12 +14,6 @@ import { t } from './i18n.js'
 
 const PHRASE_HOLD_MS = 800
 const drawPhrase = pool => t(pool[Math.min(pool.length - 1, Math.floor(Math.random() * pool.length))])
-export function elapsedLabel(ms) {
-  const minutes = Math.floor(ms / 60000)
-  if (minutes < 60) return `${Math.max(1, minutes)}m`
-  const hours = Math.floor(minutes / 60)
-  return minutes % 60 === 0 ? `${hours}h` : `${hours}h ${minutes % 60}m`
-}
 export { reducedMotion }
 
 function useRunningHost(active) {
@@ -87,6 +82,12 @@ export function ActivityIndicator({ sessionId, useRoster, useSessionStatus, useL
   const membersWorking = useWork(value => (value.rooms?.[sessionId] ?? []).length > 0)
   const hook = useWork(value => value.rabi?.[sessionId] ?? null)
   const running = useSessionStatus(map => map.get(sessionId)?.running === true)
+  const turnAt = useWork?.(work => work.turns?.[sessionId])
+  // Until the host reports the turn's start, the clock counts from when this window
+  // saw the run begin.
+  const runAt = useRef(0)
+  if (!running) runAt.current = 0
+  else if (runAt.current === 0) runAt.current = Date.now()
   const liveKey = useLive(state => JSON.stringify(state[sessionId] ?? {}))
   // A queued message waits for the next turn, so only a transcript or steering
   // send counts as fresh input.
@@ -157,25 +158,17 @@ export function ActivityIndicator({ sessionId, useRoster, useSessionStatus, useL
   useEffect(() => { if (!running) actions.clearLive(sessionId) }, [running, sessionId])
   // Only rows that take the activity row's place grow out of it.
   useRowEntrances(() => leaving.current || Date.now() - endedAt.current < 300)
-  const [now, setNow] = useState(Date.now)
-  useEffect(() => {
-    if (phase !== 'in') return undefined
-    const timer = setInterval(() => setNow(Date.now()), 10000)
-    return () => clearInterval(timer)
-  }, [phase])
   const failure = hook?.state === 'failed' && (hook.at ?? Infinity) >= inputAt && isCurrentPageFailure(hook.at) ? hook : null
   const host = useRunningHost(active || failure !== null)
   if (host && failure) return createPortal(h('div', { className: 'bt-rabi-hook-error', role: 'alert' },
     h('span', null, rabiFailureMessage(failure)),
     h('button', { type: 'button', className: 'bt-link', onClick: () => actions.openSettings('rabi') }, t('Rabi connection settings'))), host)
   if (!host || phase === null || !shown) return null
-  const elapsed = now - shown.at >= 60000 ? elapsedLabel(now - shown.at) : null
   return createPortal(h('div', { className: 'bt-typing', 'data-exiting': phase === 'out' ? '' : undefined, role: 'status', 'aria-live': 'polite', 'aria-atomic': true },
     bot ? h(BotMark, { bot, size: 28, state: markState.current, live: true, pokeable: true }) : h(RoomAvatar, { room, roster, size: 28 }),
     h('span', { className: 'bt-typing-text' },
-      h('span', { key: `${shown.key}:${shown.at}`, className: 'bt-typing-label' },
-        h(Shimmer, null, `${shown.text}…`),
-        elapsed ? h('span', { className: 'bt-typing-time' }, `· ${elapsed}`) : null))), host)
+      h('span', { key: `${shown.key}:${shown.at}`, className: 'bt-typing-label' }, h(Shimmer, null, `${shown.text}…`)),
+      h(Elapsed, { at: Math.max(turnAt ?? runAt.current, inputAt), className: 'bt-typing-time' }))), host)
 }
 
 

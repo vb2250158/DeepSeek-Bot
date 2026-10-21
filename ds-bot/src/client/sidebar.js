@@ -1,8 +1,8 @@
 import { createElement as h, Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { FishLogo } from '@deepseek-ai/dsh-client-ui-primitives'
+import { FishLogo } from './dsh-primitives.js'
 import { currentPart, previewOf, relativeShort } from './text.js'
-import { PlusIcon, SearchIcon, PinMarkIcon, CloudDownloadIcon, GearIcon } from './icons.js'
+import { PlusIcon, SearchIcon, PinMarkIcon, CloudDownloadIcon, GearIcon, PlugIcon } from './icons.js'
 import { MAIN_LOOK } from './characters.js'
 import { botState, BotMark, BotAvatar, RoomAvatar } from './mark.js'
 import { reducedMotion } from './activity-row.js'
@@ -250,13 +250,15 @@ function useListGlide(listRef, layout, key) {
 }
 
 export function TeamSidebar(props) {
-  const { wide, useRoster, useUi, useSessions, actions } = props
+  const { wide, expandSidebar, useRoster, useUi, useSessions, actions } = props
   const listRef = useRef(null)
   const pinRef = useRef(null)
   const dragged = useRef(null)
   const suppressClickUntil = useRef(0)
   const [dragging, setDragging] = useState(false)
   const [overPins, setOverPins] = useState(false)
+  const closing = useRef(false)
+  useLayoutEffect(() => { closing.current = false })
   const roster = useRoster(value => value)
   const markedUnread = useUi(value => value.unread)
   props.useRegistry(value => value)
@@ -311,7 +313,26 @@ export function TeamSidebar(props) {
   }
   useListGlide(listRef, wide, order.map(entry => entry.item.id).join(','))
   useLandOnMainBot(roster, useSessions, actions)
-  const rowProps = { roster, actions, useSessions, useUi, useSessionStatus: props.useSessionStatus, useSessionRetainInfo: props.useSessionRetainInfo, useActivity: props.useActivity, useWork: props.useWork, wide }
+  // The shell keeps wide content during its collapse fade. Normalize through its
+  // public expansion action before toggling; coalesce synchronous activations
+  // until React commits the result.
+  const navigate = (open, id) => {
+    const result = open(id)
+    if (wide && window.innerWidth < 1024 && !closing.current) {
+      closing.current = true
+      expandSidebar?.()
+      actions.toggleSidebar()
+    }
+    return result
+  }
+  const rowActions = {
+    ...actions,
+    openSession: id => navigate(actions.openSession, id),
+    openAgent: id => navigate(actions.openAgent, id),
+    openAgentSession: id => navigate(actions.openAgentSession, id),
+    newAgentSession: id => navigate(actions.newAgentSession, id),
+  }
+  const rowProps = { roster, actions: rowActions, useSessions, useUi, useSessionStatus: props.useSessionStatus, useSessionRetainInfo: props.useSessionRetainInfo, useActivity: props.useActivity, useWork: props.useWork, wide }
   // Typing while the sidebar has focus starts a search.
   const typeToSearch = (event) => {
     if (event.defaultPrevented || event.key.length !== 1 || event.key === ' ' || event.metaKey || event.ctrlKey || event.altKey || event.nativeEvent.isComposing) return
@@ -431,6 +452,17 @@ function UpdateButton({ useUpdate, actions }) {
                 : h('button', {
                   type: 'button', className: 'bt-update-go', disabled: dshPhase === 'installing', onClick: startDsh,
                 }, dshPhase === 'installing' ? t('Updating…') : dshPhase === 'failed' ? t('Try again') : t('Update')))) : null), document.body) : null)
+}
+
+// The footer entry to the shell's plugin panel.
+export function ConnectPlugins({ wide, actions }) {
+  if (!wide) return null
+  return h('span', { className: 'bt-connect-wrap' },
+    h('button', {
+      type: 'button', className: 'bt-connect bt-connect-foot',
+      onClick: () => actions.selectPanel('plugins'),
+    },
+    h(PlugIcon), t('Connect plugins')))
 }
 
 // Account seat of the Settings trigger: the visible label stays for assistive tech only.

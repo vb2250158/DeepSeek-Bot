@@ -1,6 +1,6 @@
 import { createElement as h, Fragment, useEffect, useRef, useState } from 'react'
 import { isMainOf } from './sources.js'
-import { HEADER, currentPart, stripHeader, usageOf } from './text.js'
+import { HEADER, currentPart, runStatsOf, stripHeader, usageOf } from './text.js'
 import { PlusIcon, ShareIcon, CloseIcon, ChevronLeftIcon, GearIcon, InfoIcon, FolderIcon, PeopleIcon } from './icons.js'
 import { botState, BotMark, BotAvatar } from './mark.js'
 import { GlobeIcon, Favicon } from './browser-pane.js'
@@ -44,6 +44,28 @@ function PermissionRow({ bot, roster, actions, run }) {
     h('div', { className: 'bt-section-title' }, t('Permissions')),
     // A Bot without its own preset may run on another one set in DSH, so its first pick always applies.
     h(PermissionPicker, { catalog, saved: bot.permission ?? catalog.defaultPreset, repick: bot.permission === undefined, onPick: permission => run(actions.updateBot(bot.id, { permission })) }))
+}
+
+// The current part's turns, speed, cache hits and context, for a window without DSH's
+// status bar (actions.runStats). It reads them again when a turn starts or ends.
+function RunStats({ bot, part, running, actions }) {
+  const [values, setValues] = useState(null)
+  useEffect(() => {
+    if (!actions.runStats) return undefined
+    let current = true
+    actions.runStats(bot.id).then(
+      (next) => { if (current) setValues(next) },
+      // The line stays as it was until the next read works.
+      () => {},
+    )
+    return () => { current = false }
+  }, [bot.id, part, running])
+  const shown = runStatsOf(values)
+  if (shown.length === 0) return null
+  return h('div', { className: 'bt-run-stats' },
+    shown.map((entry, index) => h(Fragment, { key: entry.key },
+      index > 0 ? h('span', { className: 'bt-run-sep', 'aria-hidden': true }, '·') : null,
+      h('span', { title: entry.title }, entry.text))))
 }
 
 // The Bot's browser inside the details page: its tabs as small window cards on
@@ -109,7 +131,7 @@ function MemberPile({ room, roster }) {
     more > 0 ? h('span', { key: 'more', className: 'bt-pile-face bt-pile-more', style: { animationDelay: `${shown.length * 40}ms` } }, `+${more}`) : null)
 }
 
-function GroupOverview({ room, roster, usage, openSettings }) {
+function GroupOverview({ room, roster, actions, usage, openSettings }) {
   return [
     room.notice
       ? h(About, { key: 'notice', title: 'Notice', text: room.notice })
@@ -118,6 +140,7 @@ function GroupOverview({ room, roster, usage, openSettings }) {
       h('div', { className: 'bt-kv' }, h('span', null, t(ROOM_MODES.find(([id]) => id === shownMode(room, roster))?.[1] ?? 'Everyone')))),
     room.permission ? h('div', { key: 'permission' }, h('div', { className: 'bt-section-title' }, t('Permissions')),
       h('div', { className: 'bt-kv' }, h('span', { className: presetDanger(room.permission) ? 'bt-perm-danger' : undefined }, presetName(room.permission, roster.permissions)))) : null,
+    roster.memory === false ? null : h(MemoryRow, { key: 'memory', owner: { id: room.id, name: room.name, group: true }, actions }),
     usage ? h('div', { key: 'usage' }, h('div', { className: 'bt-section-title' }, t('Usage')),
       h('div', { className: 'bt-kv' }, h('span', null, room.name), h('span', null, usage))) : null,
   ]
@@ -216,6 +239,7 @@ export function DetailsDrawer({ sessionId, startRenaming, startTab, hasStrip, co
       room && tab === 'library' ? h(GroupLibrary, { key: room.id, room, roster, actions }) : null,
       room && tab === 'members' ? h(GroupMembers, { key: room.id, room, roster, actions, useWork, run }) : null,
       bot && tab === 'details' && !compact ? [
+        h(RunStats, { key: 'stats', bot, part, running, actions }),
         h('div', { key: 'model', className: 'bt-drawer-model' },
           h('div', { className: 'bt-section-title' }, t('Model')),
           h(ModelMenu, { bot, roster, actions, run, wide: true }),
@@ -227,7 +251,7 @@ export function DetailsDrawer({ sessionId, startRenaming, startTab, hasStrip, co
         bot.instructions
           ? h(About, { key: 'about', text: bot.instructions })
           : h('button', { key: 'about', type: 'button', className: 'bt-more', onClick: () => setView('settings') }, t('Add instructions in Bot settings')),
-        roster.memory === false ? null : h(MemoryRow, { key: 'memory', bot, actions }),
+        roster.memory === false ? null : h(MemoryRow, { key: 'memory', owner: { id: bot.id, name: bot.name }, actions }),
         usage ? h('div', { key: 'usage' }, h('div', { className: 'bt-section-title' }, t('Usage')),
           h('div', { className: 'bt-kv' }, h('span', null, bot.name), h('span', null, usage))) : null,
         h(ScheduleSummary, { key: 'routines', bot, actions }),

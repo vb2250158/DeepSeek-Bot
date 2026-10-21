@@ -1,8 +1,9 @@
 import { createElement as h, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { BotMark, toolState } from './mark.js'
-import { Shimmer, workPhrase } from './cells.js'
-import { elapsedLabel } from './activity-row.js'
+import { Elapsed, Shimmer, workPhrase } from './cells.js'
+import { elapsedLabel } from './text.js'
 import { t, language } from './i18n.js'
+import { SPRING_TAP, spring } from './motion.js'
 
 // -------------------------------------------------------------------------
 // What a group's members are doing: above the group's composer, a row for each member
@@ -12,6 +13,18 @@ import { t, language } from './i18n.js'
 
 const NO_WORK = { bots: {}, rooms: {}, approvals: [] }
 const ROWS_MAX = 4
+
+function useNow(active) {
+  const [now, setNow] = useState(Date.now)
+  useEffect(() => {
+    if (!active) return undefined
+    const timer = setInterval(() => setNow(Date.now()), 30000)
+    return () => clearInterval(timer)
+  }, [active])
+  return now
+}
+
+const since = (now, at) => (typeof at === 'number' && now - at >= 60000 ? ` · ${elapsedLabel(now - at)}` : '')
 
 // Work in this group wins over the Bot's own chat or another group.
 export function memberWork(room, work = NO_WORK) {
@@ -147,17 +160,10 @@ function useFlowColumn(ref, active, key) {
   }, [active, key])
 }
 
-function useNow(active) {
-  const [now, setNow] = useState(Date.now)
-  useEffect(() => {
-    if (!active) return undefined
-    const timer = setInterval(() => setNow(Date.now()), 30000)
-    return () => clearInterval(timer)
-  }, [active])
-  return now
-}
-
-const since = (now, at) => (typeof at === 'number' && now - at >= 60000 ? ` · ${elapsedLabel(now - at)}` : '')
+// The clock stays whole at the end; only what comes before it is cut.
+const stateLine = (className, at, ...what) => h('span', { className },
+  h('span', { className: 'bt-member-what' }, ...what),
+  typeof at === 'number' ? h(Elapsed, { at, className: 'bt-member-time' }) : null)
 
 function ApprovalCard({ approval, bot, actions }) {
   const [busy, setBusy] = useState(false)
@@ -214,19 +220,20 @@ export function useMemberWork(room, useWork) {
 
 export const workState = doing => (doing?.switching ? 'thinking' : toolState(doing?.tool ?? ''))
 
-export function MemberState({ entry, bot, room, roster, now }) {
-  if (entry?.state === 'ask') return h('span', { className: 'bt-member-state bt-mw-ask' }, `${t('Waiting for your approval')}${since(now, entry.approvals[0].at)}`)
+export function MemberState({ entry, bot, room, roster }) {
+  if (entry?.state === 'ask') return stateLine('bt-member-state bt-mw-ask', entry.approvals[0].at, t('Waiting for your approval'))
   if (entry?.state !== 'work') return bot.role ? h('span', { className: 'bt-member-state' }, bot.role) : null
   const where = entry.doing.roomId === room.id ? ''
     : entry.doing.roomId ? t('in {name}', { name: roster.roomsById[entry.doing.roomId]?.name ?? t('a group chat') })
       : t('in its own chat')
-  return h('span', { className: 'bt-member-state' },
-    h(Shimmer, null, `${workPhrase(entry.doing)}…`), where ? ` ${where}` : '', since(now, entry.doing.since))
+  return stateLine('bt-member-state', entry.doing.since, h(Shimmer, null, `${workPhrase(entry.doing)}…`), where ? ` ${where}` : '')
 }
 
+// Work in this group can be stopped from its details, since the user cannot reach the
+// member's group Session otherwise; a turn waiting for an approval still holds its work.
 export function StopMemberWork({ entry, bot, room, actions }) {
   const [stopping, setStopping] = useState(false)
-  if (entry?.state !== 'work' || !entry.here) return null
+  if (!entry?.here || (entry.state !== 'work' && entry.state !== 'ask')) return null
   const stop = () => {
     setStopping(true)
     void Promise.resolve(actions.stopMemberWork(room.id, bot.id))
@@ -250,7 +257,7 @@ export const MEMBER_CSS = `
 .bt-mw-row-text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bt-mw-row-time{flex:none;font-size:12px;color:var(--bt-ink-3);white-space:nowrap}
 .bt-mw-work{display:flex;align-items:center;justify-content:space-between;gap:8px}
-.bt-mw-stop{flex:none;height:22px;padding:0 10px;border:1px solid var(--bt-line,rgba(0,0,0,.12));border-radius:11px;background:none;color:var(--bt-ink-2);font:inherit;font-size:12px;cursor:pointer}
+.bt-mw-stop{flex:none;height:22px;padding:0 10px;border:1px solid var(--bt-line,rgba(0,0,0,.12));border-radius:12px;background:none;color:var(--bt-ink-2);font:inherit;font-size:12px;cursor:pointer}
 .bt-mw-stop:hover{background:var(--bt-hover)}
 .bt-mw-stop:disabled{opacity:.5;cursor:default}
 .bt-event.bt-mw-dock{margin:0 0 6px;pointer-events:none}
@@ -259,13 +266,38 @@ export const MEMBER_CSS = `
 .bt-mw-stack{display:inline-flex;align-items:center;flex:none;line-height:0}
 .bt-mw-stack>*+*{margin-left:-4px}
 .bt-mw-face{position:relative;display:inline-flex;flex:none;border-radius:50%}
-.bt-mw-stack .bt-mw-face{box-shadow:0 0 0 1.5px var(--bt-main,#fff)}
-.bt-mw-face[data-ask]::after{content:"";position:absolute;right:-2px;bottom:-2px;width:7px;height:7px;border-radius:50%;background:#e3a008;box-shadow:0 0 0 1.5px var(--bt-main,#fff)}
+.bt-mw-stack .bt-mw-face{box-shadow:0 0 0 1.5px var(--bt-main)}
+.bt-mw-face[data-ask]::after{content:"";position:absolute;right:-2px;bottom:-2px;width:7px;height:7px;border-radius:50%;background:#e3a008;box-shadow:0 0 0 1.5px var(--bt-main)}
 .bt-mw-ask{color:#b7791f;flex:none;white-space:nowrap}
 body[data-ds-dark-theme] .bt-mw-ask{color:#f0b84a}
 .bt-mw-member{padding:0 6px 8px 42px;display:flex;flex-direction:column;gap:6px}
 .bt-mw-state{font-size:12px;line-height:16px;color:var(--bt-ink-2);margin-top:-4px}
 .bt-mw-card{display:flex;flex-direction:column;gap:4px;padding:10px 12px;border-radius:12px;background:var(--bt-hover);font-size:12px;line-height:17px;color:var(--bt-ink-2)}
+@keyframes bt-mw-in{from{transform:translateY(8px) scale(.94)}}
+@keyframes bt-mw-out{to{opacity:0;transform:translateY(6px) scale(.96);filter:blur(3px)}}
+@keyframes bt-mw-seat{from{opacity:0;scale:.6}}
+@keyframes bt-mw-swap{from{opacity:0;filter:blur(4px)}}
+.bt-members{display:flex;flex-direction:column;gap:2px;margin:0 -8px}
+.bt-member{display:flex;flex-direction:column;border-radius:12px;animation:bt-rise .18s ease-out backwards}
+.bt-member-row{display:flex;align-items:center;gap:8px;min-height:48px;padding:0 8px;border-radius:12px;transition:background-color .12s ease}
+.bt-member-row:hover{background:var(--bt-hover)}
+.bt-member-open{flex:1;min-width:0;display:flex;align-items:center;gap:10px;padding:8px 0;border:0;background:none;color:var(--bt-ink);font:inherit;text-align:left;cursor:pointer}
+.bt-member-open>.bt-mark{flex:none}
+.bt-member-text{display:flex;flex-direction:column;min-width:0;gap:1px}
+.bt-member-line{display:flex;align-items:center;gap:6px;min-width:0}
+.bt-member-name{min-width:0;font-size:14px;line-height:20px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bt-member-line>.bt-tag{font-size:11px;line-height:15px;padding:0 5px}
+.bt-member-state{display:flex;min-width:0;font-size:12px;line-height:16px;color:var(--bt-ink-3);white-space:nowrap}
+.bt-member-what{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.bt-member-time{flex:none;margin-left:.3em;font-variant-numeric:tabular-nums}
+.bt-member-state.bt-mw-ask{color:#b7791f}
+body[data-ds-dark-theme] .bt-member-state.bt-mw-ask{color:#f0b84a}
+.bt-member-stop{flex:none;height:26px;padding:0 11px;border:0;border-radius:13px;background:var(--bt-main);box-shadow:inset 0 0 0 .5px var(--bt-line-2);color:var(--bt-ink-2);font:inherit;font-size:12px;cursor:pointer;transition:background-color .12s ease,color .12s ease,${spring(SPRING_TAP, 'scale')}}
+.bt-member-stop:hover{background:var(--bt-active);color:var(--bt-ink)}
+.bt-member-stop:active:not(:disabled){scale:.94}
+.bt-member-stop:disabled{opacity:.5;cursor:default}
+.bt-member-cards{display:flex;flex-direction:column;gap:6px;padding:2px 8px 8px 50px}
+.bt-mw-card{display:flex;flex-direction:column;gap:4px;padding:10px 12px;border-radius:12px;background:var(--bt-hover);font-size:12px;line-height:17px;color:var(--bt-ink-2);animation:bt-rise .2s ease-out backwards}
 .bt-mw-tool{font-weight:600;color:var(--bt-ink)}
 .bt-mw-text{color:var(--bt-ink);overflow-wrap:anywhere}
 .bt-mw-reason{overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
