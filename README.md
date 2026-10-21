@@ -7,6 +7,8 @@
 
 # DeepSeek Bot
 
+Restoring a Bot chat requests only that Session's metadata on paged DSH hosts. Older hosts retain the full catalog refresh used for navigation.
+
 Bot chats continue interrupted turns and quota failures automatically through DSH's native continuation API, without manual retry buttons or resending user messages. Repeated failures back off; new input, explicit stops and unloading cancel pending continuation. Unknown Rabi write outcomes are not replayed. See the [plugin configuration](ds-bot/README.md) for timing options.
 
 Group chats have Details, Library and Members tabs. Add a Bot directly below the member list. Each group keeps its UTF-8 text documents in a separate folder keyed by the group ID; renaming the group keeps the same folder. Library supports creating, uploading and reading .md, .txt, .csv, .json and .yaml files, with a default 1 MiB file limit. Existing names are never overwritten. Team Bots read these references through read_group_library. Deleting a group retains its documents.

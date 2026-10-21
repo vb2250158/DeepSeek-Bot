@@ -14241,7 +14241,10 @@ function createSessionNavigator({ sessions, openSession, onError }) {
     const current = ++request;
     try {
       const catalog = sessions.list.getSnapshot();
-      if (catalog.phase === "pending" || catalog.byId[id] === void 0) await sessions.refresh();
+      if (catalog.phase === "pending" || catalog.byId[id] === void 0) {
+        if (typeof sessions.ensureListed === "function") await sessions.ensureListed(id);
+        else await sessions.refresh();
+      }
       if (current !== request) return;
       await openSession(id);
     } catch (error) {

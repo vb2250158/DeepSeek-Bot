@@ -12,6 +12,20 @@ test('a known host session opens without refreshing or changing its identity', a
   assert.deepEqual(opened, ['original'])
 })
 
+test('a paged host resolves only the selected session instead of refreshing history', async () => {
+  const calls = []
+  const navigate = createSessionNavigator({
+    sessions: {
+      list: { getSnapshot: () => ({ phase: 'pending', byId: {} }) },
+      ensureListed: async id => { calls.push(['lookup', id]); return true },
+      refresh: () => assert.fail('unnecessary full refresh'),
+    },
+    openSession: id => calls.push(['open', id]), onError: error => { throw error },
+  })
+  await navigate('original')
+  assert.deepEqual(calls, [['lookup', 'original'], ['open', 'original']])
+})
+
 test('a new browser waits for the host catalog before retaining its exact session', async () => {
   const byId = {}
   const calls = []
