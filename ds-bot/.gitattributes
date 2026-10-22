@@ -2,3 +2,4 @@
 # build-client.mjs --check). Checked out with CRLF on Windows it always reads as stale.
 client.js text eol=lf
 client-app.js text eol=lf
+scripts/thin-client.js text eol=lf
