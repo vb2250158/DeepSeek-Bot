@@ -1,5 +1,5 @@
 import { createElement as h, Fragment, useEffect } from 'react'
-import { TeamSidebar, AccountLauncher } from './sidebar.js'
+import { TeamSidebar, BotSettingsLauncher } from './sidebar.js'
 import { DetailsDrawer } from './details-drawer.js'
 import { ActivityIndicator } from './activity-row.js'
 import { FishLogo } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -22,7 +22,7 @@ export function BotTeam(props) {
   return h('aside', { className: 'bt-team-column', 'aria-label': t('DS Bot'), style: { '--bt-team-width': `${width}px` } },
     h(TeamSidebar, { ...props, wide: true }),
     h('div', { className: 'bt-team-footer' },
-      h(AccountLauncher, { ...props, seat: false })),
+      h(BotSettingsLauncher, { ...props, seat: false })),
     h(ColumnResizer, { side: 'team', width, onChange }))
 }
 

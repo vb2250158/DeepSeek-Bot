@@ -67,3 +67,9 @@ test('refresh does not replay an old Rabi Hook failure notice', () => {
   assert.equal(fixture({ hook: { state: 'failed', code: 'host_stopped', at: 1 } }).view, null)
   assert.equal(fixture({ hook: { state: 'failed', code: 'host_stopped', at: Date.now() + 1000 } }).view.node.props.role, 'alert')
 })
+
+test('streamed text followed by running work keeps the activity row', () => {
+  const { view } = fixture({ running: true, live: { reply: { text: true }, tool: { label: 'Reading file', at: 1 } } })
+  assert.equal(view.node.props.role, 'status')
+  assert.match(JSON.stringify(view.node), /Reading file/)
+})

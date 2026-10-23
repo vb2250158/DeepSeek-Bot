@@ -11,8 +11,8 @@ export function apply(ctx) {
     output: { schema: { type: 'object', additionalProperties: true }, render: (_args, value) => [{ type: 'text', text: JSON.stringify(value) }] },
     async execute(args) {
       const reply = value => ({ statusCode: 200, ok: true, body: JSON.stringify(value) })
-      if (args.path === '/api/webgui-access') return reply({ code: 0, data: { token: 'fixture-only-access' } })
-      if (JSON.parse(args.requestHeadersJson ?? '{}')['x-rabiroute-webgui-token'] !== 'fixture-only-access') return { statusCode: 403, ok: false, body: '{}' }
+      if (args.path === '/api/webgui-access') return reply({ code: 0, data: { token: 'mock-fixture-access' } })
+      if (JSON.parse(args.requestHeadersJson ?? '{}')['x-rabiroute-webgui-token'] !== 'mock-fixture-access') return { statusCode: 403, ok: false, body: '{}' }
       if (args.path === '/api/lan-agent/instances') return reply({ code: 0, instances: [
         { instanceId: 'fixture-online', name: 'Build computer', connected: true, local: false, agents: [] },
         { instanceId: 'fixture-offline', name: 'Offline computer', connected: false, local: false, agents: [] },
