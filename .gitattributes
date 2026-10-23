@@ -3,3 +3,7 @@
 
 # Cookie fixtures test BOM and line-ending variants; normalizing them removes what they test.
 app/test/fixtures/** -text -whitespace
+
+# Generated JavaScript includes the thin client template verbatim.
+ds-bot/scripts/thin-client.js text eol=lf
+ds-bot/client-app.js text eol=lf

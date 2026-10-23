@@ -3,6 +3,9 @@ import { createRequire } from 'node:module'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { pathToFileURL } from 'node:url'
+import { Context } from '@deepseek-ai/cordis'
+import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import { install } from '../src/host/time-context.js'
 import { historyEntry } from '../src/host/parts.js'
 import { fakeContext } from './fake-ctx.js'
@@ -74,25 +77,17 @@ test('a loaded DSH clock gets no second clock in either listener order', async (
   const bundle = join(process.env.DSH_HARNESS, 'packages/bundle/web-app/package.json')
   const { apply: nativeClock } = await import(pathToFileURL(createRequire(bundle).resolve('@deepseek-ai/dsh-time-context')).href)
   const run = async (nativeFirst) => {
-    const projections = new Map()
-    const ctx = fakeContext({
-      services: {
-        sessionProjections: {
-          register: (definition) => { projections.set(definition.key, definition) },
-          stateOf: (_session, key) => projections.get(key)?.init(),
-        },
-      },
-    })
-    ctx.sessionProjections = ctx.get('sessionProjections')
-    // Prepended listeners run last-registered first.
-    ctx.on = (name, listener) => { ctx.listeners.set(name, [listener, ...(ctx.listeners.get(name) ?? [])]) }
+    const ctx = new Context()
+    t.after(() => ctx.fiber.dispose())
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(SessionProjectionRegistry)
     const rt = { ctx, config: { timeZone: 'UTC' }, load: async () => {}, isBotSession: () => true, async* eventsBackwards() {} }
-    if (nativeFirst) { nativeClock(ctx, { timeZone: 'UTC' }); install(rt) } else { install(rt); nativeClock(ctx, { timeZone: 'UTC' }) }
-    const hooks = ctx.listeners.get('agent/pre-step')
-    const payload = { agent: { id: 'bot', session: { seq: 0, eventAt() {} } }, turn: 1, step: 1, signal: new AbortController().signal }
+    if (nativeFirst) { await nativeClock(ctx, { timeZone: 'UTC' }); install(rt) } else { install(rt); await nativeClock(ctx, { timeZone: 'UTC' }) }
+    const session = ctx.sessions.create(SessionId('clock-order-' + nativeFirst))
+    const payload = { agent: { id: session.id, session }, turn: 1, step: 1, signal: new AbortController().signal }
     const user = { role: 'user', content: [{ type: 'text', text: 'Hello' }], source: { kind: 'user' } }
-    const invoke = at => at === hooks.length ? { kind: 'enter', messages: [user] } : hooks[at](payload, () => invoke(at + 1))
-    return (await invoke(0)).messages.map(message => message.source.kind)
+    const decision = await ctx.waterfall('agent/pre-step', payload, () => Promise.resolve({ kind: 'enter', messages: [user] }))
+    return decision.messages.map(message => message.source.kind)
   }
   assert.deepEqual(await run(true), ['user', 'time-context'])
   assert.deepEqual(await run(false), ['user', 'time-context'])
