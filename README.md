@@ -7,6 +7,8 @@
 
 # DS Bot
 
+`0.2.2-rabi.1` integrates upstream 0.2.2 browser isolation and grants, side chats, durable delegated results and request admission, transactional memory, and hot-update recovery. Rabi calls use the public scoped-executor batch API on DSH rc.3 and retain the earlier single-call API on rc.2; capability selection happens before dispatch, so an uncertain write is never retried through another API.
+
 `0.2.0-rabi.1` integrates upstream 0.2.0: group-scoped memory, structured view cards, photos, thinking levels and live turn metrics. This fork keeps equal team-management rights, independent pinned chats, the native Bot panel, Rabi-owned context and memory, group libraries and interrupted-turn recovery.
 
 `0.2.0-rabi.2` retains Rabi bindings when the shared memory overlay opens and keeps the managed-memory label in wide Bot details.
@@ -168,6 +170,3 @@ The plugin source is in [`ds-bot/`](ds-bot/). For options and internals, see [`d
 DS Bot is an independent community project. **It is not an official DeepSeek product**, and it is not affiliated with, endorsed by or sponsored by DeepSeek. "DeepSeek", "DeepSeek Harness" and the other names are trademarks of their owners. They are used here only to say what this plugin works with.
 
 Bots use your own model quota, and they read and write files and run commands when you ask them to. Check important actions yourself.
-# Maintenance release 0.2.2-rabi.1
-
-Integrates upstream 0.2.2 while preserving the Rabi workbench, group library, shared team permissions, model picker and asynchronous client loader. Browser grants remain user-owned; named Bot requests, memory journals and delegated results retain their upstream recovery checks. Tests use the selected DSH runtime, including the rc.3 native tool executor.

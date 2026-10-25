@@ -1,6 +1,10 @@
 # ds-bot
 
-Version 0.2.1-rabi.1 integrates upstream 0.2.1, including aside questions (`/btw`), richer view cards, group relay pause, and message layout controls. The native workbench, direct Bot settings button, shared team management, deferred client loading and Rabi-owned persona memory remain. The standalone app retains the upstream account sign-out menu.
+`0.2.2-rabi.1` retains the Rabi workbench and DSH continuation while integrating upstream 0.2.2. The Rabi client selects the public scoped-executor batch API before dispatch on rc.3 and the existing single-call API on rc.2; neither failures nor uncertain writes trigger a second dispatch.
+
+Version 0.2.2-rabi.1 integrates upstream 0.2.2, including per-Bot browser isolation and grants, side chats (`/side`), durable delegated results, named-request admission and transactional memory. Existing `/btw` cards stay readable; new aside questions use side chats. The native workbench, direct Bot settings button, shared team management, deferred client loading and Rabi-owned persona memory remain. The standalone app retains the upstream account sign-out menu.
+
+Browser writes whose requests fail before the click settles still report an unknown outcome and block repetition until the page has been observed. Per-Bot browser plugins remain off until configured.
 
 Group chats expose Details, Library and Members. Add members directly in Members. Library stores UTF-8 text files per stable group ID under <Bot home>/groups/<group ID>/library. Configure groupLibraryPath (an absolute parent directory), groupLibraryMaxBytes (default 1048576, range 1–8388608) and groupLibraryPageSize (default 50, range 1–200) on the bot plugin. Existing groups create their folder on first library visit; new groups create it at creation. Read-only Hosts never create folders. Only regular text files are listed or read; paths, device names and links are rejected. Uploads and new documents refuse duplicate names. Group deletion retains documents. Team Bots can list and read a group library with read_group_library; file content is reference data and tool reads enter the normal Session log.
 

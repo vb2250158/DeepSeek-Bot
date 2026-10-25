@@ -162,7 +162,7 @@ async function setup(t, actionTimeout = 500, options = {}) {
     try {
       await fixture.close()
     } finally {
-      if (profileRoot) await rm(profileRoot, { recursive: true, force: true })
+      if (profileRoot) await rm(profileRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
     }
   })
   profileRoot = await mkdtemp(join(tmpdir(), 'browser-write-safety-'))
@@ -188,7 +188,7 @@ async function mountedDownloadAndUpload(t, rootsFor) {
   t.after(async () => {
     await cleanup?.()
     await fixture.close()
-    await rm(profileRoot, { recursive: true, force: true })
+    await rm(profileRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
   })
   mountBrowserPlugin({
     effect(create) { cleanup = create() },
@@ -431,7 +431,7 @@ test('browser_task driver tools inherit the outer authorization gate', async (t)
       try {
         await fixture.close()
       } finally {
-        if (profileRoot) await rm(profileRoot, { recursive: true, force: true })
+        if (profileRoot) await rm(profileRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
       }
     }
   })
@@ -625,7 +625,7 @@ test('concurrent downloads reserve unique names and preserve both files', async 
   t.after(async () => {
     await Promise.all(sessions.map(session => session.close().catch(() => {})))
     await fixture.close()
-    await rm(profileRoot, { recursive: true, force: true })
+    await rm(profileRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
   })
   for (const botId of ['download-one', 'download-two']) {
     sessions.push(await openBotBrowser({

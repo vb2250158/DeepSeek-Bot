@@ -273,11 +273,12 @@ test('a write that changed nothing fails the call with a code, and a saved one k
   // What a saved write answers is what the model reads, word for word.
   assert.match(await tool('remember', { text: 'Likes tea' }, 'b2'), /^Saved to your memory, in MEMORY\.md \(MEMORY\.md: \d+ of 4000 characters\)\. It shows in your memory from your next conversation; recall finds it now\.$/)
   // A refusal is a failure, with the kind of failure in its code.
-  await assert.rejects(tool('remember', { text: 'API key sk-' + 'abcdefghijklmnopqrstuvwx' }, 'b2'), (error) => {
+  await assert.rejects(tool('remember', { text: 'Ship on Friday', scope: 'team' }, 'stranger'), (error) => {
     assert.equal(error.code, 'memory/refused')
-    assert.match(error.message, /looks like a key/)
+    assert.match(error.message, /Only Bots on the team keep a memory/)
     return true
   })
+  await assert.rejects(tool('remember', { text: 'API key sk-' + 'abcdefghijklmnopqrstuvwx' }, 'b2'), error => error.code === 'memory/refused' && /looks like a key/.test(error.message))
   // A write with nothing in it says what is missing.
   await assert.rejects(tool('remember', { text: '  ' }, 'b2'), (error) => {
     assert.equal(error.code, 'memory/empty')
@@ -1223,7 +1224,7 @@ test('Rabi bound Bots use no independent local memory or review requests', async
   writeFileSync(join(home,'state.json'),JSON.stringify(state))
   const f=start({home});t.after(()=>f.stop())
   assert.equal(f.section('b2'),'')
-  for(const[name,args]of [['remember',{text:'Keep in Rabi'}],['forget',{entry:'old'}]])await assert.rejects(f.tool(name,args,'b2'),/Rabi owns this persona memory/)
+  for(const[name,args]of [['remember',{text:'Keep in Rabi'}],['forget',{entry:'old'}]])await assert.rejects(f.tool(name,args,'b2'),error=>error.code==='memory/refused'&&/Rabi owns this persona memory/.test(error.message))
   assert.match(await f.tool('recall',{},'b2'),/Rabi owns this persona memory/)
   assert.equal((await f.call('memory-view',{botId:'b2'})).value.source,'rabi')
   assert.equal((await f.call('memory-ask',{botId:'b2',text:'Save it'})).ok,false)

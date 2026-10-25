@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { ToolCallId } from '@deepseek-ai/dsh-llm'
 
 const TOOL = 'rabiroute_manager_api'
 export const rabiRefuse = (message, code = 'bot/refused') => { throw Object.assign(new Error(message), { code }) }
@@ -13,10 +14,13 @@ export function rabiClient(ctx, timeoutMs = 8000) {
   const request = async (path, method = 'GET', body, signal, headers) => {
     if (!available()) rabiRefuse('Install and configure dsh-rabiroute-agent on the controller first')
     const timeout = AbortSignal.timeout(timeoutMs)
-    const result = await ctx.tools.execute({
-      name: TOOL, callId: `ds-bot-ui-${randomUUID()}`, signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
-      arguments: { method, path, ...(body ? { bodyJson: JSON.stringify(body) } : {}), ...(headers ? { requestHeadersJson: JSON.stringify(headers) } : {}) },
-    })
+    const callId = ToolCallId(`ds-bot-ui-${randomUUID()}`)
+    const callSignal = signal ? AbortSignal.any([signal, timeout]) : timeout
+    const args = { method, path, ...(body ? { bodyJson: JSON.stringify(body) } : {}), ...(headers ? { requestHeadersJson: JSON.stringify(headers) } : {}) }
+    // DSH's public scoped-executor API dispatches raw batches; earlier runtimes accept one call.
+    const result = typeof ctx.tools.setExecutor === 'function'
+      ? (await ctx.tools.execute({ calls: [{ type: 'tool-call', id: callId, name: TOOL, arguments: JSON.stringify(args) }], signal: callSignal })).results[0].result
+      : await ctx.tools.execute({ name: TOOL, callId, signal: callSignal, arguments: args })
     if (result.isError) rabiRefuse(result.error?.kind === 'host_stopped' ? 'Rabi is not running. Start Rabi, then send your message again.' : result.error?.message ?? 'Rabi request failed')
     const receipt = result.value
     if (receipt?.error?.kind === 'host_stopped') rabiRefuse('Rabi is not running. Start Rabi, then send your message again.')

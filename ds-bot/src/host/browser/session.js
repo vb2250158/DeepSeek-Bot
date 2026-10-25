@@ -431,12 +431,14 @@ function createSession({ context, browser, page, botId, userDataDir, cookieFile,
     if (requests.length === 0) return
     let timer
     try {
-      await Promise.race([
+      const settled = await Promise.race([
         Promise.all(requests),
         new Promise((_, reject) => {
           timer = setTimeout(() => reject(new Error('the browser request did not finish')), actionTimeout)
         }),
       ])
+      const failed = settled.find(result => !result.ok)
+      if (failed) throw failed.error
     } finally {
       clearTimeout(timer)
     }
@@ -457,10 +459,12 @@ function createSession({ context, browser, page, botId, userDataDir, cookieFile,
         if (requestOrigin !== action.origin || ['GET', 'HEAD'].includes(request.method().toUpperCase())) return
         let resolve
         let reject
-        requests.push(new Promise((res, rej) => {
+        const pending = new Promise((res, rej) => {
           resolve = res
           reject = rej
-        }))
+        })
+        // Requests can fail before the click settles; retain the failure until the action reads it.
+        requests.push(pending.then(() => ({ ok: true }), error => ({ ok: false, error })))
         pendingRequests.set(request, { resolve, reject })
       }
       const onRequestFinished = request => {

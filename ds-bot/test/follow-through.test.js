@@ -31,7 +31,8 @@ const started = new Map()
 
 // The durable logs DSH keeps, by Session: what a Session's turns did and said.
 // `inspect` stands in for DSH reading that log, when a test cannot read it.
-async function start(home, durableLogs, inspect) {
+async function start(home, suppliedLogs, inspect) {
+  const logs = suppliedLogs ?? new Map()
   const ctx = fakeContext()
   const agents = new Map()
   const agentOf = (sessionId) => {
@@ -50,7 +51,7 @@ async function start(home, durableLogs, inspect) {
       create: async () => ({ sessionId: 's1' }),
       resolveAgent: async sessionId => ({ agent: agentOf(sessionId) }),
       selectModel: async () => {},
-      inspect: inspect ?? (async sessionId => ({ events: durableLogs?.get(sessionId) ?? logs.get(sessionId) ?? [] })),
+      inspect: inspect ?? (async sessionId => ({ events: logs?.get(sessionId) ?? [] })),
     },
     sessionTitle: { rename: async () => {} },
     sessions: { flush: async () => {} },
@@ -60,7 +61,6 @@ async function start(home, durableLogs, inspect) {
   ctx.connection.fetch.register = (options) => { if (options.path === '/api/bot') route = options; return register(options) }
   apply(ctx, { home })
   let seq = 0
-  const logs = new Map()
   const emit = (id, type, data) => {
     const event = { type, seq: ++seq, data }
     logs.set(id, [...(logs.get(id) ?? []), event])

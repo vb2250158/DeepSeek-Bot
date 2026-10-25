@@ -2,6 +2,13 @@
 
 All notable changes to DS Bot are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the versions follow [Semantic Versioning](https://semver.org/). Before 1.0, a minor version can contain breaking changes.
 
+## [0.2.2-rabi.1] - 2026-10-26
+
+- Integrate upstream 0.2.2 browser isolation and grants, side chats, durable delegated results and named-request admission, transactional memory, and hot-update recovery.
+- Retain equal Bot management, Rabi-owned context and memory, the native workbench, group libraries, deferred client loading and DSH continuation.
+- Select the public scoped-executor batch API before Rabi dispatch on DSH rc.3 while retaining the rc.2 single-call API; uncertain operations never switch APIs or replay.
+- Observe browser write failures from request creation, preserving the unknown-result guard when a request fails before the click finishes.
+
 ## [0.1.7-rabi.3] - 2026-10-20
 
 - Combine upstream handoff and lifecycle fixes with group library tabs, direct member management, native continuation, pre-step failure recovery and explicit Rabi setup.
