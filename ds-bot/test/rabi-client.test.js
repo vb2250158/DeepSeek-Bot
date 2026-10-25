@@ -35,14 +35,13 @@ test('a stopped Host is reported explicitly without retrying discovery or busine
 import { Context } from '@deepseek-ai/cordis'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { defineTool } from '@deepseek-ai/dsh-tools'
-import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 
 async function runtimeClient(t, receipt) {
   const ctx = new Context()
   t.after(async () => ctx.fiber.dispose())
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
-  await ctx.plugin(NativeToolExecutor)
+  if (typeof ctx.tools.setExecutor === 'function') await ctx.plugin(await import('@deepseek-ai/dsh-tool-executor-native'))
   const calls = []
   const fixture = inner => {
     inner.tools.register(defineTool({
@@ -58,7 +57,7 @@ async function runtimeClient(t, receipt) {
   return { client: rabiClient(ctx), calls }
 }
 
-test('rc3 dispatches a Manager read through one native tool batch', async t => {
+test('the installed tool runtime dispatches a Manager read exactly once', async t => {
   const { client, calls } = await runtimeClient(t, { ok: true, statusCode: 200, body: JSON.stringify({ code: 0, data: { count: 2 } }) })
   assert.deepEqual(await client.json('/api/fixture'), { code: 0, data: { count: 2 } })
   assert.equal(calls.length, 1)
@@ -66,7 +65,7 @@ test('rc3 dispatches a Manager read through one native tool batch', async t => {
   assert.equal(calls[0].signal.aborted, false)
 })
 
-test('rc3 uncertain Manager writes retain their one original dispatch and headers', async t => {
+test('the installed tool runtime retains one uncertain Manager write and its headers', async t => {
   const { client, calls } = await runtimeClient(t, { ok: false, uncertain: true, statusCode: 500 })
   await assert.rejects(client.json('/api/fixture', 'PATCH', { enabled: true }, undefined, { 'If-Match': '"fixture-revision"' }), /outcome is uncertain/)
   assert.equal(calls.length, 1)

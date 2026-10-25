@@ -4,12 +4,12 @@ import { Context } from '@deepseek-ai/cordis'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { defineTool } from '@deepseek-ai/dsh-tools'
-import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import { mountBrowserPlugin } from '../src/host/browser/mount.js'
 import { toolDefs as refsTools } from '../src/host/browser/refs.js'
 
 
 async function executeOne(ctx, input) {
+  if (typeof ctx.tools.setExecutor !== 'function') return ctx.tools.execute(input)
   const batch = await ctx.tools.execute({
     signal: input.signal,
     calls: [{ type: 'tool-call', id: input.callId, name: input.name, arguments: JSON.stringify(input.arguments) }],
@@ -23,7 +23,7 @@ test('browser handoff and resume return valid DSH outputs and clear the Bot hold
   const ctx = new Context()
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
-  await ctx.plugin(NativeToolExecutor)
+  if (typeof ctx.tools.setExecutor === 'function') await ctx.plugin(await import('@deepseek-ai/dsh-tool-executor-native'))
   t.after(async () => ctx.fiber.dispose())
 
   let hold = null
@@ -94,7 +94,7 @@ test('browser tools refuse every operation while a user hold is active', async t
   const ctx = new Context()
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
-  await ctx.plugin(NativeToolExecutor)
+  if (typeof ctx.tools.setExecutor === 'function') await ctx.plugin(await import('@deepseek-ai/dsh-tool-executor-native'))
   t.after(async () => ctx.fiber.dispose())
   const hold = { by: 'user', reason: 'stopped', note: 'The user is controlling this browser.' }
   const plugin = inner => {
@@ -138,7 +138,7 @@ test('browser endpoint connection uses the execution Bot identity, not tool argu
   const ctx = new Context()
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
-  await ctx.plugin(NativeToolExecutor)
+  if (typeof ctx.tools.setExecutor === 'function') await ctx.plugin(await import('@deepseek-ai/dsh-tool-executor-native'))
   t.after(async () => ctx.fiber.dispose())
   let connected
   const plugin = inner => {
@@ -174,7 +174,7 @@ test('a channel user hold closes the cached Playwright session and give-back rec
   const ctx = new Context()
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
-  await ctx.plugin(NativeToolExecutor)
+  if (typeof ctx.tools.setExecutor === 'function') await ctx.plugin(await import('@deepseek-ai/dsh-tool-executor-native'))
   t.after(async () => ctx.fiber.dispose())
   let hold = null
   let notifyHold
