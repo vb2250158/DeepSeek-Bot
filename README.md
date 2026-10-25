@@ -1,11 +1,11 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/logo-dark.svg">
-    <img src="docs/images/logo.svg" alt="DeepSeek Bot" width="260">
+    <img src="docs/images/logo.svg" alt="DS Bot" width="260">
   </picture>
 </p>
 
-# DeepSeek Bot
+# DS Bot
 
 `0.2.0-rabi.1` integrates upstream 0.2.0: group-scoped memory, structured view cards, photos, thinking levels and live turn metrics. This fork keeps equal team-management rights, independent pinned chats, the native Bot panel, Rabi-owned context and memory, group libraries and interrupted-turn recovery.
 
@@ -33,7 +33,7 @@ This is the [vb2250158 maintenance fork](https://github.com/vb2250158/DeepSeek-B
 
 ![version](https://img.shields.io/badge/version-v0.2_preview-blue) ![DSH](https://img.shields.io/badge/DSH-0.2.1--rc.2-4D6BFE) ![license](https://img.shields.io/badge/license-Apache_2.0-green)
 
-DeepSeek Bot (DS Bot) is a bot plugin for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH). It turns DSH into bots. You create your own bots, then talk and work with them.
+DS Bot is a bot plugin for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH). It turns DSH into bots. You create your own bots, then talk and work with them.
 
 ![Say one sentence to Chief, and it sets up the bots and the group chat](docs/images/team.png)
 
@@ -59,7 +59,7 @@ For this fork's host and browser clients, follow [Host deployment](host/README.m
 
 **Desktop app (Windows, macOS, Linux)**
 
-The desktop app brings its own DSH, so you don't need to install DSH first. Download it from [Releases](https://github.com/Fei2411/DeepSeek-Bot/releases):
+The desktop app brings its own DSH, so you don't need to install DSH first. Download it from [Releases](https://github.com/Fei2411/DS-Bot/releases):
 
 - Windows (x64): `DeepSeek-Bot-<version>-win-x64.exe`. Run it; it installs for your user only, without administrator rights. If Windows shows "Windows protected your PC", select **More info** → **Run anyway**.
 - macOS: `DeepSeek-Bot-<version>-mac-arm64.zip` for an Apple chip, `DeepSeek-Bot-<version>-mac-x64.zip` for Intel. Safari unzips it by itself; drag **DeepSeek Bot** into **Applications** and open it. When macOS says it cannot check the app, open **System Settings** → **Privacy & Security** and select **Open Anyway**.
@@ -77,7 +77,9 @@ First install DSH and set up at least one model in it. DS Bot uses the models fr
 2. In **Package name or address**, enter `ds-bot`. In mainland China, set **Registry** to **Mainland China mirror**.
 3. Select **Install**, then **Enable now**. If DSH says the change takes effect at the next start, quit DSH completely and open it again.
 
-If npm is not reachable, in step 2 you can also enter the full path of `ds-bot-0.2.1.tgz` downloaded from [Releases](https://github.com/Fei2411/DeepSeek-Bot/releases), or `github:Fei2411/DeepSeek-Bot#v0.2.1&path:/ds-bot` (needs Git).
+If npm is not reachable, in step 2 you can also enter the full path of `ds-bot-0.2.1.tgz` downloaded from [Releases](https://github.com/Fei2411/DS-Bot/releases), or `github:Fei2411/DS-Bot#v0.2.1&path:/ds-bot` (needs Git).
+
+DS Bot 0.2.1 and earlier cannot update themselves in DSH Desktop 0.2.1-rc.2 or later: on the Plugins page, remove `ds-bot` and add `ds-bot` again. The Bots, chats and memory stay.
 
 **DSH Web (Windows, macOS, Linux)**
 
@@ -166,3 +168,6 @@ The plugin source is in [`ds-bot/`](ds-bot/). For options and internals, see [`d
 DS Bot is an independent community project. **It is not an official DeepSeek product**, and it is not affiliated with, endorsed by or sponsored by DeepSeek. "DeepSeek", "DeepSeek Harness" and the other names are trademarks of their owners. They are used here only to say what this plugin works with.
 
 Bots use your own model quota, and they read and write files and run commands when you ask them to. Check important actions yourself.
+# Maintenance release 0.2.2-rabi.1
+
+Integrates upstream 0.2.2 while preserving the Rabi workbench, group library, shared team permissions, model picker and asynchronous client loader. Browser grants remain user-owned; named Bot requests, memory journals and delegated results retain their upstream recovery checks. Tests use the selected DSH runtime, including the rc.3 native tool executor.

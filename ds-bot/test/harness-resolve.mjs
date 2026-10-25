@@ -46,6 +46,10 @@ registerHooks({
       if (specifier === '@deepseek-ai/dsh-session-reference' && existsSync(reference)) {
         return nextResolve(specifier, { ...context, parentURL: pathToFileURL(reference).href })
       }
+      const toolTestkit = resolve(harness, 'packages/test-support/tool-testkit/package.json')
+      if (specifier === '@deepseek-ai/dsh-tool-testkit' && existsSync(toolTestkit)) {
+        return nextResolve(specifier, { ...context, parentURL: pathToFileURL(toolTestkit).href })
+      }
       return nextResolve(specifier, { ...context, parentURL: anchor })
     }
     return nextResolve(specifier, context)

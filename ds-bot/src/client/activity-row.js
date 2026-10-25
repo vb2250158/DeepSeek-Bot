@@ -118,13 +118,19 @@ export function ActivityIndicator({ sessionId, useRoster, useSessionStatus, useL
     .filter(sub => sub.placement !== 'queued').map(sub => sub.time)))
   const bot = roster.byId[sessionId]
   const room = roster.roomsById[sessionId]
+  // The one switch the row names: a working-folder move jumps the chat to a fresh
+  // part while a turn is not running, so without it the conversation just empties.
+  const moveAt = useWork?.((work) => {
+    const entry = bot === undefined ? undefined : work.bots?.[bot.id]
+    return entry?.switching === true && entry.folder === true && entry.roomId === undefined ? entry.since : 0
+  }) ?? 0
   const entries = useMemo(() => Object.values(JSON.parse(liveKey)), [liveKey])
   const streaming = entries.some(entry => entry.text)
   const tools = entries.filter(entry => !entry.text).sort((a, b) => a.at - b.at)
   // Group chats show who is typing on their own while members speak.
   const relaying = tools.some(entry => entry.relay)
-  const active = running || pendingInput > 0
-  const visible = rowVisible({ running: active, streaming, tools, relaying, bot, room }) && !(room && membersWorking)
+  const active = running || pendingInput > 0 || moveAt !== 0
+  const visible = (moveAt !== 0 || rowVisible({ running: active, streaming, tools, relaying, bot, room })) && !(room && membersWorking)
   const tool = tools.at(-1)
   const inputRef = useRef(0)
   // A steer keeps the run going, so nothing else resets the row: fresh input is
@@ -133,11 +139,12 @@ export function ActivityIndicator({ sessionId, useRoster, useSessionStatus, useL
   inputRef.current = inputAt
   const want = !visible ? null
     : hook?.state === 'running' ? { key: `rabi:${hook.point}`, label: t(hook.point === 'SessionStart' || hook.point === 'UserPromptSubmit' ? 'Connecting to Rabi and reading context' : 'Synchronizing with Rabi'), state: 'working' }
-    : pendingInput > 0 && !running ? { key: 'submitting', label: t('Sending message'), state: 'thinking' }
-    : inputAt > (tool?.at ?? 0)
-      ? { key: `input:${inputAt}`, pool: PHRASES.thinking, state: 'thinking' }
-      : tool ? { key: tool.label ? `tool:${tool.label}` : 'working', label: tool.label, pool: PHRASES.working, state: tool.state ?? 'working' }
-        : { key: 'thinking', pool: PHRASES.thinking, state: 'thinking' }
+      : moveAt !== 0 ? { key: 'move', label: t('Switching working folder'), state: 'thinking' }
+        : pendingInput > 0 && !running ? { key: 'submitting', label: t('Sending message'), state: 'thinking' }
+          : inputAt > (tool?.at ?? 0)
+            ? { key: `input:${inputAt}`, pool: PHRASES.thinking, state: 'thinking' }
+            : tool ? { key: tool.label ? `tool:${tool.label}` : 'working', label: tool.label, pool: PHRASES.working, state: tool.state ?? 'working' }
+              : { key: 'thinking', pool: PHRASES.thinking, state: 'thinking' }
   const [shown, setShown] = useState(null)
   const wantKey = want?.key ?? null
   const markState = useRef('thinking')
@@ -191,7 +198,7 @@ export function ActivityIndicator({ sessionId, useRoster, useSessionStatus, useL
     bot ? h(BotMark, { bot, size: 28, state: markState.current, live: true, pokeable: true }) : h(RoomAvatar, { room, roster, size: 28 }),
     h('span', { className: 'bt-typing-text' },
       h('span', { key: `${shown.key}:${shown.at}`, className: 'bt-typing-label' }, h(Shimmer, null, `${shown.text}…`)),
-      h(Elapsed, { at: Math.max(turnAt ?? runAt.current, inputAt), className: 'bt-typing-time' }))), host)
+      h(Elapsed, { at: moveAt !== 0 ? moveAt : Math.max(turnAt ?? runAt.current, inputAt), className: 'bt-typing-time' }))), host)
 }
 
 

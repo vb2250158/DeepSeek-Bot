@@ -1,11 +1,11 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/logo-dark.svg">
-    <img src="docs/images/logo.svg" alt="DeepSeek Bot" width="260">
+    <img src="docs/images/logo.svg" alt="DS Bot" width="260">
   </picture>
 </p>
 
-# DeepSeek Bot
+# DS Bot
 
 `0.2.0-rabi.1` 合入上游 0.2.0 的群记忆、结构化卡片、头像、思考档位和运行统计；保留团队平权、独立置顶、原生 Bot 面板、Rabi 上下文与记忆归属、群资料库和中断续作。
 
@@ -31,7 +31,7 @@ Bot 聊天不显示手动继续或重试按钮。中断任务和额度失败由 
 
 ![版本](https://img.shields.io/badge/版本-v0.2_预览-blue) ![DSH](https://img.shields.io/badge/DSH-0.2.1--rc.2-4D6BFE) ![许可](https://img.shields.io/badge/许可-Apache_2.0-green)
 
-DeepSeek Bot（简称 DS Bot）是一个基于 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（简称 dsh）的 bot 插件，插件将 dsh 改造为 bot 形式。你可以与自己创建的 bot 交流、工作。
+DS Bot 是一个基于 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（简称 dsh）的 bot 插件，插件将 dsh 改造为 bot 形式。你可以与自己创建的 bot 交流、工作。
 
 ![和 Chief 说一句话，它就把 bot 和群聊建好](docs/images/team.zh.png)
 
@@ -57,7 +57,7 @@ DS Bot 默认跟随当前 DSH 皮肤及浅色、深色模式。在 **设置 → 
 
 **桌面应用（Windows、macOS、Linux）**
 
-桌面应用自带 dsh，不用先装 dsh。在 [Releases](https://github.com/Fei2411/DeepSeek-Bot/releases) 里下载：
+桌面应用自带 dsh，不用先装 dsh。在 [Releases](https://github.com/Fei2411/DS-Bot/releases) 里下载：
 
 - Windows（x64）：`DeepSeek-Bot-<版本>-win-x64.exe`。运行它即可安装，只装给当前用户，不要管理员权限。如果提示“Windows 已保护你的电脑”，点 **更多信息** → **仍要运行**。
 - macOS：Apple 芯片下载 `DeepSeek-Bot-<版本>-mac-arm64.zip`，Intel 下载 `DeepSeek-Bot-<版本>-mac-x64.zip`。Safari 会自动解压；把 **DeepSeek Bot** 拖进 **应用程序**，再打开。如果提示无法检查这个 App，打开 **系统设置** → **隐私与安全性**，点 **仍要打开**。
@@ -75,7 +75,9 @@ DS Bot 默认跟随当前 DSH 皮肤及浅色、深色模式。在 **设置 → 
 2. **包名或地址** 填 `ds-bot`。在中国大陆，**安装源** 选 **中国大陆镜像源**。
 3. 点 **安装**，再点 **立即启用**。如果提示“下次启动生效”，完全退出 dsh 再打开。
 
-连不上 npm 时，第 2 步也可以填 [Releases](https://github.com/Fei2411/DeepSeek-Bot/releases) 里下载的 `ds-bot-0.2.1.tgz` 的完整路径，或者 `github:Fei2411/DeepSeek-Bot#v0.2.1&path:/ds-bot`（需要装 Git）。
+连不上 npm 时，第 2 步也可以填 [Releases](https://github.com/Fei2411/DS-Bot/releases) 里下载的 `ds-bot-0.2.1.tgz` 的完整路径，或者 `github:Fei2411/DS-Bot#v0.2.1&path:/ds-bot`（需要装 Git）。
+
+DS Bot 0.2.1 及更早的版本在 DSH Desktop 0.2.1-rc.2 及以后的版本里不能自己更新：在插件页移除 `ds-bot`，再添加 `ds-bot`。Bot、聊天和记忆都会保留。
 
 **dsh Web（Windows、macOS、Linux）**
 
@@ -164,3 +166,6 @@ ds bot 拥有群聊功能。群聊是非常好的多 bot 协作方式，但它�
 ds bot 是独立的社区项目，**不是 DeepSeek 官方产品**，与 DeepSeek 没有隶属、认可或赞助关系。“DeepSeek”“DeepSeek Harness”等名称是各自所有者的商标，这里只用来说明本插件和什么一起用。
 
 bot 会消耗你自己的模型额度，也会按你的要求读写文件、运行命令。重要的操作请自己检查。
+# 维护版 0.2.2-rabi.1
+
+合入上游 0.2.2，保留 Rabi 工作台、群资料库、团队共同管理权限、模型选择器和异步前端加载。浏览器授权仍由用户维护；具名 Bot 请求、记忆事务和委派结果保留上游恢复检查。测试使用选定的 DSH 运行时，包含 rc.3 原生工具执行器。
