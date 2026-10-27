@@ -33,13 +33,24 @@ export function install(rt) {
 
   // The index on disk, with the entries that can be trusted: an id that is a hash, a
   // known type, and a name that is text.
-  const readIndex = async () => {
+  const readIndex = async ({ forWrite = false } = {}) => {
     if (indexPath === undefined) return []
     let parsed
-    try { parsed = JSON.parse(await readFile(indexPath, 'utf8')) } catch { return [] }
-    const items = Array.isArray(parsed?.items) ? parsed.items : []
-    return items
-      .filter(entry => typeof entry?.id === 'string' && HASH.test(entry.id) && EXTENSIONS[entry.mime] !== undefined)
+    try { parsed = JSON.parse(await readFile(indexPath, 'utf8')) } catch (error) {
+      if (error?.code === 'ENOENT') return []
+      throw Object.assign(new Error('The saved avatar library index could not be read. Restore or repair it before changing photos.'), {
+        code: 'bot/avatar-index-unreadable', cause: { name: error?.name, code: error?.code },
+      })
+    }
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed) || parsed.version !== 1 || !Array.isArray(parsed.items)) {
+      throw Object.assign(new Error('The saved avatar library index is damaged. Restore or repair it before changing photos.'), { code: 'bot/avatar-index-invalid' })
+    }
+    const items = parsed.items
+    const readable = items.filter(entry => typeof entry?.id === 'string' && HASH.test(entry.id) && typeof entry.mime === 'string' && Object.hasOwn(EXTENSIONS, entry.mime))
+    if (forWrite && readable.length !== items.length) {
+      throw Object.assign(new Error('The avatar library has damaged entries. Existing photos are still readable; repair its index before changing photos.'), { code: 'bot/avatar-index-invalid' })
+    }
+    return readable
       .map(entry => ({
         id: entry.id,
         name: String(entry.name ?? '').slice(0, 120),
@@ -70,7 +81,7 @@ export function install(rt) {
   // picture is checked as an image, and the same bytes are kept once.
   const importPhotos = (items) => serial(async () => {
     if (root === undefined) throw new Error('This host keeps no Bot data folder, so it has no avatar library.')
-    const index = await readIndex()
+    const index = await readIndex({ forWrite: true })
     const result = { imported: [], duplicates: [], failed: [] }
     for (const item of items) {
       const name = String(item?.name ?? '').trim().slice(0, 120)
@@ -119,7 +130,7 @@ export function install(rt) {
 
   // A photo leaves the library; the Bots that use it keep their own copy.
   const deletePhoto = (id) => serial(async () => {
-    const index = await readIndex()
+    const index = await readIndex({ forWrite: true })
     const entry = index.find(item => item.id === id)
     if (entry === undefined) return false
     await writeIndex(index.filter(item => item.id !== id))

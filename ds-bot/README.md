@@ -285,3 +285,5 @@ dev/check.sh                             # all checks (see below)
 ## License
 
 [Apache-2.0](LICENSE)
+
+A missing avatar-library index starts an empty library. An unreadable or damaged saved index is preserved and blocks photo imports and removals until it is repaired. If only some entries are damaged, valid photos remain visible; changing the catalog still requires repairing those entries first.

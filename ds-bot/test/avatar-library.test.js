@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import fsPromises from 'node:fs/promises'
+import { syncBuiltinESMExports } from 'node:module'
 import { hostname, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
@@ -63,13 +65,24 @@ test('an image whose index write failed is not treated as an imported duplicate'
   const { call, stop } = start(home)
   t.after(async () => { await stop(); rmSync(home, { recursive: true, force: true, maxRetries: 5 }) })
   const index = join(home, 'avatars', 'index.json')
-  mkdirSync(index, { recursive: true })
+  mkdirSync(join(home, 'avatars'), { recursive: true })
+  writeFileSync(index, JSON.stringify({ version: 1, items: [] }))
+  let failIndex = true
+  let indexWriteAttempts = 0
+  const rename = fsPromises.rename
+  const replacement = t.mock.method(fsPromises, 'rename', async (from, to) => {
+    if (failIndex && to === index) { indexWriteAttempts++; throw Object.assign(new Error('synthetic index write failure'), { code: 'EIO' }) }
+    return rename(from, to)
+  })
+  syncBuiltinESMExports()
+  t.after(() => { replacement.mock.restore(); syncBuiltinESMExports() })
   const result = (await call('avatar-import', { items: [{ name: 'first.png', image: pngUrl }, { name: 'again.png', image: pngUrl }] })).value
   assert.equal(result.failed.length, 2)
   assert.equal(result.imported.length, 0)
   assert.equal(result.duplicates.length, 0)
   assert.equal((await call('avatar-library', {})).value.total, 0)
-  rmSync(index, { recursive: true })
+  assert.equal(indexWriteAttempts, 2)
+  failIndex = false
   const retry = (await call('avatar-import', { items: [{ name: 'first.png', image: pngUrl }, { name: 'again.png', image: pngUrl }] })).value
   assert.equal(retry.imported.length, 1)
   assert.equal(retry.duplicates.length, 1)
@@ -283,4 +296,110 @@ test('a Bot cannot reach the library: no tool offers it', async (t) => {
     assert.match(schema.properties.avatar.description, /local image path.*data URL/)
   }
   assert.equal(existsSync(join(home, 'avatars')), false)
+})
+
+for (const [label, contents] of [
+  ['invalid JSON', '{"version":1,"items":['],
+  ['invalid items object', JSON.stringify({ version: 1, items: {} })],
+  ['missing items', JSON.stringify({ version: 1 })],
+  ['unsupported envelope', JSON.stringify([])],
+  ['unsupported version', JSON.stringify({ version: 2, items: [] })],
+]) test(`an existing avatar index with ${label} is preserved on import and delete`, async t => {
+  const home = makeHome()
+  const { call, stop } = start(home)
+  t.after(async () => { await stop(); rmSync(home, { recursive: true, force: true, maxRetries: 5 }) })
+  mkdirSync(join(home, 'avatars'), { recursive: true })
+  const index = join(home, 'avatars', 'index.json')
+  writeFileSync(index, contents)
+  const before = readFileSync(index)
+  for (const [endpoint, payload] of [['avatar-import', { items: [{ name: 'new.png', image: pngUrl }] }], ['avatar-delete', { id: 'any' }]]) {
+    const result = await call(endpoint, payload)
+    assert.equal(result.ok, false)
+    assert.match(result.error.message, /index.*(?:read|damaged)/)
+    assert.deepEqual(readFileSync(index), before)
+  }
+  assert.equal(existsSync(join(home, 'avatars', 'files')), false)
+})
+
+test('readable photos remain listed beside damaged entries while mutations preserve the original index', async t => {
+  const home = makeHome()
+  const { call, stop } = start(home)
+  t.after(async () => { await stop(); rmSync(home, { recursive: true, force: true, maxRetries: 5 }) })
+  const imported = (await call('avatar-import', { items: [{ name: 'kept.png', image: pngUrl }] })).value.imported[0]
+  const index = join(home, 'avatars', 'index.json')
+  const saved = JSON.parse(readFileSync(index, 'utf8'))
+  saved.items.push(null, { id: 'broken', mime: 'image/png', name: 'damaged' })
+  writeFileSync(index, JSON.stringify(saved))
+  const before = readFileSync(index)
+  const listed = (await call('avatar-library', {})).value
+  assert.equal(listed.total, 1)
+  assert.equal(listed.items.length, 1)
+  assert.equal(listed.items[0].id, imported.id)
+  assert.equal(listed.items[0].image, pngUrl)
+  for (const [endpoint, payload] of [['avatar-import', { items: [{ name: 'new.jpg', image: jpegUrl }] }], ['avatar-delete', { id: imported.id }]]) {
+    const result = await call(endpoint, payload)
+    assert.equal(result.ok, false)
+    assert.match(result.error.message, /damaged entries/)
+    assert.deepEqual(readFileSync(index), before)
+  }
+  assert.equal(existsSync(join(home, 'avatars', 'files', imported.id + '.png')), true)
+})
+
+test('an existing unreadable avatar index is rejected without creating photo files', async t => {
+  const home = makeHome()
+  const { call, stop } = start(home)
+  t.after(async () => { await stop(); rmSync(home, { recursive: true, force: true, maxRetries: 5 }) })
+  const index = join(home, 'avatars', 'index.json')
+  mkdirSync(index, { recursive: true })
+  const result = await call('avatar-import', { items: [{ name: 'new.png', image: pngUrl }] })
+  assert.equal(result.ok, false)
+  assert.match(result.error.message, /index could not be read/)
+  assert.deepEqual(readdirSync(index), [])
+  assert.equal(existsSync(join(home, 'avatars', 'files')), false)
+})
+
+test('an access-denied avatar index preserves its bytes and refuses mutation', async t => {
+  const home = makeHome()
+  const { call, stop } = start(home)
+  t.after(async () => { await stop(); rmSync(home, { recursive: true, force: true, maxRetries: 5 }) })
+  mkdirSync(join(home, 'avatars'), { recursive: true })
+  const index = join(home, 'avatars', 'index.json')
+  writeFileSync(index, JSON.stringify({ version: 1, items: [] }))
+  const before = readFileSync(index)
+  const read = fsPromises.readFile
+  const replacement = t.mock.method(fsPromises, 'readFile', async (file, ...args) => {
+    if (file === index) throw Object.assign(new Error('synthetic access denied'), { code: 'EACCES' })
+    return read(file, ...args)
+  })
+  syncBuiltinESMExports()
+  t.after(() => { replacement.mock.restore(); syncBuiltinESMExports() })
+  for (const [endpoint, payload] of [['avatar-import', { items: [{ name: 'new.png', image: pngUrl }] }], ['avatar-delete', { id: 'any' }]]) {
+    const result = await call(endpoint, payload)
+    assert.equal(result.ok, false)
+    assert.match(result.error.message, /index could not be read/)
+    assert.deepEqual(readFileSync(index), before)
+  }
+  assert.equal(existsSync(join(home, 'avatars', 'files')), false)
+})
+
+test('prototype MIME keys in the saved index stay unreadable and prevent catalog rewrites', async t => {
+  const home = makeHome()
+  const { call, stop } = start(home)
+  t.after(async () => { await stop(); rmSync(home, { recursive: true, force: true, maxRetries: 5 }) })
+  const imported = (await call('avatar-import', { items: [{ name: 'kept.png', image: pngUrl }] })).value.imported[0]
+  const index = join(home, 'avatars', 'index.json')
+  const saved = JSON.parse(readFileSync(index, 'utf8'))
+  saved.items.push({ id: 'a'.repeat(64), mime: 'constructor' }, { id: 'b'.repeat(64), mime: '__proto__' }, { id: 'c'.repeat(64), mime: ['image/png'] })
+  writeFileSync(index, JSON.stringify(saved))
+  const before = readFileSync(index)
+  const listed = (await call('avatar-library', {})).value
+  assert.equal(listed.total, 1)
+  assert.deepEqual(listed.items.map(entry => entry.id), [imported.id])
+  for (const [endpoint, payload] of [['avatar-import', { items: [{ name: 'new.jpg', image: jpegUrl }] }], ['avatar-delete', { id: imported.id }]]) {
+    const result = await call(endpoint, payload)
+    assert.equal(result.ok, false)
+    assert.match(result.error.message, /damaged entries/)
+    assert.deepEqual(readFileSync(index), before)
+  }
+  assert.equal(existsSync(join(home, 'avatars', 'files', imported.id + '.png')), true)
 })
