@@ -1,4 +1,6 @@
 <p align="center">
+
+Private maintenance 0.2.3-rabi.1 integrates upstream 0.2.3 with avatar storage, browser handoff and steering fixes. It retains the native DSH team panel, Rabi bindings and group library; avatar-library controls stay separate from group documents. Tests use the rc.3 tool executor and authenticated API route.
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/logo-dark.svg">
     <img src="docs/images/logo.svg" alt="DS Bot" width="260">

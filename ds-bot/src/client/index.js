@@ -18,6 +18,7 @@ import { VOICE_BUNDLE } from './speech.js'
 import { sameVersion } from './dsh-offer.js'
 import { QuestionCard, QuestionDock } from './questions.js'
 import { AnsweredReply, WidgetDock, WIDGET_CSS } from './widget-cell.js'
+import { HandoffDock, HANDOFF_CSS } from './handoff-card.js'
 import { installHeaderNavigation } from './header-navigation.js'
 import { AssistantCell, TriggerCell, TurnProcessCell, Nothing, TurnTailCell, ToolCell } from './cells.js'
 import { Overlays } from './overlays.js'
@@ -26,6 +27,7 @@ import { BROWSER_CSS } from './browser-pane.js'
 import { SECRET_CSS, SecretDock } from './secret-card.js'
 import { MODEL_CSS, ModelChoiceDock, DeepSeekSignIn } from './model-menu.js'
 import { BOT_SETTINGS_CSS } from './bot-settings.js'
+import { AVATAR_LIBRARY_CSS } from './avatar-library.js'
 import { GROUP_SETTINGS_CSS } from './group-settings.js'
 import { FOLDER_CSS } from './folder-menu.js'
 import { USAGE_CSS } from './usage-page.js'
@@ -380,6 +382,28 @@ export function apply(ctx) {
     for (const [id, owner] of pendingAdopt) if (owner === agentId && !ids.includes(id)) ids.push(id)
     return ids
   }
+  const mainView = () => Object.values(ctx.sessions.list.getSnapshot().byId ?? {}).find(session => (session?.retainedBy?.mainView ?? 0) > 0)?.id
+  // Bot mode's view must hold a team conversation; an outside Session wears the
+  // Bot skin without one. Runs whenever the surface is (or stays) Bot mode —
+  // including a cold start, where no setSurface call ever fires.
+  const homeToMainBot = () => {
+    const snapshot = roster.getSnapshot()
+    if (!snapshot.ready || !snapshot.mainBotId) return
+    const main = mainView()
+    if (main !== undefined && snapshot.byId[main] === undefined && snapshot.roomsById[main] === undefined) {
+      actions.openSession(snapshot.mainBotId)
+    }
+  }
+  const ensureBotHome = () => {
+    if (roster.getSnapshot().ready) homeToMainBot()
+    else {
+      const off = roster.subscribe(() => {
+        if (!roster.getSnapshot().ready) return
+        off()
+        homeToMainBot()
+      })
+    }
+  }
   const actions = {
     ...teamActions({ call, after, partFor, roster, ui, live, cards, heldCards, turnClock }),
     // The full-pane overlays sit above the conversation, so opening one must dismiss them
@@ -468,32 +492,17 @@ export function apply(ctx) {
     setSurface: (mode) => {
       if (mode !== 'bot' && mode !== 'agent') return
       if (mode === 'bot' && ctx.layout.panelInfo.getSnapshot().activePanelId !== BOT_PANEL) ctx.layout.selectPanel(BOT_PANEL)
-      if (surface.getSnapshot().mode === mode) return
+      if (surface.getSnapshot().mode === mode) {
+        if (mode === 'bot') ensureBotHome()
+        return
+      }
       if (mode === 'agent') {
         ui.set(state => ({ ...state, details: null, view: 'details', settings: null, palette: null, newChat: null, menu: null, voice: null, exchange: null, memory: null, toast: null }))
       }
       writeMode(mode)
       surface.set(state => ({ ...state, mode }))
       if (mode !== 'bot') return
-      // Back in Bot mode the view must hold a team conversation; an outside
-      // Session left over from Agent mode would wear the Bot skin without one.
-      const home = () => {
-        const snapshot = roster.getSnapshot()
-        if (!snapshot.ready || !snapshot.mainBotId) return
-        const list = ctx.sessions.list.getSnapshot()
-        const main = Object.values(list.byId ?? {}).find(session => (session?.retainedBy?.mainView ?? 0) > 0)?.id
-        if (main !== undefined && snapshot.byId[main] === undefined && snapshot.roomsById[main] === undefined) {
-          actions.openSession(snapshot.mainBotId)
-        }
-      }
-      if (roster.getSnapshot().ready) home()
-      else {
-        const off = roster.subscribe(() => {
-          if (!roster.getSnapshot().ready) return
-          off()
-          home()
-        })
-      }
+      ensureBotHome()
     },
     markUnread: id => writeUnread(id, true),
     beginVisit: (id) => {
@@ -587,8 +596,9 @@ export function apply(ctx) {
         await bridge.views.hold(botId, true)
         return result
       } : undefined,
-      browserGiveBack: bridge.views ? async botId => {
-        const result = await call('browser-give-back', { botId })
+      // `answer` is a handoff card's { callId, outcome }; the panel's Give back sends none.
+      browserGiveBack: bridge.views ? async (botId, answer = {}) => {
+        const result = await call('browser-give-back', { botId, ...answer })
         await bridge.views.hold(botId, false)
         return result
       } : undefined,
@@ -813,7 +823,7 @@ export function apply(ctx) {
     () => installCompiledStyles(SHELL_CSS, 'shell'),
     () => installCompiledStyles(SIDEBAR_CSS, 'sidebar'),
     () => installCompiledStyles(SECRET_CSS, 'secrets'),
-    () => installCompiledStyles(MODEL_CSS + FOLDER_CSS + BOT_SETTINGS_CSS + GROUP_SETTINGS_CSS, 'models'),
+    () => installCompiledStyles(MODEL_CSS + FOLDER_CSS + BOT_SETTINGS_CSS + GROUP_SETTINGS_CSS + AVATAR_LIBRARY_CSS, 'models'),
     () => installCompiledStyles(USAGE_CSS, 'usage'),
     () => installCompiledStyles(SCHEDULE_CSS, 'schedules'),
     () => installCompiledStyles(FEEDBACK_CSS, 'feedback'),
@@ -821,6 +831,7 @@ export function apply(ctx) {
     () => installCompiledStyles(MEMBER_CSS, 'members'),
     () => installCompiledStyles(USER_MESSAGE_CSS, 'user-messages'),
     () => installCompiledStyles(WIDGET_CSS, 'widgets'),
+    () => installCompiledStyles(HANDOFF_CSS, 'handoff'),
     () => installCompiledStyles(SIDE_CSS, 'side'),
     // Strip and panel styles also serve the side-chat tabs, which need no bridge.
     () => installCompiledStyles(BROWSER_CSS, 'browser'),
@@ -875,6 +886,7 @@ export function apply(ctx) {
     () => shadow('conversation.input.dock', { id: 'bot-question', order: -100, inject: face }, QuestionDock),
     () => shadow('conversation.input.dock', { id: 'bot-view', order: -95, inject: face }, WidgetDock),
     () => shadow('conversation.input.dock', { id: 'bot-secret', order: -90, inject: face }, SecretDock),
+    () => shadow('conversation.input.dock', { id: 'bot-handoff', order: -85, inject: face }, HandoffDock),
   ]
   shadow('main', { key: BOT_PANEL, children: {
     'bot.team': { kind: 'single', scope: 'root' },
@@ -923,6 +935,9 @@ export function apply(ctx) {
       // workspace picker, or a fork of a Session the same Agent owns. An existing
       // Session the user opened from the sidebar keeps its team tools and stays out.
       const row = list.byId[main]
+      // A subagent child reports the Agent Session as its parent, but adopting it
+      // would steal it from subagent routing — the Host refuses anyway, so skip.
+      if (row?.origin === 'subagent') return
       // The client list maps the fork's parent to `parentId`; the raw field is
       // the fallback for shapes that skip the mapping.
       const parent = row?.parentId ?? row?.parentSessionId
@@ -955,11 +970,50 @@ export function apply(ctx) {
     const groups = surfaceGroups({ shell: installShell, conversation: installConversation }, {
       onError: (_group, error) => actions.reportError(new Error(t('Bot mode could not be set up here: {error}', { error: error?.message ?? String(error) })), 'surface'),
     })
-    const reconcile = () => groups.reconcile(groupsFor(surface.getSnapshot()))
+    // A shadow step can mount "successfully" with nothing registered: when a
+    // slot's inject callback throws inside the host, the host cancels the
+    // declaration's subscription but the step's disposer still counts the group
+    // as mounted. After the shell goes on, check that its sidebar entry really
+    // landed; remount a few times when it did not (cold start race).
+    let verifyTimer = 0
+    let verifyAttempts = 0
+    const verifySidebar = () => {
+      if (!groupsFor(surface.getSnapshot()).shell) return
+      let landed = false
+      let declared = true
+      try {
+        landed = ctx.slots.entries('bot.team').some(entry => entry.component === BotTeam)
+        declared = ctx.slots.spec?.('bot.team') !== undefined
+      } catch {
+        declared = false
+      }
+      if (landed) return
+      if (!declared) {
+        // The slot itself is not declared yet; keep watching for a while.
+        if (verifyAttempts < 20) {
+          verifyAttempts += 1
+          verifyTimer = setTimeout(verifySidebar, 250)
+        }
+        return
+      }
+      if (verifyAttempts >= 3) return
+      verifyAttempts += 1
+      console.warn('[ds-bot] team panel entry missing after shell mount; remounting')
+      groups.remount('shell')
+      verifyTimer = setTimeout(verifySidebar, 250)
+    }
+    const reconcile = () => {
+      groups.reconcile(groupsFor(surface.getSnapshot()))
+      clearTimeout(verifyTimer)
+      verifyAttempts = 0
+      verifyTimer = setTimeout(verifySidebar, 250)
+    }
     reconcile()
+    if (surface.getSnapshot().mode === 'bot') ensureBotHome()
     const unsub = surface.subscribe(reconcile)
     return () => {
       unsub()
+      clearTimeout(verifyTimer)
       groups.dispose()
     }
   }, 'ds-bot: surface')

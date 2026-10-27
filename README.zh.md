@@ -1,4 +1,6 @@
 <p align="center">
+
+私有维护版 0.2.3-rabi.1 合并上游 0.2.3 的头像库、浏览器交接和消息转向修复，保留原生 DSH 团队面板、Rabi 绑定与群资料库；头像库与群资料使用不同入口。测试适配 rc.3 执行器和已认证 API 路由。
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/logo-dark.svg">
     <img src="docs/images/logo.svg" alt="DS Bot" width="260">
