@@ -15008,7 +15008,6 @@ function ComposerPlus({ sessionId, inputActions, useRoster, actions }) {
     };
   }, [open]);
   const target = roster.byId?.[sessionId]?.id ?? roster.roomsById?.[sessionId]?.id;
-  if (sessionId === void 0 || target === void 0) return null;
   const fileInput = () => button.current?.closest("[data-composer-card]")?.querySelector("input[type=file]");
   const toggle = () => {
     if (open) {
@@ -15035,6 +15034,7 @@ function ComposerPlus({ sessionId, inputActions, useRoster, actions }) {
     const rect = button.current.getBoundingClientRect();
     return { left: rect.left, bottom: viewBottom() - rect.top + 8 };
   }, [shown, open, tick]);
+  if (sessionId === void 0 || target === void 0) return null;
   return (0, import_react37.createElement)(
     import_react37.Fragment,
     null,
