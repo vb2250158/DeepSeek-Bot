@@ -1,3 +1,4 @@
+import { rosterReadiness } from './roster-readiness.js'
 import { call } from './api.js'
 import { isHex, inkText, paintCss } from './inks.js'
 import { DEFAULT_MASK, SHAPES, markupCache, maskOf } from './characters.js'
@@ -387,6 +388,7 @@ export function apply(ctx) {
   // Bot skin without one. Runs whenever the surface is (or stays) Bot mode —
   // including a cold start, where no setSurface call ever fires.
   const homeToMainBot = () => {
+    if (surface.getSnapshot().mode !== "bot") return
     const snapshot = roster.getSnapshot()
     if (!snapshot.ready || !snapshot.mainBotId) return
     const main = mainView()
@@ -394,16 +396,9 @@ export function apply(ctx) {
       actions.openSession(snapshot.mainBotId)
     }
   }
-  const ensureBotHome = () => {
-    if (roster.getSnapshot().ready) homeToMainBot()
-    else {
-      const off = roster.subscribe(() => {
-        if (!roster.getSnapshot().ready) return
-        off()
-        homeToMainBot()
-      })
-    }
-  }
+  const homeReadiness = rosterReadiness(roster, homeToMainBot)
+  const ensureBotHome = () => homeReadiness.ensure()
+  ctx.effect(() => () => homeReadiness.dispose())
   const actions = {
     ...teamActions({ call, after, partFor, roster, ui, live, cards, heldCards, turnClock }),
     // The full-pane overlays sit above the conversation, so opening one must dismiss them
@@ -497,6 +492,7 @@ export function apply(ctx) {
         return
       }
       if (mode === 'agent') {
+        homeReadiness.cancel()
         ui.set(state => ({ ...state, details: null, view: 'details', settings: null, palette: null, newChat: null, menu: null, voice: null, exchange: null, memory: null, toast: null }))
       }
       writeMode(mode)
