@@ -1,12 +1,15 @@
 import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { runInNewContext } from 'node:vm'
 import { test } from 'node:test'
 import { build } from 'esbuild'
 
 const harness = createRequire(`${process.env.DSH_HARNESS}/package.json`)
-const ui = createRequire(`${process.env.DSH_HARNESS}/packages/client/ui-primitives/package.json`)
+const face = join(process.env.DSH_HARNESS, 'packages/client/ui-primitives/package.json')
+const ui = existsSync(face) ? createRequire(face) : harness
 const React = ui('react')
 const ReactDOM = ui('react-dom')
 const { createRoot } = ui('react-dom/client')
