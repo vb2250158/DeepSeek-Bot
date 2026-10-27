@@ -3,6 +3,10 @@ import { test } from 'node:test'
 import { runInNewContext } from 'node:vm'
 import { fileURLToPath } from 'node:url'
 import { build } from 'esbuild'
+import { createRequire } from 'node:module'
+import { dirname, join } from 'node:path'
+const PLUGIN = dirname(dirname(fileURLToPath(import.meta.url)))
+const { JSDOM } = createRequire(join(process.env.DSH_HARNESS, 'package.json'))('jsdom')
 
 const bundle = await build({ stdin: { contents: "export { ActivityIndicator, rabiFailureMessage } from './src/client/activity-row.js'", resolveDir: fileURLToPath(new URL('..', import.meta.url)) }, bundle: true, format: 'cjs', platform: 'browser', write: false, logLevel: 'silent', external: ['react', 'react-dom', '@deepseek-ai/dsh-client-ui-primitives'] })
 
@@ -41,6 +45,37 @@ function fixture({ running = false, pending = [], live = {}, hook = null } = {})
   return { view, flow, message: module.exports.rabiFailureMessage }
 }
 
+// The activity row and the diagnostics it reports into, bundled once and run with a
+// minimal React stand-in; the row's DOM helpers only read `document` at call time.
+const { outputFiles } = await build({
+  stdin: {
+    contents: [
+      "export { findHost, rowVisible, freshInputAt } from './src/client/activity-row.js'",
+      "export { clientErrors } from './src/client/diagnostics.js'",
+    ].join('\n'),
+    resolveDir: PLUGIN,
+  },
+  bundle: true, format: 'cjs', platform: 'browser', write: false, logLevel: 'silent',
+  external: ['react', 'react-dom', '@deepseek-ai/dsh-client-ui-primitives'],
+})
+const react = {
+  createElement: (type, props, ...children) => ({ type, props: { ...props, children } }), Fragment: Symbol('Fragment'),
+  useEffect() {}, useLayoutEffect() {}, useState: initial => [initial, () => {}],
+  useMemo: make => make(), useRef: current => ({ current }), useId: () => 'id',
+}
+const dom = new JSDOM('<!doctype html><body></body>')
+const module = { exports: {} }
+runInNewContext(outputFiles[0].text, {
+  module, exports: module.exports,
+  document: dom.window.document,
+  window: { matchMedia: () => ({ matches: false }) },
+  MutationObserver: dom.window.MutationObserver,
+  requestAnimationFrame: fn => setTimeout(fn, 0),
+  cancelAnimationFrame: id => clearTimeout(id),
+  require: name => (name === 'react' ? react : name === 'react-dom' ? { createPortal: node => node } : {}),
+})
+const { freshInputAt } = module.exports
+
 test('submitting a message shows feedback before the Host running state exists', () => {
   const { view, flow } = fixture({ pending: [{ placement: 'transcript', time: 1 }] })
   assert.equal(view.host, flow)
@@ -72,4 +107,20 @@ test('streamed text followed by running work keeps the activity row', () => {
   const { view } = fixture({ running: true, live: { reply: { text: true }, tool: { label: 'Reading file', at: 1 } } })
   assert.equal(view.node.props.role, 'status')
   assert.match(JSON.stringify(view.node), /Reading file/)
+})
+
+// A queued message waits for the next turn; a transcript or steering send counts
+// as fresh input, and a steer the host saw counts from when it landed.
+test('fresh input ignores queued sends and takes the newest of the rest', () => {
+  const submissions = [
+    { placement: 'queued', time: 300 },
+    { placement: 'steering', time: 100 },
+    { placement: 'transcript', time: 200 },
+  ]
+  assert.equal(freshInputAt(submissions, undefined), 200)
+  assert.equal(freshInputAt(submissions, 400), 400)
+  assert.equal(freshInputAt(submissions, 50), 200)
+  assert.equal(freshInputAt([{ placement: 'queued', time: 300 }], undefined), 0)
+  assert.equal(freshInputAt(undefined, 400), 400)
+  assert.equal(freshInputAt([], undefined), 0)
 })

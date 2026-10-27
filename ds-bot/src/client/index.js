@@ -1,4 +1,3 @@
-import { rosterReadiness } from './roster-readiness.js'
 import { call } from './api.js'
 import { isHex, inkText, paintCss } from './inks.js'
 import { DEFAULT_MASK, SHAPES, markupCache, maskOf } from './characters.js'
@@ -383,22 +382,6 @@ export function apply(ctx) {
     for (const [id, owner] of pendingAdopt) if (owner === agentId && !ids.includes(id)) ids.push(id)
     return ids
   }
-  const mainView = () => Object.values(ctx.sessions.list.getSnapshot().byId ?? {}).find(session => (session?.retainedBy?.mainView ?? 0) > 0)?.id
-  // Bot mode's view must hold a team conversation; an outside Session wears the
-  // Bot skin without one. Runs whenever the surface is (or stays) Bot mode —
-  // including a cold start, where no setSurface call ever fires.
-  const homeToMainBot = () => {
-    if (surface.getSnapshot().mode !== "bot") return
-    const snapshot = roster.getSnapshot()
-    if (!snapshot.ready || !snapshot.mainBotId) return
-    const main = mainView()
-    if (main !== undefined && snapshot.byId[main] === undefined && snapshot.roomsById[main] === undefined) {
-      actions.openSession(snapshot.mainBotId)
-    }
-  }
-  const homeReadiness = rosterReadiness(roster, homeToMainBot)
-  const ensureBotHome = () => homeReadiness.ensure()
-  ctx.effect(() => () => homeReadiness.dispose())
   const actions = {
     ...teamActions({ call, after, partFor, roster, ui, live, cards, heldCards, turnClock }),
     // The full-pane overlays sit above the conversation, so opening one must dismiss them
@@ -487,18 +470,12 @@ export function apply(ctx) {
     setSurface: (mode) => {
       if (mode !== 'bot' && mode !== 'agent') return
       if (mode === 'bot' && ctx.layout.panelInfo.getSnapshot().activePanelId !== BOT_PANEL) ctx.layout.selectPanel(BOT_PANEL)
-      if (surface.getSnapshot().mode === mode) {
-        if (mode === 'bot') ensureBotHome()
-        return
-      }
+      if (surface.getSnapshot().mode === mode) return
       if (mode === 'agent') {
-        homeReadiness.cancel()
         ui.set(state => ({ ...state, details: null, view: 'details', settings: null, palette: null, newChat: null, menu: null, voice: null, exchange: null, memory: null, toast: null }))
       }
       writeMode(mode)
       surface.set(state => ({ ...state, mode }))
-      if (mode !== 'bot') return
-      ensureBotHome()
     },
     markUnread: id => writeUnread(id, true),
     beginVisit: (id) => {
@@ -966,50 +943,11 @@ export function apply(ctx) {
     const groups = surfaceGroups({ shell: installShell, conversation: installConversation }, {
       onError: (_group, error) => actions.reportError(new Error(t('Bot mode could not be set up here: {error}', { error: error?.message ?? String(error) })), 'surface'),
     })
-    // A shadow step can mount "successfully" with nothing registered: when a
-    // slot's inject callback throws inside the host, the host cancels the
-    // declaration's subscription but the step's disposer still counts the group
-    // as mounted. After the shell goes on, check that its sidebar entry really
-    // landed; remount a few times when it did not (cold start race).
-    let verifyTimer = 0
-    let verifyAttempts = 0
-    const verifySidebar = () => {
-      if (!groupsFor(surface.getSnapshot()).shell) return
-      let landed = false
-      let declared = true
-      try {
-        landed = ctx.slots.entries('bot.team').some(entry => entry.component === BotTeam)
-        declared = ctx.slots.spec?.('bot.team') !== undefined
-      } catch {
-        declared = false
-      }
-      if (landed) return
-      if (!declared) {
-        // The slot itself is not declared yet; keep watching for a while.
-        if (verifyAttempts < 20) {
-          verifyAttempts += 1
-          verifyTimer = setTimeout(verifySidebar, 250)
-        }
-        return
-      }
-      if (verifyAttempts >= 3) return
-      verifyAttempts += 1
-      console.warn('[ds-bot] team panel entry missing after shell mount; remounting')
-      groups.remount('shell')
-      verifyTimer = setTimeout(verifySidebar, 250)
-    }
-    const reconcile = () => {
-      groups.reconcile(groupsFor(surface.getSnapshot()))
-      clearTimeout(verifyTimer)
-      verifyAttempts = 0
-      verifyTimer = setTimeout(verifySidebar, 250)
-    }
+    const reconcile = () => groups.reconcile(groupsFor(surface.getSnapshot()))
     reconcile()
-    if (surface.getSnapshot().mode === 'bot') ensureBotHome()
     const unsub = surface.subscribe(reconcile)
     return () => {
       unsub()
-      clearTimeout(verifyTimer)
       groups.dispose()
     }
   }, 'ds-bot: surface')

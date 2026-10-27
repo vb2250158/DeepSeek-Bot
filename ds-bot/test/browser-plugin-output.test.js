@@ -103,7 +103,7 @@ test('a screenshot degrades to text when no attachments service is mounted', asy
   const ctx = new Context()
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
-  if (typeof ctx.tools.setExecutor === "function") await ctx.plugin(await import("@deepseek-ai/dsh-tool-executor-native"))
+  if (typeof ctx.tools.setExecutor === 'function') await ctx.plugin(await import('@deepseek-ai/dsh-tool-executor-native'))
   t.after(async () => ctx.fiber.dispose())
 
   const plugin = inner => {

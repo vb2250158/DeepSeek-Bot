@@ -9,7 +9,7 @@ Private maintenance 0.2.3-rabi.1 integrates upstream 0.2.3 with avatar storage, 
 
 # DS Bot
 
-`0.2.2-rabi.1` integrates upstream 0.2.2 browser isolation and grants, side chats, durable delegated results and request admission, transactional memory, and hot-update recovery. Rabi calls use the public scoped-executor batch API on DSH rc.3 and retain the earlier single-call API on rc.2; capability selection happens before dispatch, so an uncertain write is never retried through another API.
+`0.2.3-rabi.1` integrates the upstream 0.2.3 release, including reusable avatars, browser handoff cards and stored screenshots, task-safe conversation rollover, archived-history paging, group corrections and steering feedback. The Rabi workbench, team libraries, scoped-executor compatibility and deferred client loading remain.
 
 `0.2.0-rabi.1` integrates upstream 0.2.0: group-scoped memory, structured view cards, photos, thinking levels and live turn metrics. This fork keeps equal team-management rights, independent pinned chats, the native Bot panel, Rabi-owned context and memory, group libraries and interrupted-turn recovery.
 

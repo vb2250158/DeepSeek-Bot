@@ -1,8 +1,8 @@
 # ds-bot
 
-`0.2.2-rabi.1` retains the Rabi workbench and DSH continuation while integrating upstream 0.2.2. The Rabi client selects the public scoped-executor batch API before dispatch on rc.3 and the existing single-call API on rc.2; neither failures nor uncertain writes trigger a second dispatch.
+`0.2.3-rabi.1` integrates the upstream 0.2.3 release, including reusable avatars, browser handoff cards and stored screenshots, task-safe conversation rollover, archived-history paging, group corrections and steering feedback. The Rabi workbench, team libraries, scoped-executor compatibility and deferred client loading remain.
 
-Version 0.2.2-rabi.1 integrates upstream 0.2.2, including per-Bot browser isolation and grants, side chats (`/side`), durable delegated results, named-request admission and transactional memory. Existing `/btw` cards stay readable; new aside questions use side chats. The native workbench, direct Bot settings button, shared team management, deferred client loading and Rabi-owned persona memory remain. The standalone app retains the upstream account sign-out menu.
+Version 0.2.3-rabi.1 retains the upstream 0.2.2 capabilities, including per-Bot browser isolation and grants, side chats (`/side`), durable delegated results, named-request admission and transactional memory. Existing `/btw` cards stay readable; new aside questions use side chats. The native workbench, direct Bot settings button, shared team management, deferred client loading and Rabi-owned persona memory remain. The standalone app retains the upstream account sign-out menu.
 
 Browser writes whose requests fail before the click settles still report an unknown outcome and block repetition until the page has been observed. Per-Bot browser plugins remain off until configured.
 
@@ -285,3 +285,5 @@ dev/check.sh                             # all checks (see below)
 ## License
 
 [Apache-2.0](LICENSE)
+
+A missing avatar-library index starts an empty library. An unreadable or damaged saved index is preserved and blocks photo imports and removals until it is repaired. If only some entries are damaged, valid photos remain visible; changing the catalog still requires repairing those entries first.

@@ -282,9 +282,8 @@ const SHELL_PARTS = /_logoRow|_brand|_toggle|_newSession|_footArea|_collapsed|_t
 const rules = [...rulesOf(SHELL_CSS), ...rulesOf(SIDEBAR_CSS)].filter(rule => SHELL_PARTS.test(rule.selector))
 const hiding = rules.filter(rule => /display:none/.test(rule.body))
 
-// The shell sidebar's own markup (dsh-client-ui-sidebar SidebarRoot), reduced to what the
-// team view reshapes: the switch is in the logo row, except in a macOS desktop window,
-// where it sits in the strip by the window buttons.
+// The native Harness owns its brand, session action, footer and collapse control.
+// DS Bot renders its team inside the workbench without replacing those controls.
 function shell({ platform, collapsed }) {
   const darwin = platform === 'mac'
   const toggle = '<button class="x_iconButton x_toggle" aria-label="Toggle sidebar"></button>'
@@ -294,8 +293,8 @@ function shell({ platform, collapsed }) {
         ${darwin ? `<div class="x_topStrip">${toggle}</div>` : ''}
         <div class="x_logoRow">${collapsed ? '' : '<button class="x_brand x_wide"></button>'}${darwin ? '' : toggle}</div>
         <div class="x_newSession"></div>
-        <div class="bt-workbench"><div class="bt-team-column"></div></div>
-        <div class="x_footArea"><button class="x_settingsArea"></button></div>
+        <div class="team"></div>
+        <div class="x_footArea"><div class="x_footerActions"><span class="x_native-account"></span><span class="x_other-plugin"></span></div><div class="x_settingsArea"></div></div>
       </div>
     </div></body></html>`
   const { document } = new JSDOM(html).window
@@ -311,23 +310,44 @@ function shell({ platform, collapsed }) {
 
 for (const platform of ['web', 'windows', 'mac']) {
   for (const collapsed of [false, true]) {
-    test(`the native sidebar remains usable on ${platform} with collapsed=${collapsed}`, () => {
+    test(`native ${platform} navigation retains one switch and its controls when ${collapsed ? 'collapsed' : 'open'}`, () => {
       const { document, hidden, switches } = shell({ platform, collapsed })
       assert.equal(switches.length, 1)
       assert.equal(switches[0].classList.contains('x_toggle'), true)
+      assert.equal(switches[0].classList.contains('bt-side-collapse'), false)
       assert.equal(hidden(document.querySelector('.x_newSession')), false)
       const brand = document.querySelector('.x_brand')
       if (brand) assert.equal(hidden(brand), false)
-      const foot = document.querySelector('.x_footArea')
-      assert.equal(rules.some(rule => foot.matches(rule.selector) && /(^|;)display:/.test(rule.body)), false)
+      const nativeFooter = document.querySelector('.x_footArea')
+      assert.equal(hidden(nativeFooter), false)
+      const changedFooterRules = rules.filter(rule => nativeFooter.matches(rule.selector) && /display:|height:|grid-|order:/.test(rule.body))
+      assert.deepEqual(changedFooterRules.map(rule => rule.selector), [])
+      assert.equal(hidden(document.querySelector('.x_settingsArea')), false)
     })
   }
 }
 
-test('the team keeps its settings and conversations in the native DSH panel', () => {
+test('the team sidebar leaves the collapse control with native navigation', () => {
+  const roster = { bots: [], rooms: [], agents: [], byId: {}, ready: true }
+  const props = wide => ({
+    wide,
+    useRoster: pick => pick(roster), useUi: pick => pick({ unread: {} }), useRegistry: pick => pick({}),
+    useSessions: pick => pick({ ids: [], byId: {} }), useUpdate: () => ({}),
+    actions: { toggleSidebar: () => assert.fail('Rendering must not toggle navigation') },
+  })
+  const find = (node, match) => {
+    if (Array.isArray(node)) return node.map(child => find(child, match)).find(Boolean)
+    if (!node || typeof node !== 'object') return undefined
+    return match(node) ? node : find(node.props?.children, match)
+  }
+  const collapse = node => node.type === 'button' && (node.props['aria-label'] === 'Collapse sidebar' || node.props.className?.split(' ').includes('bt-side-collapse'))
+  assert.equal(find(TeamSidebar(props(true)), collapse), undefined)
+  assert.equal(find(TeamSidebar(props(false)), collapse), undefined)
+})
+
+test('the workbench keeps the Harness footer seats available to their native owners', () => {
   const source = readFileSync(new URL('../src/client/index.js', import.meta.url), 'utf8')
-  assert.match(source, /shadow\('main', \{ key: BOT_PANEL/)
-  assert.match(source, /shadow\('bot\.team'/)
-  assert.equal(/shadow\('sidebar\.footer\.action'/.test(source), false)
-  assert.equal(/shadow\('sidebar\.workspaces'/.test(source), false)
+  const ids = [...source.matchAll(/shadow\('sidebar\.footer\.action',\s*\{[^}]*?id:\s*['"]([^'"]+)['"]/g)].map(match => match[1])
+  assert.deepEqual(ids, [])
+  assert.match(source, /BotWorkbench/)
 })

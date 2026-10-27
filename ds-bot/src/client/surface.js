@@ -35,6 +35,19 @@ export function surfaceGroups(install, { onError } = {}) {
     mounted[group] = []
     disposeAll(disposers, `withdraw ${group}`)
   }
+  const mount = (group) => {
+    const disposers = []
+    try {
+      for (const step of install[group]()) if (step) disposers.push(step())
+      mounted[group] = disposers
+      return true
+    } catch (error) {
+      disposeAll(disposers, `roll back ${group}`)
+      console.warn(`[ds-bot] install ${group}`, error)
+      onError?.(group, error)
+      return false
+    }
+  }
   let lastWanted = {}
   const api = {
     reconcile(wanted) {
@@ -50,15 +63,7 @@ export function surfaceGroups(install, { onError } = {}) {
           for (const group of [...GROUPS].reverse()) if (!next[group]) withdraw(group)
           for (const group of GROUPS) {
             if (!next[group] || mounted[group].length > 0 || failed.has(group)) continue
-            try {
-              for (const step of install[group]()) if (step) mounted[group].push(step())
-            } catch (error) {
-              failed.add(group)
-              withdraw(group)
-              console.warn(`[ds-bot] install ${group}`, error)
-              onError?.(group, error)
-              break
-            }
+            if (!mount(group)) { failed.add(group); break }
           }
         }
       } finally {

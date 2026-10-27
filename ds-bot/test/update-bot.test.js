@@ -49,7 +49,7 @@ function start(team = TEAM) {
   })
   let route
   const register = ctx.connection.fetch.register
-  ctx.connection.fetch.register = (options) => { if (options.path === "/api/bot") route = options; return register(options) }
+  ctx.connection.fetch.register = (options) => { if (options.path === '/api/bot') route = options; return register(options) }
   apply(ctx, { home })
   const tool = (name, args, sessionId) => ctx.registeredTools.get(name).execute(args, { agent: { id: sessionId } })
   const call = async (endpoint, payload) => (await route.fetch(new Request('http://localhost/api/bot', { method: 'POST', body: JSON.stringify({ endpoint, payload }) }))).json()
