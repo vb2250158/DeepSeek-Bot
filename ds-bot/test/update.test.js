@@ -58,10 +58,10 @@ test('the install source decides where a newer version is looked for', () => {
   assert.deepEqual(sourceOf('npm:ds-bot@^0.1.0'), { kind: 'registry' })
   assert.deepEqual(sourceOf('link:E:/项目库/My Bots/ds-bot'), { kind: 'path' })
   assert.deepEqual(sourceOf('/home/user/ds-bot'), { kind: 'path' })
-  assert.deepEqual(sourceOf('github:Fei2411/DeepSeek-Bot#v0.1.0&path:/ds-bot'),
-    { kind: 'git', owner: 'Fei2411', repo: 'DeepSeek-Bot', ref: 'v0.1.0', rest: ['path:/ds-bot'] })
-  assert.deepEqual(sourceOf('git+https://github.com/Fei2411/DeepSeek-Bot.git#main'),
-    { kind: 'git', owner: 'Fei2411', repo: 'DeepSeek-Bot', rest: [] })
+  assert.deepEqual(sourceOf('github:Fei2411/DS-Bot#v0.1.0&path:/ds-bot'),
+    { kind: 'git', owner: 'Fei2411', repo: 'DS-Bot', ref: 'v0.1.0', rest: ['path:/ds-bot'] })
+  assert.deepEqual(sourceOf('git+https://github.com/Fei2411/DS-Bot.git#main'),
+    { kind: 'git', owner: 'Fei2411', repo: 'DS-Bot', rest: [] })
   assert.deepEqual(sourceOf('https://example.com/ds-bot-0.1.0.tgz'), { kind: 'tarball' })
   assert.deepEqual(sourceOf(undefined), { kind: 'unknown' })
 })
@@ -108,15 +108,15 @@ test('a private registry of pnpm\'s own is asked alone, and an answer stands for
 
 test('a versioned GitHub install follows the latest release tag and keeps its path', async () => {
   const { rt, installs } = start({
-    source: 'github:Fei2411/DeepSeek-Bot#v0.1.0&path:/ds-bot',
-    answers: { 'https://api.github.com/repos/Fei2411/DeepSeek-Bot/releases/latest': { tag_name: 'v9.1.0' } },
+    source: 'github:Fei2411/DS-Bot#v0.1.0&path:/ds-bot',
+    answers: { 'https://api.github.com/repos/Fei2411/DS-Bot/releases/latest': { tag_name: 'v9.1.0' } },
   })
   const view = await rt.updateCheck()
   assert.equal(view.available, true)
   assert.equal(view.latest, '9.1.0')
   rt.updateStart()
   await flush()
-  assert.deepEqual(installs, [['github:Fei2411/DeepSeek-Bot#v9.1.0&path:/ds-bot', {}]])
+  assert.deepEqual(installs, [['github:Fei2411/DS-Bot#v9.1.0&path:/ds-bot', {}]])
 })
 
 test('a versioned GitHub install follows the release to the repository\'s current address', async () => {
@@ -125,7 +125,7 @@ test('a versioned GitHub install follows the release to the repository\'s curren
     answers: {
       'https://api.github.com/repos/old-owner/DeepSeek-Bot/releases/latest': {
         tag_name: 'v9.1.0',
-        html_url: 'https://github.com/Fei2411/DeepSeek-Bot/releases/tag/v9.1.0',
+        html_url: 'https://github.com/Fei2411/DS-Bot/releases/tag/v9.1.0',
       },
     },
   })
@@ -134,11 +134,11 @@ test('a versioned GitHub install follows the release to the repository\'s curren
   assert.equal(view.latest, '9.1.0')
   rt.updateStart()
   await flush()
-  assert.deepEqual(installs, [['github:Fei2411/DeepSeek-Bot#v9.1.0&path:/ds-bot', {}]])
+  assert.deepEqual(installs, [['github:Fei2411/DS-Bot#v9.1.0&path:/ds-bot', {}]])
 })
 
 test('a linked checkout, an unversioned git install, or a disabled check never asks the network', async () => {
-  for (const source of [`link:/work/${PKG.name}`, 'github:Fei2411/DeepSeek-Bot#main', undefined]) {
+  for (const source of [`link:/work/${PKG.name}`, 'github:Fei2411/DS-Bot#main', undefined]) {
     const { rt, fetched } = start({ source })
     const view = await rt.updateCheck()
     assert.equal(view.available, false)

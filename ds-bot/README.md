@@ -1,8 +1,8 @@
 # ds-bot
 
-`0.2.2-rabi.1` retains the Rabi workbench and DSH continuation while integrating upstream 0.2.2. The Rabi client selects the public scoped-executor batch API before dispatch on rc.3 and the existing single-call API on rc.2; neither failures nor uncertain writes trigger a second dispatch.
+`0.2.3-rabi.1` integrates the upstream 0.2.3 release, including reusable avatars, browser handoff cards and stored screenshots, task-safe conversation rollover, archived-history paging, group corrections and steering feedback. The Rabi workbench, team libraries, scoped-executor compatibility and deferred client loading remain.
 
-Version 0.2.2-rabi.1 integrates upstream 0.2.2, including per-Bot browser isolation and grants, side chats (`/side`), durable delegated results, named-request admission and transactional memory. Existing `/btw` cards stay readable; new aside questions use side chats. The native workbench, direct Bot settings button, shared team management, deferred client loading and Rabi-owned persona memory remain. The standalone app retains the upstream account sign-out menu.
+Version 0.2.3-rabi.1 retains the upstream 0.2.2 capabilities, including per-Bot browser isolation and grants, side chats (`/side`), durable delegated results, named-request admission and transactional memory. Existing `/btw` cards stay readable; new aside questions use side chats. The native workbench, direct Bot settings button, shared team management, deferred client loading and Rabi-owned persona memory remain. The standalone app retains the upstream account sign-out menu.
 
 Browser writes whose requests fail before the click settles still report an unknown outcome and block repetition until the page has been observed. Per-Bot browser plugins remain off until configured.
 
@@ -55,7 +55,7 @@ In the maintenance fork, **DS Bot** appears below automation in the native DSH s
 
 The [project page](../README.md#install) has the full steps for dsh Desktop and dsh Web. In short:
 
-- dsh Desktop: Settings → Plugins → add `ds-bot` (npm), a `.tgz` file, or `github:Fei2411/DeepSeek-Bot#v0.1.7&path:/ds-bot`.
+- dsh Desktop: Settings → Plugins → add `ds-bot` (npm), a `.tgz` file, or `github:Fei2411/DS-Bot#v0.1.7&path:/ds-bot`.
 - Command line: `dsh plugin --profile desktop add ds-bot` (or `--profile web`).
 
 To work on the plugin from a checkout, add it to a dsh profile as a linked dependency and a bundle:
@@ -228,6 +228,7 @@ Files in `bot/`:
 | `usage.sqlite` | Token counts for the Usage page; rebuilt from the Session logs if deleted, losing only the calls outside the logs and the names of deleted Bots |
 | `memory/` | Memory (see [Memory](#memory)): `bots/<id>/`, `groups/<id>/` and `team/` (`MEMORY.md` and topics), `journal.jsonl` (every change), `snapshots/` (the section each Session froze), `summaries/` (the panel's summary; safe to delete), `reviewed.json` (how far the memory review has read) and `archive/` (deleted Bots and group chats) |
 | `ocr.json` | Cache of image text; safe to delete |
+| `avatars/` | The avatar library: the profile photos you imported once, so several Bots can use the same picture. `index.json` lists them, `files/` holds the images, each named by the hash of its bytes, so the same photo is stored once. The Bots that use a photo keep their own copy. Safe to delete. |
 | `workspace` | The team workspace: the working folder of every Bot without one of its own (`config.workspace` changes it) |
 | `secrets.json` | Saved secrets. Treat backups of it like passwords. |
 | `logs/diagnostics.jsonl` | Recent errors and warnings, with keys, tokens, saved secrets and the home folder removed. It moves to `diagnostics.jsonl.1` past 1 MB. Safe to delete. |

@@ -35,8 +35,23 @@ export function surfaceGroups(install, { onError } = {}) {
     mounted[group] = []
     disposeAll(disposers, `withdraw ${group}`)
   }
-  return {
+  const mount = (group) => {
+    const disposers = []
+    try {
+      for (const step of install[group]()) if (step) disposers.push(step())
+      mounted[group] = disposers
+      return true
+    } catch (error) {
+      disposeAll(disposers, `roll back ${group}`)
+      console.warn(`[ds-bot] install ${group}`, error)
+      onError?.(group, error)
+      return false
+    }
+  }
+  let lastWanted = {}
+  const api = {
     reconcile(wanted) {
+      lastWanted = wanted
       pending = wanted
       if (reconciling) return
       reconciling = true
@@ -48,23 +63,29 @@ export function surfaceGroups(install, { onError } = {}) {
           for (const group of [...GROUPS].reverse()) if (!next[group]) withdraw(group)
           for (const group of GROUPS) {
             if (!next[group] || mounted[group].length > 0 || failed.has(group)) continue
-            try {
-              for (const step of install[group]()) if (step) mounted[group].push(step())
-            } catch (error) {
-              failed.add(group)
-              withdraw(group)
-              console.warn(`[ds-bot] install ${group}`, error)
-              onError?.(group, error)
-              break
-            }
+            if (!mount(group)) { failed.add(group); break }
           }
         }
       } finally {
         reconciling = false
       }
     },
+    // A step can go on with nothing actually contributed — a slot inject whose
+    // callback threw inside the host still returns its disposer. remount takes
+    // the group off and lets the reconcile put it back, so a caller that
+    // notices the contribution is missing can retry instead of trusting
+    // `mounted`. Groups that lean on it (the conversation on the shell's
+    // styles) come off first and go back only through the reconcile — a
+    // failed remount never leaves one stranded.
+    remount(group, wanted = lastWanted) {
+      if (!GROUPS.includes(group)) return
+      for (const later of GROUPS.slice(GROUPS.indexOf(group) + 1)) withdraw(later)
+      withdraw(group)
+      api.reconcile(wanted)
+    },
     dispose() { for (const group of [...GROUPS].reverse()) withdraw(group) },
   }
+  return api
 }
 
 // The priority that puts an entry below every other entry of its cell (lowest

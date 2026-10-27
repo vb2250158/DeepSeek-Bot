@@ -1,0 +1,353 @@
+import { test } from 'node:test'
+import assert from 'node:assert/strict'
+import { createRequire } from 'node:module'
+import { dirname, join } from 'node:path'
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import { runInNewContext } from 'node:vm'
+import { build } from 'esbuild'
+
+// jsdom comes from the harness that test/harness-resolve.mjs found, like the dsh packages.
+const PLUGIN = dirname(dirname(fileURLToPath(import.meta.url)))
+const { JSDOM } = createRequire(join(process.env.DSH_HARNESS ?? join(PLUGIN, '..', 'deepseek-harness'), 'package.json'))('jsdom')
+
+// The sidebar and its style sheets import the browser's React; bundle them with a minimal
+// stand-in, as the tool-cell tests do: components run as plain functions. Navigation
+// fixtures retain refs across commits and run their layout effects after each render.
+const { outputFiles } = await build({
+  stdin: {
+    contents: "export { SHELL_CSS } from './src/client/styles.js'\nexport { SIDEBAR_CSS, TeamSidebar } from './src/client/sidebar.js'",
+    resolveDir: PLUGIN,
+  },
+  bundle: true, format: 'cjs', platform: 'browser', write: false, logLevel: 'silent',
+  external: ['react', 'react-dom', '@deepseek-ai/dsh-client-ui-primitives'],
+})
+let renderRefs
+let refIndex = 0
+let layoutEffects
+const react = {
+  createElement: (type, props, ...children) => ({ type, props: { ...props, children } }), Fragment: Symbol('Fragment'),
+  useEffect() {}, useLayoutEffect: effect => layoutEffects?.push(effect), useState: initial => [initial, () => {}],
+  useMemo: make => make(), useRef: current => renderRefs ? renderRefs[refIndex++] ??= { current } : { current }, useId: () => 'id',
+}
+const module = { exports: {} }
+const viewport = { innerWidth: 1280 }
+runInNewContext(outputFiles[0].text, {
+  module, exports: module.exports,
+  require: name => (name === 'react' ? react : {}),
+  window: viewport,
+})
+const { SHELL_CSS, SIDEBAR_CSS, TeamSidebar } = module.exports
+
+function navigationSidebar(wide, { shell = true } = {}) {
+  const calls = []
+  const refs = []
+  let collapsed = !wide
+  const bot = { id: 'writer', name: 'Writer', createdAt: 1 }
+  const room = { id: 'room', name: 'Team', members: [], createdAt: 2 }
+  const agent = { id: 'agent', sessions: ['session'], createdAt: 3 }
+  const roster = { bots: [bot], rooms: [room], agents: [agent], byId: { writer: bot }, ready: true }
+  const actions = Object.fromEntries(['openSession', 'openAgent', 'openAgentSession', 'newAgentSession'].map(name => [name, id => { calls.push([name, id]); return id }]))
+  actions.toggleSidebar = () => { collapsed = !collapsed; calls.push(['toggleSidebar']) }
+  const rows = []
+  const walk = (node) => {
+    if (Array.isArray(node)) { node.forEach(walk); return }
+    if (!node || typeof node !== 'object') return
+    if (['BotRow', 'RoomRow', 'AgentRow'].includes(node.type?.name)) rows.push(node)
+    walk(node.props?.children)
+  }
+  const render = (nextWide = shell ? wide : !collapsed) => {
+    wide = nextWide
+    // The public owner action closes over the shell's committed collapsed state;
+    // wide may still be true during the shell's 150ms content fade-out.
+    const committedCollapsed = collapsed
+    renderRefs = refs
+    refIndex = 0
+    layoutEffects = []
+    const tree = TeamSidebar({
+      wide, actions,
+      ...(shell ? { expandSidebar: () => { if (committedCollapsed) actions.toggleSidebar() } } : {}),
+      useRoster: pick => pick(roster), useUi: pick => pick({ unread: {} }), useRegistry: pick => pick({}),
+      useSessions: pick => pick({ ids: [], byId: {} }), useUpdate: () => ({}),
+    })
+    renderRefs = undefined
+    const effects = layoutEffects
+    layoutEffects = undefined
+    effects.forEach(effect => effect())
+    rows.length = 0
+    walk(tree)
+  }
+  render()
+  return { calls, rows, actions, render, get collapsed() { return collapsed } }
+}
+
+for (const width of [390, 1023, 1024, 1280]) {
+  for (const wide of [false, true]) {
+    test(`sidebar navigation at ${width}px with ${wide ? 'expanded content' : 'a collapsed rail'} only closes an open mobile sidebar`, () => {
+      viewport.innerWidth = width
+      const initial = navigationSidebar(wide)
+      assert.equal(initial.rows.length, 3)
+      for (const [index, row] of initial.rows.entries()) {
+        const names = row.type.name === 'AgentRow' ? ['openAgent', 'openAgentSession', 'newAgentSession'] : ['openSession']
+        for (const name of names) {
+          const { rows, calls } = navigationSidebar(wide)
+          assert.equal(rows[index].props.actions[name]('selected'), 'selected')
+          assert.deepEqual(calls, wide && width < 1024 ? [[name, 'selected'], ['toggleSidebar']] : [[name, 'selected']])
+        }
+      }
+    })
+  }
+}
+
+test('repeated sidebar navigation before another commit closes only once', () => {
+  viewport.innerWidth = 390
+  const side = navigationSidebar(true)
+  side.rows[0].props.actions.openAgent('first')
+  side.rows[1].props.actions.openSession('second')
+  assert.equal(side.collapsed, true)
+  assert.deepEqual(side.calls, [['openAgent', 'first'], ['toggleSidebar'], ['openSession', 'second']])
+})
+
+test('the standalone UI can navigate without a shell expansion action', () => {
+  viewport.innerWidth = 390
+  // app/ui passes its actual wide state directly, without the DSH owner action.
+  const side = navigationSidebar(true, { shell: false })
+  side.rows[1].props.actions.openSession('first')
+  side.rows[2].props.actions.openSession('second')
+  assert.equal(side.collapsed, true)
+  assert.deepEqual(side.calls, [['openSession', 'first'], ['toggleSidebar'], ['openSession', 'second']])
+  side.render()
+  side.calls.length = 0
+  side.rows[1].props.actions.openSession('from-rail')
+  assert.deepEqual(side.calls, [['openSession', 'from-rail']])
+  side.actions.toggleSidebar()
+  side.render()
+  side.rows[2].props.actions.openSession('after-expansion')
+  assert.equal(side.collapsed, true)
+})
+
+test('navigation during the shell fade-out keeps the already collapsed sidebar closed', () => {
+  viewport.innerWidth = 390
+  const side = navigationSidebar(true)
+  side.rows[0].props.actions.openAgentSession('first')
+  assert.equal(side.collapsed, true)
+  side.render(true)
+  side.calls.length = 0
+  side.rows[1].props.actions.openSession('during-fade')
+  assert.equal(side.collapsed, true, 'wide remains true until the content fade settles')
+  assert.equal(side.calls.filter(([name]) => name === 'openSession').length, 1)
+})
+
+test('a sidebar reopened before wide becomes false still closes on the next navigation', () => {
+  viewport.innerWidth = 390
+  const side = navigationSidebar(true)
+  side.rows[0].props.actions.openAgent('first')
+  side.render(true)
+  side.actions.toggleSidebar()
+  side.render(true)
+  assert.equal(side.collapsed, false)
+  side.rows[1].props.actions.openSession('after-reopen')
+  assert.equal(side.collapsed, true)
+})
+
+test('the navigation guard resets across a full collapse and expansion cycle', () => {
+  viewport.innerWidth = 390
+  const side = navigationSidebar(true)
+  side.rows[0].props.actions.newAgentSession('first')
+  side.render(false)
+  side.calls.length = 0
+  side.rows[1].props.actions.openSession('from-rail')
+  assert.equal(side.collapsed, true)
+  assert.deepEqual(side.calls, [['openSession', 'from-rail']])
+  side.actions.toggleSidebar()
+  side.render(true)
+  side.rows[1].props.actions.openSession('after-expansion')
+  assert.equal(side.collapsed, true)
+})
+
+// A Bot working in its own chat previews what it is doing, the way a group row does
+// for members at work; an idle Bot keeps the last message preview.
+test('a running Bot\'s sidebar row shows what it is doing', () => {
+  viewport.innerWidth = 1280
+  const bot = { id: 'writer', name: 'Writer', createdAt: 1 }
+  const roster = { bots: [bot], rooms: [], agents: [], byId: { writer: bot }, ready: true, exchangeTurns: {} }
+  const rows = []
+  const walk = (node) => {
+    if (Array.isArray(node)) { node.forEach(walk); return }
+    if (!node || typeof node !== 'object') return
+    if (node.type?.name === 'BotRow') rows.push(node)
+    walk(node.props?.children)
+  }
+  const tree = TeamSidebar({
+    wide: true,
+    actions: Object.fromEntries(['openSession', 'openAgent', 'openAgentSession', 'newAgentSession', 'openMenu', 'openPalette', 'openNewChat', 'toggleSidebar', 'clearUnread'].map(name => [name, () => {}])),
+    useRoster: pick => pick(roster), useUi: pick => pick({ unread: {} }), useRegistry: pick => pick({}),
+    useSessions: pick => pick({ ids: [], byId: {} }), useUpdate: () => ({}),
+    useSessionStatus: pick => pick(new Map([['writer', { running: true }]])),
+    useSessionRetainInfo: () => null,
+    useActivity: pick => pick({ writer: 'working' }),
+    useWork: pick => pick({ waiting: {}, rooms: {}, approvals: [] }),
+  })
+  walk(tree)
+  assert.equal(rows.length, 1)
+  // BotRow renders as a function component: run it, then flatten Shimmer and the
+  // other function children to read the preview line's text.
+  const expand = (node) => {
+    if (Array.isArray(node)) return node.map(expand)
+    if (!node || typeof node !== 'object') return node
+    if (typeof node.type === 'function') return expand(node.type(node.props))
+    return { ...node, props: { ...node.props, children: expand(node.props.children) } }
+  }
+  const previews = []
+  const collect = (node) => {
+    if (Array.isArray(node)) { node.forEach(collect); return }
+    if (!node || typeof node !== 'object') return
+    if (node.props?.className === 'bt-row-preview') previews.push(node)
+    collect(node.props?.children)
+  }
+  const textOf = (node) => {
+    if (node === null || node === undefined || typeof node === 'boolean') return ''
+    if (typeof node === 'string' || typeof node === 'number') return String(node)
+    if (Array.isArray(node)) return node.map(textOf).join('')
+    return textOf(node.props?.children)
+  }
+  collect(expand(rows[0].type(rows[0].props)))
+  assert.equal(previews.length, 1)
+  // The row already says Writer, so the preview is the doing phrase alone.
+  assert.match(textOf(previews[0]), /^.+…$/)
+  assert.doesNotMatch(textOf(previews[0]), /^Writer ·/)
+})
+
+test('an idle Bot\'s sidebar row keeps the message preview', () => {
+  viewport.innerWidth = 1280
+  const bot = { id: 'writer', name: 'Writer', createdAt: 1 }
+  const roster = { bots: [bot], rooms: [], agents: [], byId: { writer: bot }, ready: true, exchangeTurns: {} }
+  const rows = []
+  const walk = (node) => {
+    if (Array.isArray(node)) { node.forEach(walk); return }
+    if (!node || typeof node !== 'object') return
+    if (node.type?.name === 'BotRow') rows.push(node)
+    walk(node.props?.children)
+  }
+  const tree = TeamSidebar({
+    wide: true,
+    actions: Object.fromEntries(['openSession', 'openAgent', 'openAgentSession', 'newAgentSession', 'openMenu', 'openPalette', 'openNewChat', 'toggleSidebar', 'clearUnread'].map(name => [name, () => {}])),
+    useRoster: pick => pick(roster), useUi: pick => pick({ unread: {} }), useRegistry: pick => pick({}),
+    useSessions: pick => pick({ ids: [], byId: {} }), useUpdate: () => ({}),
+    useSessionStatus: pick => pick(new Map()),
+    useSessionRetainInfo: () => null,
+    useActivity: pick => pick({}),
+    useWork: pick => pick({ waiting: {}, rooms: {}, approvals: [] }),
+  })
+  walk(tree)
+  const expand = (node) => {
+    if (Array.isArray(node)) return node.map(expand)
+    if (!node || typeof node !== 'object') return node
+    if (typeof node.type === 'function') return expand(node.type(node.props))
+    return { ...node, props: { ...node.props, children: expand(node.props.children) } }
+  }
+  const previews = []
+  const collect = (node) => {
+    if (Array.isArray(node)) { node.forEach(collect); return }
+    if (!node || typeof node !== 'object') return
+    if (node.props?.className === 'bt-row-preview') previews.push(node)
+    collect(node.props?.children)
+  }
+  collect(expand(rows[0].type(rows[0].props)))
+  assert.equal(previews.length, 0)
+})
+
+test('preparing sidebar navigation leaves actions elsewhere unchanged', () => {
+  viewport.innerWidth = 390
+  const { actions, calls } = navigationSidebar(true)
+  assert.deepEqual(calls, [])
+  actions.openSession('from-another-surface')
+  assert.deepEqual(calls, [['openSession', 'from-another-surface']])
+})
+
+function rulesOf(css) {
+  const text = css.replace(/\/\*[\s\S]*?\*\//g, '')
+  const rules = []
+  for (let at = 0; ;) {
+    const open = text.indexOf('{', at)
+    if (open === -1) return rules
+    let end = open + 1
+    for (let depth = 1; depth > 0; end += 1) depth += text[end] === '{' ? 1 : text[end] === '}' ? -1 : 0
+    const selector = text.slice(at, open).trim()
+    if (!selector.startsWith('@')) rules.push({ selector, body: text.slice(open + 1, end - 1).replace(/\s+/g, '') })
+    at = end
+  }
+}
+const SHELL_PARTS = /_logoRow|_brand|_toggle|_newSession|_footArea|_collapsed|_topStrip|bt-side-collapse/
+const rules = [...rulesOf(SHELL_CSS), ...rulesOf(SIDEBAR_CSS)].filter(rule => SHELL_PARTS.test(rule.selector))
+const hiding = rules.filter(rule => /display:none/.test(rule.body))
+
+// The native Harness owns its brand, session action, footer and collapse control.
+// DS Bot renders its team inside the workbench without replacing those controls.
+function shell({ platform, collapsed }) {
+  const darwin = platform === 'mac'
+  const toggle = '<button class="x_iconButton x_toggle" aria-label="Toggle sidebar"></button>'
+  const html = `<!doctype html><html${platform === 'windows' ? ' data-windows-titlebar' : ''}${darwin ? ' data-platform="darwin"' : ''}><body>
+    <div${collapsed ? ' data-sidebar-collapsed="true"' : ''}>
+      <div class="x_root${collapsed ? ' x_collapsed' : ''}">
+        ${darwin ? `<div class="x_topStrip">${toggle}</div>` : ''}
+        <div class="x_logoRow">${collapsed ? '' : '<button class="x_brand x_wide"></button>'}${darwin ? '' : toggle}</div>
+        <div class="x_newSession"></div>
+        <div class="team"></div>
+        <div class="x_footArea"><div class="x_footerActions"><span class="x_native-account"></span><span class="x_other-plugin"></span></div><div class="x_settingsArea"></div></div>
+      </div>
+    </div></body></html>`
+  const { document } = new JSDOM(html).window
+  const hidden = (node) => {
+    for (let at = node; at && at.nodeType === 1; at = at.parentElement) {
+      if (hiding.some(rule => at.matches(rule.selector))) return true
+    }
+    return false
+  }
+  const switches = [...document.querySelectorAll('.x_toggle, .bt-side-collapse')].filter(node => !hidden(node))
+  return { document, hidden, switches }
+}
+
+for (const platform of ['web', 'windows', 'mac']) {
+  for (const collapsed of [false, true]) {
+    test(`native ${platform} navigation retains one switch and its controls when ${collapsed ? 'collapsed' : 'open'}`, () => {
+      const { document, hidden, switches } = shell({ platform, collapsed })
+      assert.equal(switches.length, 1)
+      assert.equal(switches[0].classList.contains('x_toggle'), true)
+      assert.equal(switches[0].classList.contains('bt-side-collapse'), false)
+      assert.equal(hidden(document.querySelector('.x_newSession')), false)
+      const brand = document.querySelector('.x_brand')
+      if (brand) assert.equal(hidden(brand), false)
+      const nativeFooter = document.querySelector('.x_footArea')
+      assert.equal(hidden(nativeFooter), false)
+      const changedFooterRules = rules.filter(rule => nativeFooter.matches(rule.selector) && /display:|height:|grid-|order:/.test(rule.body))
+      assert.deepEqual(changedFooterRules.map(rule => rule.selector), [])
+      assert.equal(hidden(document.querySelector('.x_settingsArea')), false)
+    })
+  }
+}
+
+test('the team sidebar leaves the collapse control with native navigation', () => {
+  const roster = { bots: [], rooms: [], agents: [], byId: {}, ready: true }
+  const props = wide => ({
+    wide,
+    useRoster: pick => pick(roster), useUi: pick => pick({ unread: {} }), useRegistry: pick => pick({}),
+    useSessions: pick => pick({ ids: [], byId: {} }), useUpdate: () => ({}),
+    actions: { toggleSidebar: () => assert.fail('Rendering must not toggle navigation') },
+  })
+  const find = (node, match) => {
+    if (Array.isArray(node)) return node.map(child => find(child, match)).find(Boolean)
+    if (!node || typeof node !== 'object') return undefined
+    return match(node) ? node : find(node.props?.children, match)
+  }
+  const collapse = node => node.type === 'button' && (node.props['aria-label'] === 'Collapse sidebar' || node.props.className?.split(' ').includes('bt-side-collapse'))
+  assert.equal(find(TeamSidebar(props(true)), collapse), undefined)
+  assert.equal(find(TeamSidebar(props(false)), collapse), undefined)
+})
+
+test('the workbench keeps the Harness footer seats available to their native owners', () => {
+  const source = readFileSync(new URL('../src/client/index.js', import.meta.url), 'utf8')
+  const ids = [...source.matchAll(/shadow\('sidebar\.footer\.action',\s*\{[^}]*?id:\s*['"]([^'"]+)['"]/g)].map(match => match[1])
+  assert.deepEqual(ids, [])
+  assert.match(source, /BotWorkbench/)
+})
