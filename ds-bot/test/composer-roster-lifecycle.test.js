@@ -7,12 +7,26 @@ import { runInNewContext } from 'node:vm'
 import { test } from 'node:test'
 import { build } from 'esbuild'
 
-const harness = createRequire(`${process.env.DSH_HARNESS}/package.json`)
-const face = join(process.env.DSH_HARNESS, 'packages/client/ui-primitives/package.json')
-const ui = existsSync(face) ? createRequire(face) : harness
-const React = ui('react')
-const ReactDOM = ui('react-dom')
-const { createRoot } = ui('react-dom/client')
+// A checkout keeps React next to ui-primitives. The published DSH packages do not:
+// React is only a devDependency there, so `npm run harness` installs it on the harness itself.
+const anchors = [
+  join(process.env.DSH_HARNESS, 'packages/client/ui-primitives/package.json'),
+  join(process.env.DSH_HARNESS, 'package.json'),
+].filter(existsSync)
+const load = (name) => {
+  let missing
+  for (const anchor of anchors) {
+    try { return createRequire(anchor)(name) } catch (error) {
+      if (error?.code !== 'MODULE_NOT_FOUND' || !error.message.includes(`'${name}'`)) throw error
+      missing = error
+    }
+  }
+  throw missing ?? new Error(`${name} is not installed; run npm run harness in ds-bot/`)
+}
+const React = load('react')
+const ReactDOM = load('react-dom')
+const { createRoot } = load('react-dom/client')
+const harness = createRequire(join(process.env.DSH_HARNESS, 'package.json'))
 const { act } = React
 const { JSDOM } = harness('jsdom')
 const bundle = await build({
