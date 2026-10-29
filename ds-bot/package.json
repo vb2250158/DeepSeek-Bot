@@ -1,6 +1,6 @@
 {
   "name": "ds-bot",
-  "version": "0.2.3-rabi.2",
+  "version": "0.2.3-rabi.3",
   "description": "DS Bot: a team of long-lived Bots for DeepSeek Harness, with shared team management, pinned chats and group chats",
   "keywords": [
     "dsh-plugin",
@@ -27,7 +27,8 @@
     ".": "./index.js",
     "./client": "./client.js",
     "./web-search": "./web-search.js",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
   },
   "files": [
     "index.js",
@@ -37,6 +38,7 @@
     "web-search.js",
     "cordis.patch.yml",
     "README.md",
+    "locale/",
     "LICENSE",
     "client-app.js"
   ],

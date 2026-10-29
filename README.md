@@ -11,6 +11,8 @@ Private maintenance 0.2.3-rabi.1 integrates upstream 0.2.3 with avatar storage, 
 
 # DS Bot
 
+The plugin list shows the DS Bot name and description in the DSH language: English, Chinese, Japanese, Spanish, French, German, Russian or Portuguese. The Bot interface supports English and Chinese.
+
 `0.2.3-rabi.1` integrates the upstream 0.2.3 release, including reusable avatars, browser handoff cards and stored screenshots, task-safe conversation rollover, archived-history paging, group corrections and steering feedback. The Rabi workbench, team libraries, scoped-executor compatibility and deferred client loading remain.
 
 `0.2.0-rabi.1` integrates upstream 0.2.0: group-scoped memory, structured view cards, photos, thinking levels and live turn metrics. This fork keeps equal team-management rights, independent pinned chats, the native Bot panel, Rabi-owned context and memory, group libraries and interrupted-turn recovery.
