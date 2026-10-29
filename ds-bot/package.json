@@ -1,6 +1,6 @@
 {
   "name": "ds-bot",
-  "version": "0.2.3-rabi.1",
+  "version": "0.2.3-rabi.2",
   "description": "DS Bot: a team of long-lived Bots for DeepSeek Harness, with shared team management, pinned chats and group chats",
   "keywords": [
     "dsh-plugin",

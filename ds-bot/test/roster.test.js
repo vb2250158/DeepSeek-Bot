@@ -10,10 +10,14 @@ import { apply } from '../index.js'
 import { fakeContext } from './fake-ctx.js'
 
 // Enough of the dsh services for the roster to make Sessions; kickoff messages are dropped.
-function start(team, { models = [], reasoning = {}, archiveError, selection } = {}) {
+function start(team, { models = [], reasoning = {}, archiveError, selection, presets } = {}) {
   const home = mkdtempSync(join(tmpdir(), 'ds-bot-roster-'))
   if (team !== undefined) writeFileSync(join(home, 'state.json'), JSON.stringify(team))
   const ctx = fakeContext()
+  if (presets !== undefined) {
+    const get = ctx.get
+    ctx.get = name => name === 'agentPresets' ? { list: async () => presets } : get(name)
+  }
   if (selection !== undefined) {
     const baseGet = ctx.get
     ctx.get = name => name === 'agentDefaultModel' ? { currentSelection: () => selection } : baseGet(name)
@@ -24,6 +28,7 @@ function start(team, { models = [], reasoning = {}, archiveError, selection } = 
   const archived = []
   const warnings = []
   let sessions = 0
+  const sessionRequests = []
   ctx.logger.warn = (...args) => warnings.push(format(...args))
   Object.assign(ctx, {
     llm: {
@@ -45,7 +50,7 @@ function start(team, { models = [], reasoning = {}, archiveError, selection } = 
       },
     },
     sessionController: {
-      create: async () => ({ sessionId: `s${++sessions}` }),
+      create: async request => { sessionRequests.push(request); return { sessionId: `s${++sessions}` } },
       resolveAgent: async sessionId => ({ agent: { session: { id: sessionId }, followup: message => sent.push({ sessionId, message }) } }),
       selectModel: async (request) => { selected.push(request) },
     },
@@ -67,7 +72,7 @@ function start(team, { models = [], reasoning = {}, archiveError, selection } = 
     await ctx.dispose()
     rmSync(home, { recursive: true, force: true, maxRetries: 5 })
   }
-  return { call, stop, home, sent, selected, ctx, archived, warnings }
+  return { call, stop, home, sent, selected, ctx, archived, warnings, sessionRequests }
 }
 
 const settle = () => new Promise(resolve => setTimeout(resolve, 20))
@@ -971,4 +976,27 @@ test('a group\'s relay limit is a user setting the state view shows, and old lat
     assert.equal(result.ok, false, JSON.stringify(bad))
     assert.match(result.error.message, /Relay limit must be a whole number from 1 to 200/)
   }
+})
+
+test('Rabi imports create assistant Sessions', async t => {
+  const f = start(undefined, { presets: [{ id: 'standard' }, { id: 'rabi-assistant' }] })
+  t.after(f.stop)
+  const get = f.ctx.get
+  f.ctx.get = name => name === 'rabiAgentHooks' ? { requireBinding: () => () => {} } : get(name)
+  f.ctx.tools.get = () => ({})
+  const bindings = new Map()
+  f.ctx.tools.execute = async input => {
+    const { path, method, bodyJson } = input.arguments
+    let body
+    if (path === '/api/personas') body = { personas: [{ personaId: 'fixture', name: 'Fixture' }] }
+    else {
+      const id = path.split('/').at(-1)
+      if (method === 'PUT') bindings.set(id, JSON.parse(bodyJson).roleId)
+      body = { code: 0, data: bindings.has(id) ? { sessionId: id, roleId: bindings.get(id) } : null }
+    }
+    return { isError: false, value: { ok: true, statusCode: 200, body: JSON.stringify(body) } }
+  }
+  const result = await f.call('rabi-persona-import', { roleId: 'fixture' })
+  assert.equal(result.ok, true)
+  assert.equal(f.sessionRequests.at(-1).agentPreset, 'rabi-assistant')
 })

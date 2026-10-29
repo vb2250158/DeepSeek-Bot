@@ -1,5 +1,7 @@
 # ds-bot
 
+Rabi-bound Bots are created with the `rabi-assistant` preset, including group conversations and later conversation parts. The authenticated `rabi-persona-rebuild` operation accepts `botId` and `expectedSessionId`, preserves the Bot identity and earlier-part history, confirms the new Rabi binding, and archives the previous conversation. Pending input must be resolved first; interrupted archiving can be retried without creating another conversation.
+
 `0.2.3-rabi.1` integrates the upstream 0.2.3 release, including reusable avatars, browser handoff cards and stored screenshots, task-safe conversation rollover, archived-history paging, group corrections and steering feedback. The Rabi workbench, team libraries, scoped-executor compatibility and deferred client loading remain.
 
 Version 0.2.3-rabi.1 retains the upstream 0.2.2 capabilities, including per-Bot browser isolation and grants, side chats (`/side`), durable delegated results, named-request admission and transactional memory. Existing `/btw` cards stay readable; new aside questions use side chats. The native workbench, direct Bot settings button, shared team management, deferred client loading and Rabi-owned persona memory remain. The standalone app retains the upstream account sign-out menu.

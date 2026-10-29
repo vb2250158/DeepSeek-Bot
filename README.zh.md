@@ -1,5 +1,7 @@
 <p align="center">
 
+绑定 Rabi 人格的 Bot 使用 Rabi 助手模式创建新会话。既有会话可重建，保留 Bot 身份与归档历史。
+
 私有维护版 0.2.3-rabi.1 合并上游 0.2.3 的头像库、浏览器交接和消息转向修复，保留原生 DSH 团队面板、Rabi 绑定与群资料库；头像库与群资料使用不同入口。测试适配 rc.3 执行器和已认证 API 路由。
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/logo-dark.svg">

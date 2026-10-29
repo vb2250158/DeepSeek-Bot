@@ -1,4 +1,5 @@
 import { rabiClient, rabiRefuse as refuse, rabiSegment as segment } from './rabi-client.js'
+import { splitRef } from './text.js'
 
 /** Rabi owns persona documents and bindings; Bots keep only the imported persona reference. */
 export function install(rt) {
@@ -19,6 +20,7 @@ export function install(rt) {
   const roleOf = bot => bot?.rabiPersona && bot.rabiPersona.enabled !== false ? bot.rabiPersona.roleId : undefined
   rt.rabiRoleOf = roleOf
   const pending = new Map()
+  const rebuilding = new Map()
   const signalOf = signal => signal ? AbortSignal.any([signal, shutdown.signal]) : shutdown.signal
   const pathOf = id => `/api/codex-hook/sessions/${segment(id)}`
   const binding = async (id, signal) => {
@@ -73,7 +75,7 @@ export function install(rt) {
     if (!persona) refuse('The selected Rabi persona is no longer available. Refresh the list.')
     let bot = imported(roleId)
     if (!bot) {
-      bot = await rt.createBot({ name: uniqueName(persona.name), role: '', pickModel: true })
+      bot = await rt.createBot({ name: uniqueName(persona.name), role: '', pickModel: true, agentPreset: 'rabi-assistant' })
       // Saved before the first remote write so retries and restarts reuse this exact Bot.
       bot.rabiPersona = { roleId }
       await rt.save()
@@ -145,6 +147,14 @@ export function install(rt) {
       segment(body.roleId)
       return importOnce(body.roleId, signal)
     }
+    if (endpoint === 'rabi-persona-rebuild') {
+      const bot = rt.botOf(body.botId)
+      if (!roleOf(bot)) refuse('This Bot has no Rabi persona link')
+      if (rebuilding.has(bot.id)) return rebuilding.get(bot.id)
+      const task = rebuild(bot, body.expectedSessionId, signal)
+      rebuilding.set(bot.id, task)
+      try { return await task } finally { rebuilding.delete(bot.id) }
+    }
     if (endpoint === 'rabi-personas-import-all') {
       const personas = await catalog(signal)
       const results = []
@@ -182,6 +192,38 @@ export function install(rt) {
     }
     refuse('Unknown Rabi connection operation')
   }
+  async function rebuild(bot, expectedSessionId, signal) {
+    const roleId = roleOf(bot)
+    const current = bot.sessionId ?? bot.id
+    let change = bot.rabiPersona.rebuild
+    if (!change && current !== expectedSessionId) refuse('The Bot conversation changed. Refresh before rebuilding.')
+    if (rt.workView()[bot.id]) refuse('Wait until this Bot is idle before rebuilding its conversation')
+    const agent = await rt.resolveAgent(current)
+    if (agent.inbox.nextStep.length || agent.inbox.nextTurn.length || state.questions?.[current] || state.views?.[current]) refuse('Resolve pending Bot input before rebuilding its conversation')
+    await linkedBot(bot.id, signal)
+    if (!change) {
+      const freshId = await rt.createSession(bot.name, { dir: bot.workDir, agentPreset: 'rabi-assistant' })
+      change = { previous: current, sessionId: freshId }
+      bot.rabiPersona.rebuild = change
+      await rt.save()
+    }
+    if ((bot.sessionId ?? bot.id) !== change.sessionId) {
+      await bind(change.sessionId, roleId, signal)
+      const ref = bot.model ?? bot.appliedModel
+      if (ref) {
+        await rt.selectSessionModel(change.sessionId, { ...splitRef(ref), reasoningEffort: bot.effort ?? bot.appliedEffort })
+      }
+      await rt.applyPermission(bot, change.sessionId)
+      await rt.moveSchedules?.(change.previous, change.sessionId)
+      ;(bot.segments ??= []).push({ sessionId: change.previous, endedAt: Date.now() })
+      bot.sessionId = change.sessionId
+      await rt.save()
+    }
+    await ctx.workspaceRegistry.archiveSession(change.previous, { stopActivity: true })
+    delete bot.rabiPersona.rebuild
+    await rt.save()
+    return { botId: bot.id, previousSessionId: change.previous, sessionId: change.sessionId, agentPreset: 'rabi-assistant', archived: true }
+  }
   ctx.effect(() => ctx.systemPrompt.context({
     name: 'ds-bot:rabi-persona', order: 630, interpolate: false, required: true,
     text: ({ agent }) => {
@@ -197,7 +239,8 @@ export function install(rt) {
     const roleId = roleOf(bot)
     if (!roleId) return next()
     const service = requireHooks()
-    assembly.tools = assembly.tools.filter(tool => !['remember', 'forget', 'recall'].includes(tool.name))
+    // Older DSH assemblies include schemas; current presentations contain text only.
+    if (assembly.tools !== undefined) assembly.tools = assembly.tools.filter(tool => !['remember', 'forget', 'recall'].includes(tool.name))
     const signal = signalOf(payload.signal)
     if ((await binding(bot.id, signal))?.roleId !== roleId) refuse('Rabi persona binding changed. Check the Bot in Rabi connection before continuing.')
     const id = payload.agent.id

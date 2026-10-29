@@ -162,6 +162,7 @@ export function install(rt) {
         case 'rabi-persona-import':
         case 'rabi-personas-import-all':
         case 'rabi-persona-unlink':
+        case 'rabi-persona-rebuild':
           return ok(await rt.rabiPersonaEndpoint(endpoint, body, signal))
         case 'rabi-connection-status':
         case 'rabi-connect':

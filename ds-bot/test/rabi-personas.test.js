@@ -84,6 +84,7 @@ test('importing a persona leaves its work title for actual responsibilities inst
   const f = fixture()
   await f.call('rabi-persona-import', { roleId: 'fixture' })
   assert.equal(f.created[0].role, '')
+  assert.equal(f.created[0].agentPreset, 'rabi-assistant')
 })
 
 test('an invalid binding read cannot be mistaken for an unbound session and overwritten', async () => {
@@ -251,4 +252,42 @@ test('binding cannot create a partial Bot when full Rabi lifecycle support is mi
   const f=fixture();f.ctx.get=()=>undefined
   await assert.rejects(f.call('rabi-persona-import',{roleId:'fixture'}),/Update dsh-rabiroute-agent/)
   assert.equal(f.created.length,0)
+})
+
+test('text-only prompt presentations retain Rabi binding checks', async () => {
+  const f = fixture()
+  await f.call('rabi-persona-import', { roleId: 'fixture' })
+  const presentation = { sections: [], contexts: [], variables: {} }
+  const result = await f.ctx.listeners.get('system-prompt/assemble')[0](presentation, { agent: { id: 'bot-1' }, signal: new AbortController().signal }, async () => presentation)
+  assert.equal(result, presentation)
+  assert.equal(f.requirements.get('bot-1'), 'fixture')
+  assert.equal('tools' in presentation, false)
+})
+
+test('rebuild retains Bot identity and retries archiving without creating another conversation', async () => {
+  const f = fixture()
+  await f.call('rabi-persona-import', { roleId: 'fixture' })
+  let created = 0, failArchive = true
+  f.rt.resolveAgent = async () => ({ inbox: { nextStep: [], nextTurn: [] } })
+  f.rt.createSession = async (name, options) => { assert.equal(options.agentPreset, 'rabi-assistant'); created++; return 'fresh' }
+  f.rt.applyPermission = async () => {}
+  f.ctx.workspaceRegistry = { archiveSession: async id => { assert.equal(id, 'bot-1'); if (failArchive) throw new Error('archive unavailable') } }
+  const body = { botId: 'bot-1', expectedSessionId: 'bot-1' }
+  await assert.rejects(f.call('rabi-persona-rebuild', body), /archive unavailable/)
+  assert.equal(f.rt.state.bots['bot-1'].sessionId, 'fresh')
+  assert.equal(f.bindings.get('fresh'), 'fixture')
+  failArchive = false
+  assert.equal((await f.call('rabi-persona-rebuild', body)).archived, true)
+  assert.equal(created, 1)
+  assert.equal(f.rt.state.bots['bot-1'].segments[0].sessionId, 'bot-1')
+  assert.equal(f.rt.state.bots['bot-1'].rabiPersona.rebuild, undefined)
+  await assert.rejects(f.call('rabi-persona-rebuild', body), /conversation changed/)
+})
+
+test('rebuild refuses pending input before creating a replacement', async () => {
+  const f = fixture()
+  await f.call('rabi-persona-import', { roleId: 'fixture' })
+  f.rt.resolveAgent = async () => ({ inbox: { nextStep: [], nextTurn: [{ id: 'queued' }] } })
+  f.rt.createSession = async () => { throw new Error('must not create') }
+  await assert.rejects(f.call('rabi-persona-rebuild', { botId: 'bot-1', expectedSessionId: 'bot-1' }), /pending Bot input/)
 })

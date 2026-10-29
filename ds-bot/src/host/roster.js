@@ -67,8 +67,12 @@ export function install(rt) {
   // Under the PTC preset (DSH Desktop's default) a model may call only run_code, which
   // turns down the group_relay call that a group chat's Session is given. A Session
   // keeps the preset it is made with.
-  async function botPreset() {
+  async function botPreset(requested) {
     const presets = ctx.get?.('agentPresets')
+    if (requested !== undefined) {
+      if (presets === undefined || !(await presets.list()).some(preset => preset.id === requested && preset.broken === undefined)) throw new Error(`Bot preset is unavailable: ${requested}`)
+      return { agentPreset: requested }
+    }
     if (presets === undefined) return {}
     const standard = (await presets.list()).some(preset => preset.id === 'standard' && preset.broken === undefined)
     return standard ? { agentPreset: 'standard' } : {}
@@ -76,7 +80,7 @@ export function install(rt) {
 
   // `dir` is a working folder outside the team workspace. Such a Session is made by cwd
   // alone, so it joins no DSH workspace and the user's own project lists stay as they are.
-  async function createSession(title, { dir } = {}) {
+  async function createSession(title, { dir, agentPreset, botId } = {}) {
     // A Bot's tools run here too; while another dsh holds the team, a new Session would
     // belong to no saved Bot.
     const readOnly = rt.readOnly()
@@ -84,7 +88,9 @@ export function install(rt) {
     const usable = dir !== undefined && await rt.isFolder(dir)
     if (dir !== undefined && !usable) rt.warn('ds-bot: the working folder %s is gone; %s starts in the team workspace', dir, title)
     const place = usable ? { cwd: dir } : { workspaceId: await ensureWorkspace() }
-    const { sessionId } = await ctx.sessionController.create({ ...place, ...await botPreset() })
+    const persona = state.bots[botId]?.rabiPersona
+    const requested = agentPreset ?? (persona && persona.enabled !== false ? 'rabi-assistant' : undefined)
+    const { sessionId } = await ctx.sessionController.create({ ...place, ...await botPreset(requested) })
     const agent = await rt.resolveAgent(sessionId)
     await ctx.sessionTitle.rename(agent.session, title)
     return sessionId
@@ -137,7 +143,7 @@ export function install(rt) {
     return holdName('bot', cleanName, () => buildBot(cleanName, options))
   }
 
-  async function buildBot(cleanName, { role = '', instructions = '', color, brief = '', createdBy, main = false, avatar, model, effort, workDir, copyOf, pickModel = false }) {
+  async function buildBot(cleanName, { role = '', instructions = '', color, brief = '', createdBy, main = false, avatar, model, effort, workDir, copyOf, pickModel = false, agentPreset }) {
     const cleanAvatarValue = cleanAvatar(avatar)
     // The model is fixed at creation, so a later change of the DSH default leaves it alone.
     const modelRef = model ? await rt.resolveModel(model) : pickModel ? undefined : await rt.defaultModel()
@@ -150,7 +156,7 @@ export function install(rt) {
       : effort === null || effort === '' ? undefined
       : (await rt.resolveEffort(modelRef, effort)) ?? await rt.defaultEffort(modelRef)
     const dir = workDir === undefined || workDir === null ? undefined : await rt.cleanWorkDir(workDir)
-    const id = await createSession(cleanName, { dir })
+    const id = await createSession(cleanName, { dir, agentPreset })
     try {
       state.bots[id] = {
         id,
