@@ -11,7 +11,8 @@ let states = [], index = 0
 const h = (type, props, ...children) => ({ type, props: props ?? {}, children: children.flat(Infinity) })
 const noop = () => {}
 runInNewContext(bundle.outputFiles[0].text, { module, exports: module.exports, Date,
-  require: name => name === 'react' ? { createElement: h, Fragment: 'fragment', useEffect: noop, useLayoutEffect: noop, useRef: value => ({ current: value }), useCallback: value => value,
+  require: name => name === 'react' ? { createContext: initial => { const ctx = { value: initial }; ctx.Provider = ({ value, children }) => { ctx.value = value; return children }; return ctx }, useContext: ctx => ctx.value,
+  createElement: h, Fragment: 'fragment', useEffect: noop, useLayoutEffect: noop, useRef: value => ({ current: value }), useCallback: value => value,
     useState: initial => { const own = index++; if (!(own in states)) states[own] = typeof initial === 'function' ? initial() : initial; return [states[own], value => { states[own] = typeof value === 'function' ? value(states[own]) : value }] } }
     : name === 'react-dom' ? { createPortal: node => node } : { Button: 'button', Input: 'input' } })
 const nodes = value => !value || typeof value !== 'object' ? [] : Array.isArray(value) ? value.flatMap(nodes) : [value, ...nodes(value.children)]

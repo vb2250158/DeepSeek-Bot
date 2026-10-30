@@ -14,7 +14,8 @@ async function clientModule(name) {
   runInNewContext(bundle.outputFiles[0].text, {
     module, exports: module.exports, console,
     require: name => name === 'react' ? {
-      createElement: (type, props, ...children) => ({ type, props: props ?? {}, children: children.flat(Infinity) }),
+      createContext: initial => { const ctx = { value: initial }; ctx.Provider = ({ value, children }) => { ctx.value = value; return children }; return ctx }, useContext: ctx => ctx.value,
+  createElement: (type, props, ...children) => ({ type, props: props ?? {}, children: children.flat(Infinity) }),
       useState: initial => [initial, () => {}], useRef: current => ({ current }),
       useEffect() {}, useLayoutEffect() {}, useMemo: make => make(), useCallback: fn => fn,
     } : name === 'react-dom' ? { createPortal: node => node } : {},

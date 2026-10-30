@@ -2,13 +2,17 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { runInNewContext } from 'node:vm'
-import { bundleClientApp, thinClientEntry } from '../scripts/build-client.mjs'
+import { bundleClientApp, thinClientEntry, bundleOffice } from '../scripts/build-client.mjs'
 
 const committed = () => readFileSync(new URL('../client.js', import.meta.url), 'utf8')
 
 test('both deferred client artifacts match their sources', async () => {
   assert.equal(thinClientEntry(), committed(), 'client.js is stale: run `npm run build` and commit it')
   assert.equal(await bundleClientApp(), readFileSync(new URL('../client-app.js', import.meta.url), 'utf8'))
+})
+
+test('Office CLI artifact matches its sources', async () => {
+  assert.equal(await bundleOffice(), readFileSync(new URL('../office.js', import.meta.url), 'utf8'))
 })
 
 // dsh runs client.js as a classic script that hands a factory to the module loader; the
@@ -23,7 +27,7 @@ test('client.js registers a factory that exports apply and inject', () => {
 
   const requested = []
   const platform = {
-    'react': { createElement: () => null, Fragment: Symbol('Fragment'), useState: initial => [initial, () => {}], useEffect: () => {}, useMemo: make => make(), useRef: current => ({ current }) },
+    'react': { createElement: () => null, Fragment: Symbol('Fragment'), useState: initial => [initial, () => {}], useEffect: () => {}, useMemo: make => make(), useCallback: fn => fn, useRef: current => ({ current }), useId: () => 'id', useSyncExternalStore: (sub, get) => get(), createContext: initial => ({ value: initial, Provider: () => null }), useContext: ctx => ctx.value },
     'react-dom': { createPortal: node => node },
     '@deepseek-ai/dsh-client-ui-primitives': { MarkdownText: () => null },
   }

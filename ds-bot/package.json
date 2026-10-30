@@ -1,7 +1,8 @@
 {
   "name": "ds-bot",
-  "version": "0.2.3-rabi.3",
+  "version": "0.2.4-rabi.1",
   "description": "DS Bot: a team of long-lived Bots for DeepSeek Harness, with shared team management, pinned chats and group chats",
+
   "keywords": [
     "dsh-plugin",
     "deepseek-harness",
@@ -34,7 +35,9 @@
     "index.js",
     "src/host/",
     "src/shared/",
+    "src/office/",
     "client.js",
+    "office.js",
     "web-search.js",
     "cordis.patch.yml",
     "README.md",
@@ -64,6 +67,10 @@
     }
   },
   "devDependencies": {
+    "@xmldom/xmldom": "0.9.12",
     "esbuild": "0.28.2"
+  },
+  "dependencies": {
+    "deep-view": "0.1.0"
   }
 }

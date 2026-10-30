@@ -1135,7 +1135,7 @@ test('a turn whose Session moves to a fresh part before its review is still revi
 test('config.memoryReview false leaves memory to the Bots\' own remember calls', async (t) => {
   const { ctx, call, section, requests, stop } = start({ config: { memoryReview: false, memoryReviewDelayMs: 0 } })
   t.after(() => stop())
-  assert.equal(ctx.calls.filter(entry => entry === 'on agent/status').length, 3)
+  assert.equal(ctx.calls.filter(entry => entry === 'on agent/status').length, 4)
   await call('state', {})
   assert.match(section('b2'), /Call it in that same turn, before you reply/)
   ctx.emit('agent/status', { agent: { id: 'b2' }, status: 'idle' })
@@ -1225,6 +1225,8 @@ test('Rabi bound Bots use no independent local memory or review requests', async
   const f=start({home});t.after(()=>f.stop())
   assert.equal(f.section('b2'),'')
   for(const[name,args]of [['remember',{text:'Keep in Rabi'}],['forget',{entry:'old'}]])await assert.rejects(f.tool(name,args,'b2'),error=>error.code==='memory/refused'&&/Rabi owns this persona memory/.test(error.message))
+  await assert.rejects(f.tool('remember',{text:'Keep Rabi knowledge off the local team',scope:'team'},'b2'),error=>error.code==='memory/refused'&&/Rabi owns/.test(error.message))
+  await assert.rejects(f.tool('remember',{text:'Do not duplicate another Rabi persona',scope:'Writer'},'m1'),error=>error.code==='memory/refused'&&/Rabi owns/.test(error.message))
   assert.match(await f.tool('recall',{},'b2'),/Rabi owns this persona memory/)
   assert.equal((await f.call('memory-view',{botId:'b2'})).value.source,'rabi')
   assert.equal((await f.call('memory-ask',{botId:'b2',text:'Save it'})).ok,false)

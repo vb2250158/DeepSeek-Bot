@@ -14,7 +14,8 @@ const h = (type, props, ...children) => ({ type, props: { ...props, children } }
 const module = { exports: {} }
 runInNewContext(outputFiles[0].text, {
   module, exports: module.exports,
-  require: name => name === 'react' ? { createElement: h, Fragment: 'fragment', useEffect: effect => effects.push(effect), useState: initial => [typeof initial === 'function' ? initial() : initial, () => {}] }
+  require: name => name === 'react' ? { createContext: initial => { const ctx = { value: initial }; ctx.Provider = ({ value, children }) => { ctx.value = value; return children }; return ctx }, useContext: ctx => ctx.value,
+  createElement: h, Fragment: 'fragment', useEffect: effect => effects.push(effect), useState: initial => [typeof initial === 'function' ? initial() : initial, () => {}] }
     : name === 'react-dom' ? { createPortal: node => node } : {},
 })
 const { BotWorkbench, BotConversation } = module.exports

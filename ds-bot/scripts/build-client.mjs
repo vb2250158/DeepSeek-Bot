@@ -36,6 +36,27 @@ export async function bundleClientApp() {
   ].join('\n')
 }
 
+const OFFICE_OUTPUT = join(PLUGIN, 'office.js')
+
+export async function bundleOffice() {
+  const result = await build({
+    absWorkingDir: PLUGIN,
+    entryPoints: ['src/office/cli.js'],
+    bundle: true,
+    format: 'esm',
+    platform: 'node',
+    target: 'es2022',
+    charset: 'utf8',
+    write: false,
+    logLevel: 'silent',
+    banner: {
+      js: '#!/usr/bin/env node\n// Generated from src/office by `npm run build` (scripts/build-client.mjs). Do not edit by hand.',
+    },
+  })
+  if (result.warnings.length > 0) throw new Error(`esbuild warnings:\n${result.warnings.map(warning => warning.text).join('\n')}`)
+  return result.outputFiles[0].text
+}
+
 export function thinClientEntry() {
   return readFileSync(join(PLUGIN, 'scripts/thin-client.js'), 'utf8')
 }
@@ -43,17 +64,21 @@ export function thinClientEntry() {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const app = await bundleClientApp()
   const entry = thinClientEntry()
+  const office = await bundleOffice()
   if (process.argv.includes('--check')) {
     let currentApp = null
     let currentEntry = null
+    let currentOffice = null
     try { currentApp = readFileSync(OUTPUT_APP, 'utf8') } catch {}
     try { currentEntry = readFileSync(OUTPUT_ENTRY, 'utf8') } catch {}
-    if (currentApp !== app || currentEntry !== entry) {
+    try { currentOffice = readFileSync(OFFICE_OUTPUT, 'utf8') } catch {}
+    if (currentApp !== app || currentEntry !== entry || currentOffice !== office) {
       console.error('client artifacts are stale: run `npm run build` in ds-bot and commit the result')
       process.exit(1)
     }
   } else {
     writeFileSync(OUTPUT_APP, app)
     writeFileSync(OUTPUT_ENTRY, entry)
+    writeFileSync(OFFICE_OUTPUT, office)
   }
 }

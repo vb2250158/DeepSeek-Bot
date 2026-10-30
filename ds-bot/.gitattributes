@@ -1,4 +1,6 @@
-# The client artifacts are compared byte for byte with a fresh build (npm test and
-# build-client.mjs --check). Checked out with CRLF on Windows it always reads as stale.
+# Generated bundles are compared byte for byte by build-client.mjs --check.
 client.js text eol=lf
 client-app.js text eol=lf
+office.js text eol=lf
+# Generated dependency CSS retains literal trailing spaces.
+client-app.js whitespace=-blank-at-eol

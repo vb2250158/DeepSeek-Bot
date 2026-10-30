@@ -1,3 +1,5 @@
+本 fork 已合并上游 0.2.4，保留公开 Bot 平等管理、Rabi 助手预设和延迟加载。私密 Bot 通过原生 Bot 工具向团队发布内容前需要批准；删除后，其文件夹、记忆和聊天仍受保护，可在设置中解除。Rabi 绑定 Bot 的记忆和学习技能继续由 Rabi 管理，项目 AGENTS.md 提案仍可使用。Office 目录输入拒绝内部链接，PNG 读取限制内存并拒绝截断图像。
+
 <p align="center">
 
 绑定 Rabi 人格的 Bot 使用 Rabi 助手模式创建新会话。既有会话可重建，保留 Bot 身份与归档历史。
@@ -37,7 +39,7 @@ Bot 聊天不显示手动继续或重试按钮。中断任务和额度失败由 
 
 [English](README.md) | 中文
 
-![版本](https://img.shields.io/badge/版本-v0.2_预览-blue) ![DSH](https://img.shields.io/badge/DSH-0.2.1--rc.2-4D6BFE) ![许可](https://img.shields.io/badge/许可-Apache_2.0-green)
+![版本](https://img.shields.io/badge/版本-v0.2_预览-blue) ![DSH](https://img.shields.io/badge/DSH-0.2.1--rc.4-4D6BFE) ![许可](https://img.shields.io/badge/许可-Apache_2.0-green)
 
 DS Bot 是一个基于 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（简称 dsh）的 bot 插件，插件将 dsh 改造为 bot 形式。你可以与自己创建的 bot 交流、工作。
 
@@ -73,6 +75,10 @@ DS Bot 默认跟随当前 DSH 皮肤及浅色、深色模式。在 **设置 → 
 
 第一次打开时，App 会问数据和 Bot 的文件放在哪里，并可以从你的 dsh 复制 Bot 团队（只读取你的 dsh，不改它）。在 App 的设置里配好模型就能用。Windows 版和 Linux 的 AppImage 会自动更新；macOS 版和 Linux 的 deb 有新版本时会提示你下载。
 
+**从源码启动桌面应用（Windows）**
+
+安装 Node.js 22.19 或以上版本及 npm 后，在仓库目录用 PowerShell 运行 `.\start.ps1`。脚本自动准备并启动当前源码，Bot、聊天记录和模型配置持久保存在 `.ds-bot-local/`，重启后继续使用。见[源码启动说明](app/README.md#run-from-source-windows)。
+
 **作为 dsh 插件**
 
 先装好 dsh，并在 dsh 里配好至少一个模型。ds bot 直接使用 dsh 里的模型。
@@ -92,8 +98,8 @@ DS Bot 0.2.1 及更早的版本在 DSH Desktop 0.2.1-rc.2 及以后的版本里�
 需要 Node.js `22.19` 以上和 pnpm。
 
 ```sh
-npx @deepseek-ai/dsh@0.2.1-rc.2 plugin --profile web add ds-bot
-npx @deepseek-ai/dsh@0.2.1-rc.2 web
+npx @deepseek-ai/dsh@0.2.1-rc.4 plugin --profile web add ds-bot
+npx @deepseek-ai/dsh@0.2.1-rc.4 web
 ```
 
 **Docker（NAS、Linux 服务器）**
@@ -143,6 +149,10 @@ ds bot 拥有群聊功能。群聊是非常好的多 bot 协作方式，但它�
 在 设置 → 用量 里，可以按时间、按 bot、按模型查看 Token 用量。
 
 ![用量页](docs/images/usage.zh.png)
+
+### Office 文件
+
+Bot 可以处理 Office 文档：创建和编辑 .docx、.pptx、.xlsx；按稳定 id 读文档结构；检查会让 Office 拒开的包缺陷；定点编辑（批注、修订、域、表格单元格）；幻灯片重排与复制；列出工作簿错误；渲染成图片并按拼图检查。桌面应用已全部带上；在 DSH Desktop 里用 DSH 自己的 Office 运行时加 DS Bot 的命令；在 DSH Web 里检查、校验、编辑类命令可用，从头建文件和渲染页面需要桌面应用或 DSH Desktop。
 
 ## 数据
 

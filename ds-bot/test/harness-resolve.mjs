@@ -41,7 +41,11 @@ const pluginUrl = `${pathToFileURL(plugin).href}/`
 registerHooks({
   resolve(specifier, context, nextResolve) {
     if (specifier.startsWith('@deepseek-ai/') && context.parentURL?.startsWith(pluginUrl)) {
-      // Session-reference is a protocol library outside the base bundle's dependencies.
+      // These test-only protocol imports are outside the base bundle's dependencies.
+      const scope = resolve(harness, 'packages/core/scope/package.json')
+      if (specifier === '@deepseek-ai/dsh-scope' && existsSync(scope)) {
+        return nextResolve(specifier, { ...context, parentURL: pathToFileURL(scope).href })
+      }
       const reference = resolve(harness, 'packages/context/session-reference/package.json')
       if (specifier === '@deepseek-ai/dsh-session-reference' && existsSync(reference)) {
         return nextResolve(specifier, { ...context, parentURL: pathToFileURL(reference).href })

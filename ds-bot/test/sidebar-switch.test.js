@@ -26,6 +26,10 @@ let renderRefs
 let refIndex = 0
 let layoutEffects
 const react = {
+  createContext: initial => { const ctx = { value: initial }; ctx.Provider = ({ value, children }) => { ctx.value = value; return children }; return ctx },
+  useContext: ctx => ctx.value,
+  useCallback: fn => fn,
+  useSyncExternalStore: (subscribe, getSnapshot) => getSnapshot(),
   createElement: (type, props, ...children) => ({ type, props: { ...props, children } }), Fragment: Symbol('Fragment'),
   useEffect() {}, useLayoutEffect: effect => layoutEffects?.push(effect), useState: initial => [initial, () => {}],
   useMemo: make => make(), useRef: current => renderRefs ? renderRefs[refIndex++] ??= { current } : { current }, useId: () => 'id',
@@ -350,4 +354,18 @@ test('the workbench keeps the Harness footer seats available to their native own
   const ids = [...source.matchAll(/shadow\('sidebar\.footer\.action',\s*\{[^}]*?id:\s*['"]([^'"]+)['"]/g)].map(match => match[1])
   assert.deepEqual(ids, [])
   assert.match(source, /BotWorkbench/)
+})
+
+test('wide Bot and group rows reveal a cut label and clear it when it fits', () => {
+  const side = navigationSidebar(true)
+  for (const row of side.rows.filter(item => ['BotRow', 'RoomRow'].includes(item.type.name))) {
+    const button = row.type({ ...row.props, roster: { ...row.props.roster, exchangeTurns: {} }, useSessionRetainInfo: (id, pick) => pick(undefined), useSessionStatus: pick => pick(new Map()), useActivity: pick => pick({}) })
+    const label = { scrollWidth: 120, clientWidth: 60, textContent: 'A long chat name' }
+    const target = { querySelector: () => label, removeAttribute: () => { delete target.title } }
+    button.props.onMouseEnter({ currentTarget: target })
+    assert.equal(target.title, label.textContent)
+    label.clientWidth = 120
+    button.props.onMouseEnter({ currentTarget: target })
+    assert.equal(target.title, undefined)
+  }
 })

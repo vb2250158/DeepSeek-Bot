@@ -15,9 +15,10 @@ const module = { exports: {} }
 const h = (type, props, ...children) => ({ type, props: { ...props, children } })
 const noop = () => {}
 runInNewContext(outputFiles[0].text, {
-  module, exports: module.exports, document: { body: {} },
+  module, exports: module.exports, document: { body: {} }, window: { innerWidth: 1280 },
   require: name => name === 'react' ? {
-    createElement: h, Fragment: 'fragment', useEffect: noop, useLayoutEffect: noop,
+    createContext: initial => { const ctx = { value: initial }; ctx.Provider = ({ value, children }) => { ctx.value = value; return children }; return ctx }, useContext: ctx => ctx.value,
+  createElement: h, Fragment: 'fragment', useEffect: noop, useLayoutEffect: noop,
     useRef: value => ({ current: value }), useCallback: value => value,
     useState: initial => [stateIndex++ === 0 ? tab : typeof initial === 'function' ? initial() : initial, noop],
     useSyncExternalStore: (subscribe, get) => get(),

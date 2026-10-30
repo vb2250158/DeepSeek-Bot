@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync,
 import { homedir, hostname, tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { test } from 'node:test'
-import { apply } from '../index.js'
+import { createRuntime } from '../index.js'
 import { dshHomeOf } from '../src/host/folders.js'
 import { escapeRegExp } from '../src/host/text.js'
 import { fakeContext } from './fake-ctx.js'
@@ -100,7 +100,7 @@ async function start({ services = {}, workspaces = [], llm, team: saved = TEAM, 
     if (options.path === '/api/bot') route = options
     return register(options)
   }
-  apply(ctx, { home })
+  const rt = createRuntime(ctx, { home })
   const call = async (endpoint, payload) => (await route.fetch(new Request('http://localhost/api/bot', {
     method: 'POST', body: JSON.stringify({ endpoint, payload }),
   }))).json()
@@ -123,7 +123,7 @@ async function start({ services = {}, workspaces = [], llm, team: saved = TEAM, 
   }
   // Loading once fills the Session-owner indexes.
   await tool('list_bots', {}, 'a')
-  return { ctx, root, dsh, home, team, project, created, agentOf, call, tool, preStep, state, workingIn, stop }
+  return { ctx, rt, root, dsh, home, team, project, created, agentOf, call, tool, preStep, state, workingIn, stop }
 }
 
 const settle = () => new Promise(resolve => setTimeout(resolve, 20))
@@ -476,7 +476,7 @@ test('a fresh part runs on the Bot\'s model, not on the earlier part\'s last req
   assert.deepEqual(selected.filter(([sessionId]) => sessionId === 's1'), [['s1', 'v4-pro']])
 })
 
-test('a model the user picks while the fresh part is made reaches the fresh part', async (t) => {
+test('a model the user picks while the fresh part is made reaches the fresh part', { timeout: 60_000 }, async (t) => {
   const env = await start({ llm: MODELS, team: onModel('deepseek/flash') })
   t.after(env.stop)
   const selected = recordSelections(env)

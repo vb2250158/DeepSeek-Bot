@@ -1,5 +1,9 @@
 # ds-bot
 
+Upstream 0.2.4 adds private Bots, learned skill and project AGENTS.md proposals, Office tools and responsive layouts. Public Bots keep equal team-management rights. Rabi-bound Bots use `rabi-assistant`; local memory and skill learning stay with Rabi, while project AGENTS.md upkeep remains available.
+
+Private Bot approvals cover native outward Bot actions, including public Bot edits, group posts and shared memory. The upstream shell checks and tool coverage are not a process sandbox: indirect paths, network tools and external Rabi tools require their own controls. Deleting a private Bot keeps its places protected until the user releases them. Interrupted archive writes retain that protection. Office directory imports refuse internal links; PNG inputs must have bounded dimensions and complete scanlines.
+
 Plugin-list metadata follows the DSH language in English, Chinese, Japanese, Spanish, French, German, Russian and Portuguese through the exported `locale/*.json` files. The Bot interface supports English and Chinese.
 
 Rabi-bound Bots are created with the `rabi-assistant` preset, including group conversations and later conversation parts. The authenticated `rabi-persona-rebuild` operation accepts `botId` and `expectedSessionId`, preserves the Bot identity and earlier-part history, confirms the new Rabi binding, and archives the previous conversation. Pending input must be resolved first; interrupted archiving can be retried without creating another conversation.
@@ -18,7 +22,7 @@ The DS Bot plugin for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek
 
 > Early release (v0.1). Features, tools and the saved data format can still change.
 
-Tested with dsh `0.2.1-rc.2` (Web) and `0.2.0-rc.2` (Web and Desktop).
+Tested with dsh `0.2.1-rc.4` (Web) and `0.2.0-rc.2` (Web and Desktop).
 
 The chat tail reports submitted messages and live Rabi Hook progress, with explicit stopped-Host, recovery and uncertain-result notices. Bound Bots discover Rabi automatically; progress codes require adapter 0.13.36 or newer.
 

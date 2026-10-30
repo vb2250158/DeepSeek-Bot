@@ -14,6 +14,7 @@ import { MemoryRow } from './memory-panel.js'
 import { ScheduleSummary } from './schedules.js'
 import { useGlide, useMorph } from './motion.js'
 import { GroupMembers } from './group-members.js'
+import { StopRoomWork, useMemberWork } from './member-status.js'
 import { GroupLibrary } from './group-library.js'
 import { PermissionPicker, presetDanger, presetName } from './permission-picker.js'
 import { t } from './i18n.js'
@@ -132,8 +133,10 @@ function MemberPile({ room, roster }) {
     more > 0 ? h('span', { key: 'more', className: 'bt-pile-face bt-pile-more', style: { animationDelay: `${shown.length * 40}ms` } }, `+${more}`) : null)
 }
 
-function GroupOverview({ room, roster, actions, usage, openSettings }) {
+function GroupOverview({ room, roster, actions, usage, useWork, openSettings }) {
+  const { entries } = useMemberWork(room, useWork)
   return [
+    h(StopRoomWork, { key: 'stop-work', room, entries, actions }),
     room.notice
       ? h(About, { key: 'notice', title: 'Notice', text: room.notice })
       : h('button', { key: 'notice', type: 'button', className: 'bt-more', onClick: openSettings }, t('Add a notice in group settings')),
