@@ -160,6 +160,8 @@ Bot 可以处理 Office 文档：创建和编辑 .docx、.pptx、.xlsx；按稳�
 
 ## 开发
 
+在 `ds-bot/` 内运行 `npm ci && npm run build` 重生成客户端与 Office 产物。构建仅使用插件目录内的依赖，拒绝指向外部目录的 `node_modules` 链接；提交前运行 `node scripts/build-client.mjs --check` 和 `npm test`。
+
 插件源码在 [`ds-bot/`](ds-bot/)。配置项和内部结构见 [`ds-bot/README.md`](ds-bot/README.md)，开发、测试和协作方式见 [CONTRIBUTING.zh.md](CONTRIBUTING.zh.md)，版本变化见 [CHANGELOG.md](CHANGELOG.md)。
 
 ## 致谢

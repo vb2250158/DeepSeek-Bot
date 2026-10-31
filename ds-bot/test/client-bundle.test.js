@@ -1,10 +1,25 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { runInNewContext } from 'node:vm'
 import { bundleClientApp, thinClientEntry, bundleOffice } from '../scripts/build-client.mjs'
 
 const committed = () => readFileSync(new URL('../client.js', import.meta.url), 'utf8')
+
+test('build rejects an external node_modules link before generating artifacts', t => {
+  const root = mkdtempSync(join(tmpdir(), 'ds-bot-build-'))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  mkdirSync(join(root, 'scripts'))
+  copyFileSync(new URL('../scripts/build-client.mjs', import.meta.url), join(root, 'scripts/build-client.mjs'))
+  symlinkSync(fileURLToPath(new URL('../node_modules', import.meta.url)), join(root, 'node_modules'), process.platform === 'win32' ? 'junction' : 'dir')
+  const result = spawnSync(process.execPath, [resolve(root, 'scripts/build-client.mjs'), '--check'], { encoding: 'utf8' })
+  assert.notEqual(result.status, 0)
+  assert.match(result.stderr, /Build dependency is outside the plugin directory/)
+})
 
 test('both deferred client artifacts match their sources', async () => {
   assert.equal(thinClientEntry(), committed(), 'client.js is stale: run `npm run build` and commit it')

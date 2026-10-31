@@ -3,12 +3,30 @@
 //   node scripts/build-client.mjs
 //     writes client-app.js  (heavy CJS UI body, loaded after boot)
 //     writes client.js      (thin ModuleLoader entry; does not block sibling plugins)
-import { readFileSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { readFileSync, realpathSync, writeFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
+import { dirname, isAbsolute, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { build } from 'esbuild'
 
 const PLUGIN = dirname(dirname(fileURLToPath(import.meta.url)))
+const ROOT = realpathSync(PLUGIN)
+const localFile = file => {
+  const path = realpathSync(file)
+  const offset = relative(ROOT, path)
+  if (offset === '..' || offset.startsWith('../') || offset.startsWith('..\\') || isAbsolute(offset)) {
+    throw new Error('Build dependency is outside the plugin directory; run `npm ci` in ds-bot with a local node_modules directory')
+  }
+  return path
+}
+// Resolve the build tool explicitly inside this package, never from an ancestor.
+const require = createRequire(import.meta.url)
+const { build } = require(localFile(join(PLUGIN, 'node_modules/esbuild/lib/main.js')))
+const localInputs = {
+  name: 'local-build-inputs',
+  setup(build) {
+    build.onLoad({ filter: /.*/, namespace: 'file' }, args => { localFile(args.path); return undefined })
+  },
+}
 const OUTPUT_APP = join(PLUGIN, 'client-app.js')
 const OUTPUT_ENTRY = join(PLUGIN, 'client.js')
 const PLATFORM_MODULES = ['react', 'react-dom', '@deepseek-ai/dsh-client-ui-primitives']
@@ -26,6 +44,7 @@ export async function bundleClientApp() {
     charset: 'utf8',
     write: false,
     logLevel: 'silent',
+    plugins: [localInputs],
   })
   if (result.warnings.length > 0) throw new Error('esbuild warnings:\n' + result.warnings.map(w => w.text).join('\n'))
   return [
@@ -49,6 +68,7 @@ export async function bundleOffice() {
     charset: 'utf8',
     write: false,
     logLevel: 'silent',
+    plugins: [localInputs],
     banner: {
       js: '#!/usr/bin/env node\n// Generated from src/office by `npm run build` (scripts/build-client.mjs). Do not edit by hand.',
     },
