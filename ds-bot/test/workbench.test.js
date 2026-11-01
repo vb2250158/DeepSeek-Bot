@@ -37,7 +37,7 @@ test('the selected Bot uses the shared conversation factory and its existing det
     actions: {},
     renderFactorySlot: (name, props) => { calls.push({ name, ...props }); return 'shared conversation' },
   })
-  assert.deepEqual(calls, [{ name: 'conversation.content', variant: 'embedded', phase: 'active', hero: false }])
+  assert.deepEqual(calls, [{ name: 'conversation.content', variant: 'embedded', phase: 'active', hero: false, busyEnterOverride: 'steer' }])
   const [chat, details] = tree.props.children
   assert.equal(chat.props.className, 'bt-chat-column')
   assert.equal(chat.props.children[1].type.name, 'ActivityIndicator')
@@ -47,8 +47,16 @@ test('the selected Bot uses the shared conversation factory and its existing det
   assert.equal(details.props.children[0].props.startRenaming, true)
 })
 
+test('a group chat requests immediate delivery', () => {
+  const calls = []
+  BotConversation({ sessionId: 'room', useRoster: select => select({ byId: {}, roomsById: { room: { id: 'room', name: 'Team' } } }), useUi: select => select({}), actions: {}, renderFactorySlot: (_name, props) => { calls.push(props); return 'chat' } })
+  assert.equal(calls[0].busyEnterOverride, 'steer')
+})
+
 test('an unowned session has no misleading Bot details', () => {
-  const tree = BotConversation({ sessionId: 'outside', useRoster: select => select({ byId: {}, roomsById: {} }), useUi: select => select({}), actions: {}, renderFactorySlot: () => 'chat' })
+  const calls = []
+  const tree = BotConversation({ sessionId: 'outside', useRoster: select => select({ byId: {}, roomsById: {} }), useUi: select => select({}), actions: {}, renderFactorySlot: (_name, props) => { calls.push(props); return 'chat' } })
+  assert.equal(calls[0].busyEnterOverride, undefined)
   assert.equal(tree.props.children[1], null)
 })
 

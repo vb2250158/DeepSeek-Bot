@@ -1,5 +1,7 @@
 # ds-bot
 
+`0.2.4-rabi.2` makes Bot and group chats request immediate delivery while a turn is running. It uses the Conversation occurrence override provided by the local DSH fork; the saved DSH preference remains unchanged. If the running turn no longer accepts steering, DSH delivers the message in the next turn. Other sessions keep the saved DSH preference.
+
 Upstream 0.2.4 adds private Bots, learned skill and project AGENTS.md proposals, Office tools and responsive layouts. Public Bots keep equal team-management rights. Rabi-bound Bots use `rabi-assistant`; local memory and skill learning stay with Rabi, while project AGENTS.md upkeep remains available.
 
 Private Bot approvals cover native outward Bot actions, including public Bot edits, group posts and shared memory. The upstream shell checks and tool coverage are not a process sandbox: indirect paths, network tools and external Rabi tools require their own controls. Deleting a private Bot keeps its places protected until the user releases them. Interrupted archive writes retain that protection. Office directory imports refuse internal links; PNG inputs must have bounded dimensions and complete scanlines.

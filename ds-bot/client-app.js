@@ -14992,7 +14992,7 @@ function BotConversation(props) {
     (0, import_react38.createElement)(
       "section",
       { className: "bt-chat-column", "aria-label": t("Message"), style: { "--bt-placeholder": JSON.stringify(name ? t("Message {name}", { name }) : t("Message")) } },
-      renderFactorySlot("conversation.content", { variant: "embedded", phase: "active", hero: false }),
+      renderFactorySlot("conversation.content", { variant: "embedded", phase: "active", hero: false, ...known ? { busyEnterOverride: "steer" } : {} }),
       known ? (0, import_react38.createElement)(ActivityIndicator, { ...props, key: sessionId, sessionId }) : null
     ),
     known ? (0, import_react38.createElement)(

@@ -43,7 +43,7 @@ export function BotConversation(props) {
   }, [sessionId, actions])
   return h(Fragment, null,
     h('section', { className: 'bt-chat-column', 'aria-label': t('Message'), style: { '--bt-placeholder': JSON.stringify(name ? t('Message {name}', { name }) : t('Message')) } },
-      renderFactorySlot('conversation.content', { variant: 'embedded', phase: 'active', hero: false }),
+      renderFactorySlot('conversation.content', { variant: 'embedded', phase: 'active', hero: false, ...(known ? { busyEnterOverride: 'steer' } : {}) }),
       known ? h(ActivityIndicator, { ...props, key: sessionId, sessionId }) : null),
     known ? h('aside', { className: 'bt-info-column', 'aria-label': t('View conversation details'), style: { '--bt-details-width': `${width}px` } },
       h(DetailsDrawer, { ...props, key: `${id}:${ui.details === id && ui.renaming ? 'rename' : ''}:${ui.details === id ? ui.tab ?? '' : ''}`, sessionId: id, roster, hasStrip: true, compact: true,
