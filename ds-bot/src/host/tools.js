@@ -716,6 +716,18 @@ export function install(rt) {
     if (agent === undefined || hiddenTools.has(agent) || !rt.isBotSession(agent.session?.id)) return
     if (typeof agent.ctx?.tools?.restrict !== 'function') return
     try {
+      if (rt.responsiveChat) {
+        const served = new Set(ctx.tools.schemas(agent).map(schema => schema.name))
+        if (!rt.responsiveChat.delegates.some(name => served.has(name))) {
+          rt.warn('ds-bot: responsive chat %s has no configured delegation tool; slow work remains blocked', agent.session?.id)
+        }
+        const allow = ctx.tools.schemas().map(schema => schema.name)
+          .filter(name => rt.responsiveChat.allowed.has(name))
+        const release = agent.ctx.tools.restrict({ allow })
+        ctx.effect(() => release, `ds-bot: responsive chat mask ${agent.session?.id}`)
+        hiddenTools.add(agent)
+        return
+      }
       // restrict() throws on a name this profile does not serve.
       const served = new Set(ctx.tools.schemas(agent).map(schema => schema.name))
       const deny = HIDDEN_TOOLS.filter(name => served.has(name))
@@ -723,15 +735,21 @@ export function install(rt) {
       agent.ctx.tools.restrict({ deny })
       hiddenTools.add(agent)
     } catch (error) {
-      rt.warn('ds-bot: %s stay in the tool list of %s: %s', HIDDEN_TOOLS.join(', '), agent.session?.id, error)
+      rt.warn('ds-bot: %s stay in the tool list of %s: %s', rt.responsiveChat ? 'tools outside responsive chat policy' : HIDDEN_TOOLS.join(', '), agent.session?.id, error)
     }
   }
   // A new Bot, part, or group Session gets its Agent before ds-bot records it, so the
   // list is only trimmed once ds-bot resolves that Agent again; meanwhile the guard
   // refuses the question tool in any Bot Session, and a goal made there is blocked.
-  ctx.tools.guard(exec => (exec.name === BLOCKING_QUESTION_TOOL && rt.isBotSession(exec.agent?.id)
-    ? `Bots cannot use ${BLOCKING_QUESTION_TOOL}. Ask with ask_user in your own chat, or ask in your reply.`
-    : undefined))
+  ctx.tools.guard(exec => {
+    if (!rt.isBotSession(exec.agent?.id)) return undefined
+    if (rt.responsiveChat && !rt.responsiveChat.allowed.has(exec.name)) {
+      return `Responsive chat cannot run ${exec.name}. Delegate the work with ${rt.responsiveChat.delegates.join(', ')} and end this turn; the result arrives later.`
+    }
+    return exec.name === BLOCKING_QUESTION_TOOL
+      ? `Bots cannot use ${BLOCKING_QUESTION_TOOL}. Ask with ask_user in your own chat, or ask in your reply.`
+      : undefined
+  })
   // Creation waits for this listener, so the Agent's first step already lacks the tool.
   ctx.on('agent/created', async ({ agent }) => {
     try {

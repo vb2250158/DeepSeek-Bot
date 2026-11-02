@@ -1,6 +1,8 @@
 // Prompt: one section whose text depends only on the rendering Session's own Bot
 // record, so the prefix stays byte-stable across turns and roster changes.
 
+import { responsiveChatRules } from './responsive-chat.js'
+
 const TEAM_RULES = [
   '## How your Bot team works',
   '- The short label beside a Bot name is its work title, not its provider or connection type. When your actual responsibilities become clear or change, use update_bot on yourself to set a concise title based on that work. Preserve a title explicitly chosen by the user. Do not invent accomplishments, ranks, or responsibilities, and do not change a title on every message.',
@@ -51,7 +53,7 @@ export function install(rt) {
         `You are ${bot.name}, a Bot on the user's team in DS Bot.${bot.role ? ` Your role: ${bot.role}.` : ''}`,
         bot.instructions ? `\n${bot.instructions}` : '',
         '',
-        `${MANAGEMENT_RULES}\n\n${TEAM_RULES}`,
+        rt.responsiveChat ? responsiveChatRules(rt.responsiveChat) : `${MANAGEMENT_RULES}\n\n${TEAM_RULES}`,
       ].join('\n')
     }
     const room = rt.roomOf(id)

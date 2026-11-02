@@ -2,6 +2,7 @@
 // Every Bot is one root Session; the roster, rooms, and the bot-to-bot exchange log live
 // in one JSON file under DSH_HOME so they survive restarts without new Session event types.
 import { join } from 'node:path'
+import { resolveResponsiveChat } from './src/host/responsive-chat.js'
 import * as diagnostics from './src/host/diagnostics.js'
 import * as store from './src/host/store.js'
 import * as models from './src/host/models.js'
@@ -63,6 +64,7 @@ export function createRuntime(ctx, config = {}) {
   const rt = {
     ctx,
     config,
+    responsiveChat: resolveResponsiveChat(config),
     dshHome,
     home,
     statePath: join(home, 'state.json'),

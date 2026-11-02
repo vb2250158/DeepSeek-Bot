@@ -5,7 +5,7 @@ import { own } from './store.js'
 const MCP_CLIENT = '@deepseek-ai/dsh-mcp-client'
 const NAME = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/
 const SECRET_REFERENCE = /\$DSH_SECRET_([A-Z][A-Z0-9_]*)/g
-const ENSURE_TIMEOUT_MS = 15_000
+const ENSURE_TIMEOUT_MS = 1_000
 
 export function validateCapabilityName(value) {
   const name = String(value ?? '').trim()
@@ -49,6 +49,10 @@ const stringMap = (value, label) => {
 }
 
 export function install(rt) {
+  const ensureTimeoutMs = rt.config.capabilityEnsureTimeoutMs ?? (rt.responsiveChat ? 0 : ENSURE_TIMEOUT_MS)
+  if (!Number.isInteger(ensureTimeoutMs) || ensureTimeoutMs < 0 || ensureTimeoutMs > ENSURE_TIMEOUT_MS) {
+    throw new Error('capabilityEnsureTimeoutMs must be an integer from 0 to 1000.')
+  }
   const { ctx, state } = rt
   const agents = new Map()
   // Mounted fibers live in each Agent's own context, so they outlive this plugin unless
@@ -394,7 +398,7 @@ export function install(rt) {
       return true
     })
     if (stalled.has(agent)) return
-    const timeoutMs = rt.capabilityEnsureTimeoutMs ?? ENSURE_TIMEOUT_MS
+    const timeoutMs = ensureTimeoutMs
     let timer
     const completed = await Promise.race([run, new Promise(resolve => { timer = setTimeout(resolve, timeoutMs, false) })])
     clearTimeout(timer)
