@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { createRuntime } from '../index.js'
-import { expandCapabilityNames, validateCapabilityName } from '../src/host/capabilities.js'
+import { expandCapabilityNames, install as installCapabilities, validateCapabilityName } from '../src/host/capabilities.js'
 import { fakeContext } from './fake-ctx.js'
 
 const makeHome = state => {
@@ -59,7 +59,7 @@ function testAgent(id, mounts, skillsBySession, { awaitMount = async () => {} } 
   return { id, session: { id }, ctx: agentCtx }
 }
 
-async function setup({ state = team(), secret, beforeLoad } = {}) {
+async function setup({ state = team(), secret, beforeLoad, config = {} } = {}) {
   const home = makeHome(state)
   if (secret) writeFileSync(join(home, 'secrets.json'), JSON.stringify({ secrets: [secret] }))
   const mounts = []
@@ -67,7 +67,7 @@ async function setup({ state = team(), secret, beforeLoad } = {}) {
   const mcpPlugin = { name: 'mcp-client', apply() {} }
   const loader = { import: async () => ({ default: mcpPlugin }), unwrapExports: exports => exports.default }
   const ctx = fakeContext({ services: { loader } })
-  const rt = createRuntime(ctx, { home, github: false, diagnosticsFile: false })
+  const rt = createRuntime(ctx, { home, github: false, diagnosticsFile: false, ...config })
   ctx.sessionTitle = { rename: async () => {} }
   rt.resolveAgent = async sessionId => ({ session: { id: sessionId } })
   beforeLoad?.({ ctx, rt, mounts, skills, mcpPlugin })
@@ -300,9 +300,9 @@ test('a hung mount releases the message after the limit and does not hold up oth
   }
   const env = await setup({
     state,
-    beforeLoad: ({ ctx, rt }) => {
+    config: { capabilityEnsureTimeoutMs: 20 },
+    beforeLoad: ({ ctx }) => {
       ctx.logger.warn = (...args) => warnings.push(args.join(' '))
-      rt.capabilityEnsureTimeoutMs = 20
     },
   })
   const chief = testAgent('chief', env.mounts, env.skills, { awaitMount: hang })
@@ -328,6 +328,62 @@ test('a hung mount releases the message after the limit and does not hold up oth
   releaseMount()
   await env.rt.scheduleCapabilitiesReconcile()
   assert.equal(env.rt.capabilityStatusesView().chief.slow.state, 'ready')
+})
+
+test('a configured capability budget releases creation while its mount continues', async t => {
+  const state = team()
+  state.capabilities = { items: { slow: { ...mcp('slow'), approved: true, createdBy: 'chief' } } }
+  state.bots.chief.capabilities = ['slow']
+  let releaseMount
+  const gate = new Promise(resolve => { releaseMount = resolve })
+  const env = await setup({ state, config: { capabilityEnsureTimeoutMs: 0 } })
+  const agent = testAgent('chief', env.mounts, env.skills, { awaitMount: () => gate })
+  t.after(async () => {
+    releaseMount()
+    agent.ctx.dispose()
+    await env.dispose()
+  })
+  const started = performance.now()
+  await created(env)({ agent, source: 'startup' })
+  const elapsed = performance.now() - started
+  t.diagnostic(JSON.stringify({ scope: 'isolated capability startup, configured 0ms', n: 1, elapsedMs: elapsed }))
+  assert.ok(elapsed < 1000)
+  assert.equal(env.rt.capabilityStatusesView().chief.slow.state, 'connecting')
+  releaseMount()
+  await env.rt.scheduleCapabilitiesReconcile()
+  assert.equal(env.rt.capabilityStatusesView().chief.slow.state, 'ready')
+})
+
+test('capability budgets reject invalid configuration before registering effects', () => {
+  for (const capabilityEnsureTimeoutMs of [-1, 1001, 0.5, NaN, Infinity, '0']) {
+    const ctx = fakeContext()
+    assert.throws(() => installCapabilities({ ctx, config: { capabilityEnsureTimeoutMs } }), /capabilityEnsureTimeoutMs/)
+    assert.deepEqual(ctx.calls, [])
+  }
+})
+
+test('default capability waits stay below ten seconds across concurrent Bots', async t => {
+  const state = team()
+  state.capabilities = { items: { slow: { ...mcp('slow'), approved: true, createdBy: 'chief' } } }
+  for (const bot of Object.values(state.bots)) bot.capabilities = ['slow']
+  let releaseMount
+  const gate = new Promise(resolve => { releaseMount = resolve })
+  const env = await setup({ state })
+  const agents = Object.keys(state.bots).map(id => testAgent(id, env.mounts, env.skills, { awaitMount: () => gate }))
+  t.after(async () => {
+    releaseMount()
+    for (const agent of agents) agent.ctx.dispose()
+    await env.dispose()
+  })
+  const samples = await Promise.all(agents.map(async agent => {
+    const started = performance.now()
+    await created(env)({ agent, source: 'startup' })
+    assert.equal(env.rt.capabilityStatusesView()[agent.id].slow.state, 'connecting')
+    return performance.now() - started
+  }))
+  samples.sort((left, right) => left - right)
+  t.diagnostic(JSON.stringify({ scope: 'isolated capability startup, not message E2E', n: samples.length, p50: samples[1], p95: samples[2], max: samples[2], unit: 'ms' }))
+  assert.ok(samples[2] < 10_000)
 })
 
 test('unloading the plugin disposes every capability mount', async t => {

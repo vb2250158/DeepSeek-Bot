@@ -25,12 +25,13 @@ const team = () => ({
 
 // dsh keeps one Agent per Session and fires agent/created, waiting for its listeners,
 // the first time a Session resolves one. restrict() calls are recorded per Session.
-async function setup({ served = ['read', 'ask_user', QUESTION], goals } = {}) {
+async function setup({ served = ['read', 'ask_user', QUESTION], scoped = [], goals, config = {} } = {}) {
   const home = mkdtempSync(join(tmpdir(), 'ds-bot-blocking-question-'))
   writeFileSync(join(home, 'state.json'), JSON.stringify(team()))
   const ctx = fakeContext({ services: goals === undefined ? {} : { goals } })
   const agents = new Map()
   const hidden = []
+  const lifted = []
   const sent = []
   let sessions = 0
   const created = agent => Promise.all((ctx.listeners.get('agent/created') ?? []).map(listener => listener({ agent })))
@@ -40,7 +41,7 @@ async function setup({ served = ['read', 'ask_user', QUESTION], goals } = {}) {
       id,
       session: { id },
       ctx: {
-        tools: { restrict: (filter) => { hidden.push([id, [...filter.deny]]); return () => {} } },
+        tools: { restrict: (filter) => { hidden.push(filter.allow === undefined ? [id, [...filter.deny]] : [id, [], [...filter.allow]]); return () => lifted.push(id) } },
         effect: execute => execute(),
       },
       followup: message => sent.push({ sessionId: id, message }),
@@ -49,7 +50,7 @@ async function setup({ served = ['read', 'ask_user', QUESTION], goals } = {}) {
     await created(agent)
     return agent
   }
-  ctx.tools.schemas = () => served.map(name => ({ name }))
+  ctx.tools.schemas = agent => [...served, ...(agent === undefined ? [] : scoped)].map(name => ({ name }))
   Object.assign(ctx, {
     llm: {
       listProviders: () => [{ id: 'deepseek', name: 'DeepSeek' }],
@@ -70,7 +71,7 @@ async function setup({ served = ['read', 'ask_user', QUESTION], goals } = {}) {
     sessionTitle: { rename: async () => {} },
     sessions: { flush: async () => {} },
   })
-  const rt = createRuntime(ctx, { home, github: false, diagnosticsFile: false })
+  const rt = createRuntime(ctx, { home, github: false, diagnosticsFile: false, ...config })
   await rt.load()
   const guard = (name, sessionId) => ctx.guards.map(check => check({ name, agent: sessionId === undefined ? undefined : { id: sessionId } })).find(reason => reason !== undefined)
   const hiddenIn = id => hidden.filter(([sessionId, deny]) => sessionId === id && deny.includes(QUESTION))
@@ -78,8 +79,45 @@ async function setup({ served = ['read', 'ask_user', QUESTION], goals } = {}) {
     await ctx.dispose()
     rmSync(home, { recursive: true, force: true, maxRetries: 5 })
   }
-  return { ctx, rt, agentFor, hidden, hiddenIn, guard, sent, stop }
+  return { ctx, rt, agentFor, hidden, hiddenIn, guard, sent, stop, lifted }
 }
+
+test('unloading responsive chat releases its per-Agent tool mask', async t => {
+  const env = await setup({ served: ['subagent', 'job_list', 'pwsh'], config: { responsiveChat: true } })
+  t.after(env.stop)
+  await env.agentFor('chief')
+  assert.deepEqual(env.lifted, [])
+  await env.ctx.dispose()
+  assert.deepEqual(env.lifted, ['chief'])
+})
+
+test('responsive chats expose dispatch and status only, leaving worker Sessions unrestricted', async t => {
+  const env = await setup({ served: ['subagent', 'list_agents', 'job_list', 'read', 'pwsh', 'run_code'], config: { responsiveChat: true } })
+  t.after(env.stop)
+  for (const id of ['chief', 'room-writer', 'child-worker']) await env.agentFor(id)
+  for (const id of ['chief', 'room-writer']) {
+    assert.deepEqual(env.hidden.find(([sessionId]) => sessionId === id)?.[2], ['subagent', 'job_list'])
+    for (const name of ['pwsh', 'run_code', 'message_bot', 'ask_user', 'job_output', 'list_agents', 'late_mcp_tool']) {
+      assert.match(env.guard(name, id), /Delegate the work/)
+    }
+    for (const name of ['subagent', 'job_list']) assert.equal(env.guard(name, id), undefined)
+  }
+  assert.equal(env.hidden.some(([id]) => id === 'child-worker'), false)
+  assert.equal(env.guard('pwsh', 'child-worker'), undefined)
+  assert.equal(env.guard('pwsh', 'outside'), undefined)
+  const prompt = env.ctx.sections.get('bot-identity').text({ agent: { id: 'chief' } })
+  assert.match(prompt, /End your turn after dispatch/)
+  assert.doesNotMatch(prompt, /call create_bot|use tools silently/)
+})
+
+test('responsive chat guard still blocks slow tools if the schema restriction fails', async t => {
+  const env = await setup({ config: { responsiveChat: true, responsiveChatDelegationTools: ['worker_dispatch'] } })
+  t.after(env.stop)
+  env.rt.hideBotUnusedTools({ session: { id: 'chief' }, ctx: { tools: { restrict() { throw new Error('fixture') } } } })
+  assert.match(env.guard('pwsh', 'chief'), /worker_dispatch/)
+  assert.equal(env.guard('worker_dispatch', 'chief'), undefined)
+  assert.match(env.guard('subagent', 'chief'), /Delegate/)
+})
 
 // DSH's goal service, holding one goal per Session; block() records what was asked.
 function goalService() {
@@ -208,4 +246,13 @@ test('without DSH\'s goal service a goal change is left alone', async (t) => {
   startGoal(ctx, undefined, 'writer')
   await new Promise(resolve => setTimeout(resolve, 20))
   assert.deepEqual(warnings, [])
+})
+
+test('responsive chat retains a delegation tool registered only in the Agent scope', async t => {
+  const env = await setup({ served: ['job_list', 'pwsh'], scoped: ['worker_dispatch'], config: { responsiveChat: true, responsiveChatDelegationTools: ['worker_dispatch'] } })
+  t.after(env.stop)
+  await env.agentFor('chief')
+  assert.deepEqual(env.hidden.find(([id]) => id === 'chief')?.[2], ['job_list', 'worker_dispatch'])
+  assert.equal(env.guard('worker_dispatch', 'chief'), undefined)
+  assert.match(env.guard('pwsh', 'chief'), /Delegate/)
 })
