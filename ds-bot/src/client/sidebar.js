@@ -9,6 +9,7 @@ import { reducedMotion } from './activity-row.js'
 import { Shimmer, workPhrase } from './cells.js'
 import { springEasing, SPRING_SHAPE, useViewport, viewBottom } from './motion.js'
 import { hostText, t } from './i18n.js'
+import { clientErrors } from './diagnostics.js'
 import { showsDshRow } from './dsh-offer.js'
 
 // -------------------------------------------------------------------------
@@ -265,6 +266,13 @@ function useListGlide(listRef, layout, key) {
   }, [layout, key])
 }
 
+const bootHint = () => {
+  const last = clientErrors().at(-1)?.text
+  return last === undefined
+    ? t('The Bot team could not start. The engine’s startup output — its console, or the app’s startup error box — has the cause.')
+    : t('The Bot team could not start. {error}. The engine’s startup output — its console, or the app’s startup error box — has the cause.', { error: last })
+}
+
 export function TeamSidebar(props) {
   const { wide, expandSidebar, useRoster, useUi, useSessions, actions } = props
   const listRef = useRef(null)
@@ -277,6 +285,7 @@ export function TeamSidebar(props) {
   useLayoutEffect(() => { closing.current = false })
   const roster = useRoster(value => value)
   const markedUnread = useUi(value => value.unread)
+  const bootFailed = useUi(value => value.bootFailed)
   props.useRegistry(value => value)
   const updated = useSessions(list => {
     const stamps = {}
@@ -376,7 +385,7 @@ export function TeamSidebar(props) {
       h('div', { className: 'bt-pin-drop', role: dragging ? 'status' : undefined }, t('Drop here to pin'))),
     wide && roster.readOnly ? h('div', { className: 'bt-hint bt-read-only', role: 'status' }, hostText(roster.readOnly)) : null,
     h('div', { ref: listRef, className: 'bt-list', role: 'region', 'aria-label': t('Bot list') },
-      roster.ready ? null : h('div', { className: 'bt-hint' }, t('Setting up your Bots…')),
+      roster.ready ? null : h('div', { className: 'bt-hint', role: bootFailed ? 'alert' : 'status' }, bootFailed ? bootHint() : t('Setting up your Bots…')),
       order.filter(entry => !entry.item.pinned).map(entry => (entry.kind === 'bot'
         ? h(BotRow, { key: entry.item.id, ...rowProps, bot: entry.item, marked: markedUnread[entry.item.id] === true })
         : entry.kind === 'room'

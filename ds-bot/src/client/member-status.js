@@ -26,13 +26,14 @@ function useNow(active) {
 
 const since = (now, at) => (typeof at === 'number' && now - at >= 60000 ? ` · ${elapsedLabel(now - at)}` : '')
 
-// Work in this group wins over the Bot's own chat or another group.
+// Only work in this group counts here; work elsewhere shows on the Bot's own chat
+// (its 'in {group}' capsule and sidebar group tag), not in every group it is in (#473).
 export function memberWork(room, work = NO_WORK) {
   const here = work.rooms?.[room.id] ?? []
   return room.members.map((id) => {
     const approvals = (work.approvals ?? []).filter(entry => entry.botId === id)
     const local = here.find(entry => entry.botId === id)
-    const doing = local ? { ...local, roomId: room.id } : work.bots?.[id]
+    const doing = local ? { ...local, roomId: room.id } : undefined
     return { id, approvals, doing, here: local !== undefined, state: approvals.length > 0 ? 'ask' : doing ? 'work' : 'idle' }
   })
 }

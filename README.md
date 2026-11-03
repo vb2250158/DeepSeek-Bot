@@ -1,4 +1,6 @@
-This fork integrates upstream 0.2.4 with shared management for public Bots, Rabi assistant presets and deferred client loading. Private Bots require approval before native Bot tools publish their content to the team. Deleted private Bots retain protected folders, memory and chats until you release them in Settings. Rabi-bound Bots keep memory and learned skills under Rabi ownership; project AGENTS.md proposals remain available. Office directory inputs reject internal links, and PNG decoding bounds allocation and rejects truncated image data.
+This fork integrates upstream 0.2.6 (0.2.6-rabi.1) with shared management for public Bots, Rabi assistant presets and deferred client loading. Private Bots require approval before native Bot tools publish their content to the team. Deleted private Bots retain protected folders, memory and chats until you release them in Settings. Rabi-bound Bots keep memory and learned skills under Rabi ownership; project AGENTS.md proposals remain available. Office directory inputs reject internal links, and PNG decoding bounds allocation and rejects truncated image data.
+
+Responsive chat changes response strategy while keeping configured tools available. Automatic conversation rollover retains delegated results in their original parent Session; explicit stop drains only owned children. Public Bots keep equal management and can initiate group rounds with posts.
 
 <p align="center">
 
@@ -72,9 +74,9 @@ For this fork's host and browser clients, follow [Host deployment](host/README.m
 
 The desktop app brings its own DSH, so you don't need to install DSH first. Download it from [Releases](https://github.com/Fei2411/DS-Bot/releases):
 
-- Windows (x64): `DeepSeek-Bot-<version>-win-x64.exe`. Run it; it installs for your user only, without administrator rights. If Windows shows "Windows protected your PC", select **More info** → **Run anyway**.
-- macOS: `DeepSeek-Bot-<version>-mac-arm64.zip` for an Apple chip, `DeepSeek-Bot-<version>-mac-x64.zip` for Intel. Safari unzips it by itself; drag **DeepSeek Bot** into **Applications** and open it. When macOS says it cannot check the app, open **System Settings** → **Privacy & Security** and select **Open Anyway**.
-- Linux (x64): `DeepSeek-Bot-<version>-linux-x86_64.AppImage` runs on every distribution — make it executable and open it. It mounts through FUSE 2, which you may need to install first (`sudo apt install libfuse2t64` on Ubuntu 24.04+, `sudo dnf install fuse-libs` on Fedora, `sudo pacman -S fuse2` on Arch). On Ubuntu 24.04 and later an AppImage can refuse to start (Ubuntu restricts the sandbox it needs); the `DeepSeek-Bot-<version>-linux-amd64.deb` on Debian/Ubuntu does not have this problem and adds a menu entry.
+- Windows (x64): `DS-Bot-<version>-win-x64.exe`. Run it; it installs for your user only, without administrator rights. If Windows shows "Windows protected your PC", select **More info** → **Run anyway**.
+- macOS: `DS-Bot-<version>-mac-arm64.zip` for an Apple chip, `DS-Bot-<version>-mac-x64.zip` for Intel. Safari unzips it by itself; drag **DS Bot** into **Applications** and open it. When macOS says it cannot check the app, open **System Settings** → **Privacy & Security** and select **Open Anyway**.
+- Linux (x64): `DS-Bot-<version>-linux-x86_64.AppImage` runs on every distribution — make it executable and open it. It mounts through FUSE 2, which you may need to install first (`sudo apt install libfuse2t64` on Ubuntu 24.04+, `sudo dnf install fuse-libs` on Fedora, `sudo pacman -S fuse2` on Arch). On Ubuntu 24.04 and later an AppImage can refuse to start (Ubuntu restricts the sandbox it needs); the `DS-Bot-<version>-linux-amd64.deb` on Debian/Ubuntu does not have this problem and adds a menu entry.
 
 At the first start the app asks where to keep its data and the Bots' files, and offers to copy a Bot team from your DSH (it only reads your DSH). Set up a model in its settings. The Windows app and the Linux AppImage update themselves; the macOS app and the Linux deb tell you when a new version is ready to download.
 

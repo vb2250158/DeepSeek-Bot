@@ -47,8 +47,8 @@ async function measure(responsiveChat) {
       await sleep(5, undefined, { signal: options.signal })
       const phase = plan.phase++
       if (plan.task !== 'hello' && phase === 0) {
-        const name = plan.task === 'blocked' ? 'late_scoped_fixture' : responsiveChat ? 'subagent' : 'slow_fixture'
-        const args = responsiveChat && plan.task !== 'blocked' ? { description: 'Isolated latency fixture task', prompt: plan.task } : {}
+        const name = plan.task === 'late-tool' ? 'late_scoped_fixture' : responsiveChat ? 'subagent' : 'slow_fixture'
+        const args = responsiveChat && plan.task !== 'late-tool' ? { description: 'Isolated latency fixture task', prompt: plan.task } : {}
         const block = { type: 'tool-call', id: ToolCallId(`native-call-${++callSequence}`), name, arguments: JSON.stringify(args) }
         yield { type: 'block-start', index: 0, blockType: 'tool-call' }
         yield { type: 'tool-call-delta', index: 0, id: block.id, name, argumentsDelta: block.arguments }
@@ -56,7 +56,7 @@ async function measure(responsiveChat) {
         yield { type: 'finish', reason: { kind: 'tool-calls' } }
         return
       }
-      const text = plan.task === 'blocked' ? 'Fixture slow call refused.' : phase === 1 && plan.task !== 'hello' && responsiveChat ? 'Fixture task accepted; result pending.' : 'Fixture response.'
+      const text = plan.task === 'late-tool' ? 'Fixture late scoped call completed.' : phase === 1 && plan.task !== 'hello' && responsiveChat ? 'Fixture task accepted; result pending.' : 'Fixture response.'
       yield { type: 'block-start', index: 0, blockType: 'text' }
       yield { type: 'text-delta', index: 0, text }
       yield { type: 'block-end', index: 0, block: { type: 'text', text } }
@@ -107,7 +107,7 @@ async function measure(responsiveChat) {
       inject: ['tools', 'systemPrompt'],
       apply(scope) {
         const rt = {
-          ctx: scope, state: { bots: {}, rooms: {} }, responsiveChat: resolveResponsiveChat({ responsiveChat }),
+          ctx: scope, teamTools: [], state: { bots: {}, rooms: {} }, responsiveChat: resolveResponsiveChat({ responsiveChat }),
           load: async () => {}, selfOf: id => bots.has(id) ? id : undefined,
           botOf: id => bots.get(id), roomOf: () => undefined, isBotSession: id => bots.has(id),
           warn: (...args) => console.warn(...args),
@@ -132,7 +132,7 @@ async function measure(responsiveChat) {
       pendingReplies.set(agent.id, first)
       const started = performance.now()
       agent.followup(createUserMessage({ content: [{ type: 'text', text: task }], source: { kind: 'user' } }))
-      const timeout = setTimeout(() => first.reject(new Error(`No reply within 25000ms: ${agent.id}`)), 25_000)
+      const timeout = setTimeout(() => first.reject(new Error(`No reply within 25000ms: ${agent.id}; events=${JSON.stringify(agent.session.snapshotEvents().slice(-8))}`)), 25_000)
       try {
         const at = await first.promise
         await agent.whenIdle()
@@ -149,17 +149,17 @@ async function measure(responsiveChat) {
     const duringWorkers = await Promise.all(roots.map(agent => send(agent, 'hello')))
     const afterFailure = []
     const faultDispatch = []
-    let blockedCallMs
+    let lateToolCallMs
     if (responsiveChat) {
       assert.equal(workers.filter(worker => worker.state === 'running').length, 3)
       roots[3].ctx.tools.register(defineTool({
-        name: 'late_scoped_fixture', description: 'A late scoped fixture which must not execute.', parameters: {},
+        name: 'late_scoped_fixture', description: 'A late scoped fixture which remains available.', parameters: {},
         output: { schema: { type: 'string' }, render: (_args, text) => [{ type: 'text', text }] },
-        execute: async () => { lateToolExecutions += 1; return 'Unexpected execution' },
+        execute: async () => { lateToolExecutions += 1; return 'Fixture late scoped result' },
       }))
-      blockedCallMs = await send(roots[3], 'blocked')
-      assert.equal(lateToolExecutions, 0)
-      assert.ok(roots[3].session.snapshotEvents().some(event => event.type === 'tool/result' && JSON.stringify(event.data).includes('Responsive chat cannot run')))
+      lateToolCallMs = await send(roots[3], 'late-tool')
+      assert.equal(lateToolExecutions, 1)
+      assert.ok(roots[3].session.snapshotEvents().some(event => event.type === 'tool/result' && JSON.stringify(event.data).includes('Fixture late scoped result')))
       faultDispatch.push(await send(roots[3], 'fail'))
       faultDispatch.push(await send(roots[3], 'hang'))
       await sleep(200)
@@ -172,12 +172,12 @@ async function measure(responsiveChat) {
     for (const root of roots) await root.whenIdle()
     if (responsiveChat) {
       assert.ok(notices.length >= 5)
-      assert.ok(blockedCallMs <= 10_000)
+      assert.ok(lateToolCallMs <= 10_000)
       for (const sample of [...short, ...slow, ...duringWorkers, ...afterFailure, ...faultDispatch]) assert.ok(sample <= 10_000)
     }
     const deliveredNotices = roots.reduce((total, root) => total + root.session.snapshotEvents().filter(event => event.type === 'user/message' && event.data.source?.kind === 'subagent-settled').length, 0)
     if (responsiveChat) assert.equal(deliveredNotices, 5)
-    return { responsiveChat, scope: 'real DSH AgentLoop + native tool executor + managed subagent runtime + ds-bot tools/prompt; scripted 5ms LLM and bounded fixture worker; no full Web Host or real model', unit: 'ms', short: stats(short), slow: stats(slow), whileWorkersRun: stats(duringWorkers), faultDispatch: faultDispatch.length ? stats(faultDispatch) : null, afterWorkerFailureOrTimeout: afterFailure.length ? stats(afterFailure) : null, blockedCallMs, lateToolExecutions, workerStates: workers.map(worker => worker.state), nativeCompletionNotices: notices.length, deliveredNotices, visibleRootTools: ctx.tools.schemas(roots[0]).map(tool => tool.name) }
+    return { responsiveChat, scope: 'real DSH AgentLoop + native tool executor + managed subagent runtime + ds-bot tools/prompt; scripted 5ms LLM and bounded fixture worker; no full Web Host or real model', unit: 'ms', short: stats(short), slow: stats(slow), whileWorkersRun: stats(duringWorkers), faultDispatch: faultDispatch.length ? stats(faultDispatch) : null, afterWorkerFailureOrTimeout: afterFailure.length ? stats(afterFailure) : null, lateToolCallMs, lateToolExecutions, workerStates: workers.map(worker => worker.state), nativeCompletionNotices: notices.length, deliveredNotices, visibleRootTools: ctx.tools.schemas(roots[0]).map(tool => tool.name) }
   } finally {
     await ctx.fiber.dispose()
     if (previousHome === undefined) delete process.env.DSH_HOME

@@ -11,10 +11,11 @@ async function start(t, config = {}) {
   const rooms = { first: { id: 'first', name: 'First' }, second: { id: 'second', name: 'Second' } }
   const tools = new Map()
   let readOnly
-  const rt = { home, config, roomOf: id => rooms[id], readOnly: () => readOnly, warn() {},
+  const rt = { home, config, teamTools: [], roomOf: id => rooms[id], readOnly: () => readOnly, warn() {},
     ctx: { tools: { register: tool => tools.set(tool.name, tool) } }, load: async () => {}, selfOf: id => id,
     botOf: id => id === 'member' ? { id } : undefined, pickRoom: name => ({ room: Object.values(rooms).find(room => room.name === name) }) }
   install(rt)
+  for (const tool of rt.teamTools) tools.set(tool.name, tool)
   return { rt, home, rooms, tools, lock: () => { readOnly = 'Another Host owns this team' },
     call: (endpoint, body = {}) => rt.groupLibraryEndpoint(`group-library-${endpoint}`, { roomId: 'first', ...body }) }
 }

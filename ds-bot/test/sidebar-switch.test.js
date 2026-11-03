@@ -36,24 +36,26 @@ const react = {
 }
 const module = { exports: {} }
 const viewport = { innerWidth: 1280 }
-runInNewContext(outputFiles[0].text, {
+const sandbox = {
   module, exports: module.exports,
   require: name => (name === 'react' ? react : {}),
   window: viewport,
-})
+}
+runInNewContext(outputFiles[0].text, sandbox)
 const { SHELL_CSS, SIDEBAR_CSS, TeamSidebar } = module.exports
 
-function navigationSidebar(wide, { shell = true } = {}) {
+function navigationSidebar(wide, { shell = true, ready = true, bootFailed = false } = {}) {
   const calls = []
   const refs = []
   let collapsed = !wide
   const bot = { id: 'writer', name: 'Writer', createdAt: 1 }
   const room = { id: 'room', name: 'Team', members: [], createdAt: 2 }
   const agent = { id: 'agent', sessions: ['session'], createdAt: 3 }
-  const roster = { bots: [bot], rooms: [room], agents: [agent], byId: { writer: bot }, ready: true }
+  const roster = { bots: [bot], rooms: [room], agents: [agent], byId: { writer: bot }, ready }
   const actions = Object.fromEntries(['openSession', 'openAgent', 'openAgentSession', 'newAgentSession'].map(name => [name, id => { calls.push([name, id]); return id }]))
   actions.toggleSidebar = () => { collapsed = !collapsed; calls.push(['toggleSidebar']) }
   const rows = []
+  let tree
   const walk = (node) => {
     if (Array.isArray(node)) { node.forEach(walk); return }
     if (!node || typeof node !== 'object') return
@@ -68,10 +70,10 @@ function navigationSidebar(wide, { shell = true } = {}) {
     renderRefs = refs
     refIndex = 0
     layoutEffects = []
-    const tree = TeamSidebar({
+    tree = TeamSidebar({
       wide, actions,
       ...(shell ? { expandSidebar: () => { if (committedCollapsed) actions.toggleSidebar() } } : {}),
-      useRoster: pick => pick(roster), useUi: pick => pick({ unread: {} }), useRegistry: pick => pick({}),
+      useRoster: pick => pick(roster), useUi: pick => pick({ unread: {}, bootFailed }), useRegistry: pick => pick({}),
       useSessions: pick => pick({ ids: [], byId: {} }), useUpdate: () => ({}),
     })
     renderRefs = undefined
@@ -82,7 +84,7 @@ function navigationSidebar(wide, { shell = true } = {}) {
     walk(tree)
   }
   render()
-  return { calls, rows, actions, render, get collapsed() { return collapsed } }
+  return { calls, rows, actions, render, get tree() { return tree }, get collapsed() { return collapsed } }
 }
 
 for (const width of [390, 1023, 1024, 1280]) {
@@ -368,4 +370,11 @@ test('wide Bot and group rows reveal a cut label and clear it when it fits', () 
     button.props.onMouseEnter({ currentTarget: target })
     assert.equal(target.title, undefined)
   }
+})
+
+
+test('the native sidebar distinguishes startup failure from setup without adding another frame', () => {
+  const textOf = node => Array.isArray(node) ? node.map(textOf).join(' ') : typeof node === 'string' ? node : node && typeof node === 'object' ? textOf(node.props?.children) : ''
+  assert.match(textOf(navigationSidebar(true, { ready: false }).tree), /Setting up your Bots/)
+  assert.match(textOf(navigationSidebar(true, { ready: false, bootFailed: true }).tree), /The Bot team could not start/)
 })

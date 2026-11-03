@@ -93,9 +93,8 @@ async function bench(responsiveChat, startupOnly = false) {
     await delay(5)
     const slow = message.content.some(block => block.text?.includes('slow-fixture'))
     if (slow) {
-      const exec = { name: 'slow_fixture', agent: agents.get(id) }
-      const refused = ctx.guards.map(guard => guard(exec)).find(value => value !== undefined)
-      if (refused) ctx.registeredTools.get('subagent').execute()
+      // The scripted model chooses dispatch; tool access itself stays unchanged.
+      if (responsiveChat) ctx.registeredTools.get('subagent').execute()
       else await delay(11_000)
     }
     const text = slow && responsiveChat ? 'Fixture work dispatched.' : 'Fixture reply.'
@@ -118,7 +117,7 @@ async function bench(responsiveChat, startupOnly = false) {
         const message = { content: request.content, source: { kind: 'user' } }
         if (request.sessionId !== 'room') return enqueue(request.sessionId, message)
         emit('room', 'user/message', message)
-        return ctx.registeredTools.get('group_relay').execute({}, { agent: { id: 'room' }, callId: `fixture-${++sequence}`, signal: AbortSignal.timeout(10_000) })
+        return rt.teamTools.find(tool => tool.name === 'group_relay').execute({}, { agent: { id: 'room' }, callId: `fixture-${++sequence}`, signal: AbortSignal.timeout(10_000) })
       },
     },
   })
@@ -162,7 +161,7 @@ async function bench(responsiveChat, startupOnly = false) {
       assert.ok(afterFailure <= 10_000)
     }
     const contextDistributions = Object.fromEntries(Object.keys(contexts[0]).map(key => [key, stats(contexts.map(sample => sample[key]))]))
-    return { responsiveChat, scope: 'keyless fakeContext API send to scripted reply; 5ms model stub, 11s slow tool stub; group relay is real plugin code, no real model or Host', unit: 'ms', ...timings, groupRepliesPerSecond: groupReplies / (groupElapsed / 1000), groupThroughputRepliesPerSecond: stats(group.map(elapsed => 4000 / elapsed)), context, contextDistributions, afterWorkerFailuresMs: afterFailure, failedFixtureWorkers: workers.filter(worker => worker.state === 'failed').length, stillRunningFixtureWorkers: workers.filter(worker => worker.state === 'running').length }
+    return { responsiveChat, scope: 'keyless fakeContext API send to scripted reply; 5ms model stub, 11s slow tool stub; responsive dispatch is a scripted model choice; group relay is real plugin code, no real model or Host', unit: 'ms', ...timings, groupRepliesPerSecond: groupReplies / (groupElapsed / 1000), groupThroughputRepliesPerSecond: stats(group.map(elapsed => 4000 / elapsed)), context, contextDistributions, afterWorkerFailuresMs: afterFailure, failedFixtureWorkers: workers.filter(worker => worker.state === 'failed').length, stillRunningFixtureWorkers: workers.filter(worker => worker.state === 'running').length }
   } finally {
     for (const worker of workers) worker.finish()
     await Promise.all(workers.map(worker => worker.completion))

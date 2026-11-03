@@ -11,5 +11,5 @@ test('responsive chat is opt-in and validates its configuration', () => {
   }
   const policy = resolveResponsiveChat({ responsiveChat: true, responsiveChatDelegationTools: ['dispatch', 'dispatch'] })
   assert.deepEqual(policy.delegates, ['dispatch'])
-  assert.deepEqual([...policy.allowed], ['dispatch', 'job_list'])
+  assert.equal('allowed' in policy, false, 'response strategy does not define a hidden tool whitelist')
 })
