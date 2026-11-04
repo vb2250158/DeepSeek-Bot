@@ -27,27 +27,26 @@ The Bot team:
 
 ## Commands
 
-Run in `ds-bot/`. The unit tests and the linter load the `@deepseek-ai/*` packages from `dev/harness/`, which `npm run harness` installs from npm at the DSH version in `dev/harness/package.json`. `DSH_HARNESS` points them at another install or at a DeepSeek Harness checkout instead. The test bench needs a checkout at `../deepseek-harness` (or `DSH_HARNESS`), at the DSH version in the README.
+Use the current Windows source Web target in [docs/dev/testing.md](docs/dev/testing.md): Node `24.15.0`, npm `11.12.1`, pnpm `11.28.5`, Core `de3fc0d70888e6ef7c2c6b64cb6d4f0c11db4ca2` / `0.2.2-alpha.3`. Set `DSH_HARNESS` to that independent Core source checkout. Prepare only the existing native Host, Host/Client library and Web build steps listed there; do not install older npm Core versions for compatibility or build SDK executables and desktop/mobile packages.
 
-```sh
-npm ci                                 # build tool only (esbuild)
-npm run harness                        # once: the DSH packages for the tests and the linter
-npm run build                          # src/client → client.js
-npm test                               # unit tests; also fail if client.js is stale
-node scripts/build-client.mjs --check  # client.js matches src/client
-npm run lint                           # oxlint
-CONTEXT_WINDOW=100000 CHECK_RATIO=0.45 dev/bench.sh smoke 3096 8796 reset && node dev/smoke.mjs smoke 3096   # smoke test
-dev/bench.sh smoke 3096 8796 stop
+In `ds-bot/`:
+
+```powershell
+npm ci
+npm test -- --test-concurrency=4
+node scripts/build-client.mjs --check
+npm run lint
+node dev/ci-web-smoke.mjs
 ```
 
-A change is done when `npm test`, the `--check` and `npm run lint` pass; CI runs them on every pull request. Run the smoke test as well for changes to `index.js` or `src/host/`. Use a free port for each bench, and stop every bench and process that you started.
+Select local checks by the changed surface and reuse passing evidence with unchanged inputs. Keep current behavior and production-history regressions. CI runs this one Windows target plus the tracked-tree leak scan; documentation and configuration changes do not justify replaying unrelated historical suites. The recorded formal Core564 / `0.2.2-alpha.2` baseline is separate from the tested candidate.
 
 ## Branches, pull requests and issues
 
 The full workflow is in [CONTRIBUTING.md](CONTRIBUTING.md#how-we-work). The parts that an agent must follow:
 
-- Start work from the latest `dev` on a branch named `fix/<issue>-<name>`, `feat/<issue>-<name>`, `docs/<name>` or `chore/<name>`. Never start a branch name with `dev/`. Open the pull request into `dev`, not `main`; only releases and hotfixes go into `main`.
-- Bring a branch up to date with `git merge dev`. Never rebase a pushed branch and never force-push.
+- Maintain this fork on the existing `main`; do not create maintenance branches. The upstream contribution workflow in CONTRIBUTING is separate from routine fork maintenance.
+- Publish normal commits with an ordinary push and verify the remote commit. Preserve unrelated drafts and existing history.
 - Fill in the pull request template. Link the issue with `Fixes #<number>`; a bug fix names the bug it fixes. Write the user-visible change in the Changelog field, and do not edit `CHANGELOG.md`.
 - Do not start work on an issue or pull request with the `maintainer` label; it waits for the maintainer. Do not take an issue that someone else is assigned to.
 - Before you change behavior, read the design for it in `docs/plans/` (and `docs/vision.md`); for interface work also `docs/design/ui-standard.md`. A change to a decided design needs the maintainer; a new large feature adds its design note to the same pull request.

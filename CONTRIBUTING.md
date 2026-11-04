@@ -14,7 +14,7 @@ Collaborators of this repository push branches here and open pull requests into 
 2. **Bots run in DSH Sessions.** A Bot keeps its identity while its work runs in DSH Sessions: one for its own chat, one for each group, a fresh one when the context fills up. Every turn goes through the normal DSH agent loop, tools and model routes. Do not add a second agent runtime.
 3. **No real secrets anywhere.** Do not commit API keys, tokens, cookies, `DSH_HOME` folders, logs or screenshots with personal data. The tests and the test bench use a scripted mock model and need no key.
 4. **Only original material.** Do not copy code, text, icons, logos or other graphics from other products or websites. Code under a license compatible with Apache 2.0 is the only exception: say where it comes from and add its notice to a `NOTICE` file.
-5. **Every change is tested.** Run the unit tests and the client check for every change (see [Test a change](#test-a-change)).
+5. **Validate affected behavior.** Select checks using [Test a change](#test-a-change), and reuse passing results whose inputs have not changed.
 
 ## How we work
 
@@ -77,35 +77,9 @@ Keep one pull request to one issue. Split a large change into several pull reque
 
 ## Set up
 
-You need:
+This fork uses Windows x64, Node.js `24.15.0`, npm `11.12.1` and pnpm `11.28.5`. Tests pin public Core source `de3fc0d70888e6ef7c2c6b64cb6d4f0c11db4ca2` (host `0.2.2-alpha.3`), with `DSH_HARNESS` pointing at an independent source checkout. Do not download an older npm Core with `npm run harness`. The [test policy](docs/dev/testing.md) records source build commands and distinguishes the candidate from production Core564 / `0.2.2-alpha.2`.
 
-- Node.js `22.19` or later (or `24` and later).
-- Git.
-- For the test bench only: pnpm `11` and a checkout of DeepSeek Harness at the DSH version that the plugin is tested with.
-
-```sh
-git clone https://github.com/Fei2411/DS-Bot.git ds-bot-repo
-cd ds-bot-repo/ds-bot
-
-# The plugin's own build tool (esbuild only).
-npm ci
-
-# The DSH packages that the unit tests and the linter load, from npm, into dev/harness/.
-npm run harness
-```
-
-For the test bench, add the DeepSeek Harness checkout next to the plugin folder (this folder is ignored by Git):
-
-```sh
-cd ..
-git clone https://github.com/deepseek-ai/deepseek-harness.git
-git -C deepseek-harness checkout dsh-v0.2.1-rc.5
-(cd deepseek-harness && pnpm install)
-```
-
-If your DeepSeek Harness checkout is somewhere else, set `DSH_HARNESS` to its path. `DSH_HARNESS` also takes the place of `dev/harness/` for the unit tests and the linter.
-
-The `@deepseek-ai/*` packages are peer dependencies: in a real install, the DSH profile supplies them. `ds-bot/.npmrc` keeps npm from installing them into the plugin folder.
+Run `npm ci` in `ds-bot/` for plugin tools. The source host supplies `@deepseek-ai/*` peers; `.npmrc` keeps npm from installing those peers in the plugin folder.
 
 ## Layout
 
@@ -121,41 +95,9 @@ The `@deepseek-ai/*` packages are peer dependencies: in a real install, the DSH 
 
 ## Test a change
 
-Run these in `ds-bot/`:
+Select checks for the affected surface using the [test policy](docs/dev/testing.md), and reuse passing evidence whose inputs have not changed. Keep current-version behavior, saved-data, Session, binding, memory and recovery assertions. Documentation or CI-only changes do not require unrelated full historical acceptance.
 
-```sh
-npm run build                          # src/client → client.js
-npm test                               # unit tests; they also fail if client.js is stale
-node scripts/build-client.mjs --check  # client.js matches src/client
-npm run lint                           # oxlint
-```
-
-CI runs the same three checks on every pull request, on Linux and Windows. It also scans the tracked files for keys, tokens, personal paths and e-mail addresses, and for material that must stay local. To run the scan yourself, from the repository root:
-
-```sh
-mkdir -p /tmp/ds-bot-tree && git archive HEAD | tar -x -C /tmp/ds-bot-tree && node scripts/scan.mjs /tmp/ds-bot-tree
-```
-
-A "must fix" finding fails CI; "can stay" findings are for reading. The branch rules require the single check **Test result**, which passes only when all the checks pass.
-
-For a change to the server side (`index.js`, `src/host/`), also run the smoke test. It starts the mock model and a DSH Web with the plugin linked from your checkout, and walks through the main flows (Bots, group chats, conversation parts, condensing, settings). `CONTEXT_WINDOW` and `CHECK_RATIO` give the mock models a small window, so a few long replies reach the check line:
-
-```sh
-CONTEXT_WINDOW=100000 CHECK_RATIO=0.45 dev/bench.sh smoke 3096 8796 reset && node dev/smoke.mjs smoke 3096
-dev/bench.sh smoke 3096 8796 stop
-```
-
-To try the plugin by hand, start a bench and open the address that it prints:
-
-```sh
-dev/bench.sh dev 3081 8771 reset    # mock model + DSH Web; data in ../.dsh-test-dev
-```
-
-The mock model answers a fixed set of commands, so a bench costs no tokens. The commands are listed at the top of `dev/mock-llm.mjs`. Bench data stays in `.dsh-test-<name>/` next to the plugin folder and never touches your own `~/.dsh`.
-
-For a change to the context steward or its prompts (`src/host/steward.js`), also check it on a real model. `dev/steward-eval.mjs` runs its decisions on fixed conversation endings, and `dev/llm-tap.mjs` logs every call a real bench makes. Both cost tokens and explain their use at the top.
-
-For a change to the Bot browser, check it in DSH Desktop. On Linux, the scripts in `dev/desktop-linux/` run DSH Desktop under Xvfb; each script explains its use at the top.
+The single Windows **Test result** CI job runs current behavior regressions, generated-artifact consistency, lint, source Host Web smoke and a leak scan of the tracked publication tree. It has no old-DSH, multi-Node or multi-OS matrix and does not automatically test or package desktop, mobile, Docker or SDK products. The test policy owns the source-host preparation and commands.
 
 ## Write a change
 

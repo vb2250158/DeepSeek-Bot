@@ -30,6 +30,12 @@ Still stuck? [Report an install problem](https://github.com/Fei2411/DS-Bot/issue
 还是装不上？[报告安装问题](https://github.com/Fei2411/DS-Bot/issues/new?template=install.yml)。
 </details>
 
+## 受测宿主与环境
+
+本维护 fork 的单一受测目标为 Windows x64、Node.js `24.15.0`、npm `11.12.1`、pnpm `11.28.5`，使用公开 Core 源码 `vb2250158/deepseek-harness@de3fc0d70888e6ef7c2c6b64cb6d4f0c11db4ca2`（`0.2.2-alpha.3`）运行 Web。CI runner 为 `windows-2025`。不运行旧宿主或跨平台兼容矩阵。
+
+2026-11-04 记录的正式基线仍为 Core `564bd14e9ec1d82d3e2985dbd8dea9f40129d71a`（`0.2.2-alpha.2`）；上述候选不代表已实装。源码准备、行为与历史数据回归、Web smoke 及 CI 范围见[测试标准](docs/dev/testing.md)。
+
 **DS Bot**: the desktop app, the project and the plugin / 桌面应用、项目和插件 · **DeepSeek Harness (DSH)**: what they are built on / 它们的底层
 
 快速响应模式只改变回复策略，保留已配置的工具。自动转段时，子任务结果仍交回原父会话；显式停止只处理所属子任务。公开 Bot 保持平等管理，发送群消息仍可发起一轮讨论。

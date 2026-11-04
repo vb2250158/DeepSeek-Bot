@@ -30,6 +30,12 @@ Still stuck? [Report an install problem](https://github.com/Fei2411/DS-Bot/issue
 还是装不上？[报告安装问题](https://github.com/Fei2411/DS-Bot/issues/new?template=install.yml)。
 </details>
 
+## Tested host and environment
+
+This maintenance fork tests Windows x64, Node.js `24.15.0`, npm `11.12.1` and pnpm `11.28.5`, running Web from public Core source `vb2250158/deepseek-harness@de3fc0d70888e6ef7c2c6b64cb6d4f0c11db4ca2` (`0.2.2-alpha.3`). The CI runner is `windows-2025`. Earlier-host and cross-platform compatibility matrices are outside this target.
+
+The recorded production baseline on 2026-11-04 remains Core `564bd14e9ec1d82d3e2985dbd8dea9f40129d71a` (`0.2.2-alpha.2`); the candidate above is not a formal-installation claim. See the [test policy](docs/dev/testing.md) for source preparation, behavior and saved-data regressions, Web smoke and CI scope.
+
 **DS Bot**: the desktop app, the project and the plugin / 桌面应用、项目和插件 · **DeepSeek Harness (DSH)**: what they are built on / 它们的底层
 
 Responsive chat changes response strategy while keeping configured tools available. Automatic conversation rollover retains delegated results in their original parent Session; explicit stop drains only owned children. Public Bots keep equal management and can initiate group rounds with posts.

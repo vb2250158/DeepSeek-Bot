@@ -14,7 +14,7 @@
 2. **Bot 的工作跑在 DSH Session 里。** Bot 的身份不变，工作跑在 DSH Session 里：私聊一条、每个群各一条，上下文快满时换一条新的。每个回合都走 DSH 正常的 agent 循环、工具和模型路由。不要另加一套 agent 运行时。
 3. **任何地方都不放真实密钥。** 不要提交 API key、token、cookie、`DSH_HOME` 目录、日志，或带个人信息的截图。测试和测试台用脚本化的模拟模型，不需要密钥。
 4. **只用原创素材。** 不要从其他产品或网站复制代码、文字、图标、logo 或其他图形。唯一例外是与 Apache 2.0 兼容许可的代码：注明出处，并把它的声明加进 `NOTICE` 文件。
-5. **每个改动都要测试。** 每个改动都要跑单元测试和客户端检查（见[测试改动](#测试改动)）。
+5. **验证受影响的行为。** 按[测试改动](#测试改动)选择检查，复用输入未变化的通过结果。
 
 ## 协作方式
 
@@ -77,35 +77,9 @@
 
 ## 搭建环境
 
-需要：
+本 fork 使用 Windows x64、Node.js `24.15.0`、npm `11.12.1` 和 pnpm `11.28.5`。测试固定公开 Core 源码 `de3fc0d70888e6ef7c2c6b64cb6d4f0c11db4ca2`（宿主 `0.2.2-alpha.3`），`DSH_HARNESS` 指向独立源码目录；不再通过 `npm run harness` 下载旧 npm Core。正式 Core564/`0.2.2-alpha.2` 与候选的区别、现有源码构建命令见[测试标准](docs/dev/testing.md)。
 
-- Node.js `22.19` 或更高（或 `24` 及以上）。
-- Git。
-- 仅测试台需要：pnpm `11`，以及插件测试所用 DSH 版本的 DeepSeek Harness 源码。
-
-```sh
-git clone https://github.com/Fei2411/DS-Bot.git ds-bot-repo
-cd ds-bot-repo/ds-bot
-
-# 插件自己的构建工具（只有 esbuild）。
-npm ci
-
-# 单元测试和 lint 要加载的 DSH 包，从 npm 装进 dev/harness/。
-npm run harness
-```
-
-测试台需要把 DeepSeek Harness 源码放在插件目录旁边（这个目录被 Git 忽略）：
-
-```sh
-cd ..
-git clone https://github.com/deepseek-ai/deepseek-harness.git
-git -C deepseek-harness checkout dsh-v0.2.1-rc.5
-(cd deepseek-harness && pnpm install)
-```
-
-如果 DeepSeek Harness 源码放在别处，把 `DSH_HARNESS` 设为它的路径。`DSH_HARNESS` 也会代替 `dev/harness/`，供单元测试和 lint 使用。
-
-`@deepseek-ai/*` 包是 peer 依赖：真实安装时由 DSH 的 profile 提供。`ds-bot/.npmrc` 阻止 npm 把它们装进插件目录。
+在 `ds-bot/` 运行 `npm ci` 安装插件工具。`@deepseek-ai/*` peer 由源码宿主提供；`.npmrc` 阻止 npm 将它们安装到插件目录。
 
 ## 目录结构
 
@@ -121,41 +95,9 @@ git -C deepseek-harness checkout dsh-v0.2.1-rc.5
 
 ## 测试改动
 
-在 `ds-bot/` 里运行：
+按[测试标准](docs/dev/testing.md)选择受影响的检查，复用输入未变化的通过结果。当前版本的行为、保存数据、Session、绑定、记忆和恢复断言继续保留。文档或 CI 配置改动不要求重跑无关的完整旧验收。
 
-```sh
-npm run build                          # src/client → client.js
-npm test                               # 单元测试；client.js 过期时也会失败
-node scripts/build-client.mjs --check  # client.js 与 src/client 一致
-npm run lint                           # oxlint
-```
-
-CI 在每个 Pull Request 上，在 Linux 和 Windows 上跑同样的三项检查。它还会扫描入库的文件，查找密钥、token、个人路径和邮箱，以及只应留在本地的材料。想自己扫描，在仓库根目录运行：
-
-```sh
-mkdir -p /tmp/ds-bot-tree && git archive HEAD | tar -x -C /tmp/ds-bot-tree && node scripts/scan.mjs /tmp/ds-bot-tree
-```
-
-「must fix」的结果会让 CI 失败；「can stay」的结果仅供阅读。分支规则只要求一项检查 **Test result**，所有检查都通过它才通过。
-
-改服务端（`index.js`、`src/host/`）时，还要跑冒烟测试。它启动模拟模型和一个链接到你本地插件的 DSH Web，走一遍主要流程（Bot、群聊、对话分段、压缩、设置）。`CONTEXT_WINDOW` 和 `CHECK_RATIO` 让模拟模型的上下文窗口变小，几条长回复就能到达检查线：
-
-```sh
-CONTEXT_WINDOW=100000 CHECK_RATIO=0.45 dev/bench.sh smoke 3096 8796 reset && node dev/smoke.mjs smoke 3096
-dev/bench.sh smoke 3096 8796 stop
-```
-
-想手动试用插件，启动一个测试台，打开它打印的地址：
-
-```sh
-dev/bench.sh dev 3081 8771 reset    # 模拟模型 + DSH Web；数据在 ../.dsh-test-dev
-```
-
-模拟模型只回应一组固定命令，所以测试台不花 token。命令列在 `dev/mock-llm.mjs` 开头。测试台数据放在插件目录旁边的 `.dsh-test-<名字>/`，不会碰你自己的 `~/.dsh`。
-
-改上下文管家或它的提示词（`src/host/steward.js`）时，还要用真实模型检查。`dev/steward-eval.mjs` 在固定的对话结尾上跑它的决策，`dev/llm-tap.mjs` 记录真实测试台的每次调用。两者都花 token，用法写在文件开头。
-
-改 Bot 浏览器时，要在 DSH Desktop 里检查。在 Linux 上，`dev/desktop-linux/` 里的脚本用 Xvfb 运行 DSH Desktop；每个脚本的用法写在开头。
+CI 的单一 Windows **Test result** 检查依次运行当前行为回归、构建产物一致性、lint、源码 Host Web smoke 和受跟踪发布树的泄漏扫描。没有旧 DSH、多 Node、多 OS 矩阵，也不自动测试或打包桌面、移动、Docker、SDK 产品。源码宿主准备与全部命令见测试标准。
 
 ## 写改动
 
