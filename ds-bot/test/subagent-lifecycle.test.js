@@ -11,14 +11,24 @@ import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
-import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import FsLocal from '@deepseek-ai/dsh-fs-local'
-import WorkingDirectory from '@deepseek-ai/dsh-working-directory'
 import SubagentRuntime from '@deepseek-ai/dsh-subagent'
 import { archivePreviousPart } from '../src/host/parts.js'
 import { drainSelectedChildren } from '../src/host/turns.js'
 
-test('a previous part waits only for its Core-owned workers and keeps exact-parent completion', async t => {
+const scopedLifecycle = typeof SubagentRuntime.prototype.waitForChildren === 'function'
+
+test('a previous part waits only for its Core-owned workers and keeps exact-parent completion', {
+  skip: scopedLifecycle ? false : 'This DSH release does not expose exact-parent child settlement.',
+}, async t => {
+  const { default: WorkingDirectory } = await import('@deepseek-ai/dsh-working-directory')
+  const executors = []
+  try {
+    executors.push(await import('@deepseek-ai/dsh-tool-executor-native'))
+  } catch (error) {
+    // Published DSH executes tools in ToolRuntime; newer Core mounts a separate executor.
+    if (error.code !== 'ERR_MODULE_NOT_FOUND' || !error.message.startsWith("Cannot find package '@deepseek-ai/dsh-tool-executor-native'")) throw error
+  }
   const home = await mkdtemp(join(tmpdir(), 'ds-bot-child-lifecycle-'))
   const previousHome = process.env.DSH_HOME
   t.diagnostic(`syntheticHome=${home}`)
@@ -39,7 +49,7 @@ test('a previous part waits only for its Core-owned workers and keeps exact-pare
       yield { type: 'finish', reason: { kind: 'stop' } }
     }
   }
-  for (const plugin of [LlmRuntime, SessionStore, SessionProjectionRegistry, SystemPrompt, ToolRuntime, NativeToolExecutor, AgentRegistry, FsLocal, WorkingDirectory]) await ctx.plugin(plugin)
+  for (const plugin of [LlmRuntime, SessionStore, SessionProjectionRegistry, SystemPrompt, ToolRuntime, ...executors, AgentRegistry, FsLocal, WorkingDirectory]) await ctx.plugin(plugin)
   await ctx.plugin(AgentLoop, { agents: [] })
   ctx.llm.registerAdapter(['child-lifecycle-fixture'], new ScriptedModel())
   await ctx.plugin(SubagentRuntime)
@@ -65,11 +75,15 @@ test('a previous part waits only for its Core-owned workers and keeps exact-pare
   const parent = await ctx.agentLoop.create(SessionId('old-chat-part'), { provider: 'child-lifecycle-fixture', model: 'scripted' }, { cwd: home })
   const fresh = await ctx.agentLoop.create(SessionId('new-chat-part'), { provider: 'child-lifecycle-fixture', model: 'scripted' }, { cwd: home })
   const other = await ctx.agentLoop.create(SessionId('other-bot-chat'), { provider: 'child-lifecycle-fixture', model: 'scripted' }, { cwd: home })
-  const start = agent => ctx.subagents.startActivation({
-    provider: provider.name, label: `task for ${agent.id}`,
-    request: { parent: agent, prompt: [{ type: 'text', text: 'Independent synthetic work' }], maxDepth: 1 },
-    signal: new AbortController().signal, delivery: 'parent',
-  })
+  const start = agent => {
+    const request = { parent: agent, prompt: [{ type: 'text', text: 'Independent synthetic work' }], maxDepth: 1 }
+    return ctx.subagents.startActivation({
+      provider: provider.name, label: `task for ${agent.id}`,
+      // Core's root-owner API was introduced with the flat activation fields.
+      ...(typeof ctx.subagents.rootOf === 'function' ? request : { request }),
+      signal: new AbortController().signal, delivery: 'parent',
+    })
+  }
   const child = await start(parent)
   const foreign = await start(other)
   const archived = []
@@ -105,4 +119,16 @@ test('a previous part waits only for its Core-owned workers and keeps exact-pare
   await ctx.fiber.dispose()
   assert.equal(workers.get(foreign.childId).state, 'aborted')
   assert.ok(workers.get(foreign.childId).disposed > 0)
+})
+
+test('a DSH without scoped child settlement retains the original part and rejects child teardown', async () => {
+  const archived = []
+  const parent = { id: 'original-part' }
+  const rt = {
+    ctx: { subagents: {}, workspaceRegistry: { archiveSession: async id => archived.push(id) } },
+    hasSubagents: id => id === parent.id,
+  }
+  await assert.rejects(archivePreviousPart(rt, parent), /original Session remains available/)
+  await assert.rejects(drainSelectedChildren(rt, parent.id, ['child']), /does not provide scoped child teardown/)
+  assert.deepEqual(archived, [])
 })

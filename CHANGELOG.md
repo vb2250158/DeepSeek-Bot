@@ -9,6 +9,7 @@ All notable changes to DS Bot are listed here. The format follows [Keep a Change
 - Wait for attached capabilities before sending a model request; keep the Bot creation UI responsive while MCP servers start.
 - Show group goals in the native workspace, retain unsent drafts, apply the Enter preference consistently, and recover memory-history transport errors locally.
 - Stop desktop startup after the user quits its first window, and isolate first-run test homes.
+- Exercise scoped child settlement on Core versions that provide it, and verify that older DSH versions retain the original part when workers are still active.
 
 ## [0.2.6-rabi.1] - 2026-11-03
 
