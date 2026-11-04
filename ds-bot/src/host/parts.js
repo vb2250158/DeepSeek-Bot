@@ -147,7 +147,7 @@ export function historyEntry(event, group) {
   if (event.type !== 'user/message' || (source?.kind !== 'user' && source?.kind !== SOURCE_KIND)) return undefined
   const text = textOf(event.data.content)
   const ours = source.kind === SOURCE_KIND
-  const skipped = (ours && (source.handoff === true || source.role === 'kickoff')) || (!group && text.startsWith('[Group chat'))
+  const skipped = (ours && (source.handoff === true || source.role === 'kickoff' || source.role === 'goal')) || (!group && text.startsWith('[Group chat'))
   // A turn that went on after a handoff did real work, so its answers stay.
   return { answer: false, who: ours ? 'bot' : 'user', text: skipped ? '' : text, keepAnswers: !skipped || (ours && source.resume === true) }
 }
@@ -885,7 +885,13 @@ export function install(rt) {
             source: job.info ? { ...job.info, ...carried } : { kind: SOURCE_KIND, form: 'relay', role: 'resume', exchangeId: randomUUID(), senderName: 'DS Bot', ...carried },
           }))
         }
-        await forward(job, back).then(() => {
+        const returnInput = async () => {
+          await forward(job, back)
+          // A retry may carry nothing because the earlier failure already put
+          // its input in this inbox. Its durability still decides the mark.
+          if (back.length === 0 && (agent.inbox.nextStep.length > 0 || agent.inbox.nextTurn.length > 0)) await ctx.sessions.flush(agent.session)
+        }
+        await returnInput().then(() => {
           delete state.switching[agent.id]
         }).catch((error) => {
           job.kept = true

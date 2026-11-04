@@ -27,6 +27,7 @@ const NOT_PUBLIC = /(^|[\s(`'"]|\.\.\/)(spec|research|backup|shots|attachments|w
 // Migration code and its tests must name the legacy ids (old package name, old theme and
 // color keys) to move saved data over; there, and on lines that say "legacy" (旧版), old names stay.
 const LEGACY_FILES = /(^|\/)(src\/client\/storage\.js|src\/legacy\.mjs|test\/legacy[\w-]*\.test\.(?:js|mjs))$/
+const PUBLIC_REPOSITORY_URL = /(?<![\w/:.+-])(?:git\+)?https:\/\/(?:github\.com\/|api\.github\.com\/repos\/|raw\.githubusercontent\.com\/)([A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?)\/(DeepSeek-Bot)(?:\.git)?(?=$|[/?#\s"'`<>)\]},;:。！，、])/gi
 
 const extra = extraPatterns()
 
@@ -56,7 +57,7 @@ const TEXT_RULES = [
   { id: 'third-party-logo', level: MUST, re: /WhaleLogo|favicon\.svg/g, notFiles: /(^|\/)test\// },
   { id: 'vendor-name', level: KEEP, re: new RegExp(VENDORS.source, 'gi'), notFiles: LOOK_FILES, summary: true },
   // Former names of the project and the package.
-  { id: 'retired-product-name', level: MUST, re: /deepseek[-_ ]?bot/gi, legacyOk: true, notFiles: /^CHANGELOG(?:\.[a-z]+)?\.md$/ },
+  { id: 'retired-product-name', level: MUST, re: /deepseek[-_ ]?bot/gi, legacyOk: true, notFiles: /^CHANGELOG(?:\.[a-z]+)?\.md$/, allowMatch: publicRepositoryReference },
   { id: 'old-project-name', level: MUST, re: /DSH Bot\b/g, legacyOk: true },
   { id: 'old-package-name', level: MUST, re: /\bdsh-bot\b/g, legacyOk: true },
   { id: 'legacy-name-in-migration', level: KEEP, re: /\bdsh-bot\b|DeepSeek Bot\b/gi, onlyLegacy: true, summary: true },
@@ -106,6 +107,7 @@ for (const file of files) {
       if (rule.onlyLegacy && !legacy) continue
       rule.re.lastIndex = 0
       for (const match of line.matchAll(rule.re)) {
+        if (rule.allowMatch?.(line, match)) continue
         if (rule.secret && PLACEHOLDER.test(match[0])) continue
         const shown = rule.secret ? `${match[0].slice(0, 6)}… (${match[0].length} chars)` : snippet(line, match.index, match[0].length)
         add(rule.level, rule.id, file, index + 1, shown, rule.summary)
@@ -134,6 +136,21 @@ for (const name of ['README.md', 'README.zh.md', 'CONTRIBUTING.md', 'CHANGELOG.m
 }
 
 report()
+
+// Repository slugs and exact labels linking to that repository are references,
+// not product copy. Only their matched spans are exempt; the line is still scanned.
+function publicRepositoryReference(line, match) {
+  for (const url of line.matchAll(PUBLIC_REPOSITORY_URL)) {
+    const slugAt = url.index + url[0].lastIndexOf(url[2])
+    if (match.index === slugAt && match[0].length === url[2].length) return true
+    const label = /\[(?:([A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?)\/)?(DeepSeek-Bot)(?:\.git)?\]\($/i.exec(line.slice(0, url.index))
+    if (label === null || (label[1] !== undefined && label[1].toLowerCase() !== url[1].toLowerCase())) continue
+    if (!/^[^\s<>"']*\)/.test(line.slice(url.index + url[0].length))) continue
+    const labelAt = label.index + label[0].lastIndexOf(label[2])
+    if (match.index === labelAt && match[0].length === label[2].length) return true
+  }
+  return false
+}
 
 function extraPatterns() {
   const local = join(dirname(fileURLToPath(import.meta.url)), '..', '.scan-extra')

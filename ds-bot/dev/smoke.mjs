@@ -12,6 +12,8 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSyn
 import { tmpdir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { waitForBenchIdle } from './smoke-settle.mjs'
+import { benchFetch } from './smoke-http.mjs'
 
 const [name, port, ...rest] = process.argv.slice(2)
 if (!name || !port) {
@@ -40,7 +42,7 @@ async function login() {
   const log = readFileSync(join(HOME, 'web.log'), 'utf8')
   const url = log.match(new RegExp(`http://127\\.0\\.0\\.1:${port}/\\?token=[^\\s]+`))?.[0]
   if (!url) throw new Error('no login URL in web.log')
-  const response = await fetch(url, { redirect: 'manual' })
+  const response = await benchFetch(url, { redirect: 'manual' })
   const cookies = response.headers.getSetCookie().map(cookie => cookie.split(';')[0])
   if (cookies.length === 0) throw new Error(`login returned no cookie (${response.status})`)
   return cookies.join('; ')
@@ -48,7 +50,7 @@ async function login() {
 
 const cookie = await login()
 async function api(endpoint, payload = {}) {
-  const response = await fetch(`${BASE}/api/bot`, {
+  const response = await benchFetch(`${BASE}/api/bot`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', cookie },
     body: JSON.stringify({ endpoint, payload }),
@@ -62,24 +64,10 @@ const state = () => readJson(join(HOME, 'bot', 'state.json'))
 const botNamed = wanted => Object.values(state().bots).find(bot => bot.name === wanted)
 const roomNamed = wanted => Object.values(state().rooms).find(room => room.name === wanted)
 
-// Quiet: no Bot shows an activity and the mock has taken no call for QUIET_MS. Deliveries
-// start a moment after a turn ends, so activity alone is not enough.
+// The Host's native turn/work state must finish before the quiet window starts.
+// An interactive card waiting for the user is not a running turn.
 async function settle() {
-  const deadline = Date.now() + STEP_TIMEOUT_MS
-  let calls = mockLog().length
-  let since = Date.now()
-  while (Date.now() < deadline) {
-    await sleep(400)
-    const { activity = {} } = await api('state')
-    const now = mockLog().length
-    if (now !== calls || Object.keys(activity).length > 0) {
-      calls = now
-      since = Date.now()
-    } else if (Date.now() - since >= QUIET_MS) {
-      return
-    }
-  }
-  throw new Error('the team did not go quiet')
+  await waitForBenchIdle({ readState: () => api('state'), readMockCount: () => mockLog().length, quietMs: QUIET_MS, timeoutMs: STEP_TIMEOUT_MS, wait: sleep })
 }
 
 // Ids differ between runs, so the transcript names Bots, groups and Sessions by owner.
@@ -386,12 +374,26 @@ const project = realpathSync.native(mkdtempSync(join(tmpdir(), 'ds-bot-smoke-fol
 const folderOf = sessionId => readdirSync(join(HOME, 'sessions')).find(dir => existsSync(join(HOME, 'sessions', dir, sessionId)))
 const coderParts = () => (botNamed('Coder').segments ?? []).length
 const partsBeforeFolder = coderParts()
+let movedTask
+await step('Coder creates a scheduled task before changing folders', () => api('schedule-create', {
+  target: botNamed('Coder').id, title: 'Folder move smoke', prompt: 'Check the folder move result.',
+  when: { kind: 'at', at: new Date(Date.now() + 86_400_000).toISOString() },
+}), value => {
+  movedTask = value.tasks.find(task => task.title === 'Folder move smoke')
+  const coder = botNamed('Coder')
+  return expect(movedTask?.sessionId === (coder.sessionId ?? coder.id), 'the new task does not target Coder')
+})
 await step('Coder works in a folder of its own', () => api('update-bot', { id: botNamed('Coder').id, workDir: project }), () => {
   const coder = botNamed('Coder')
   return expect(coder.workDir === project, `folder not saved (${coder.workDir})`)
     ?? expect(coderParts() === partsBeforeFolder + 1, `Coder has ${coderParts()} earlier parts, not ${partsBeforeFolder + 1}`)
     ?? expect(folderOf(coder.sessionId)?.includes(basename(project)), `Coder's chat is under ${folderOf(coder.sessionId)}`)
 })
+await step('the scheduled task follows Coder with the same identity', () => api('schedules'), value => {
+  const task = value.tasks.find(task => task.id === movedTask?.id)
+  return expect(task?.sessionId === botNamed('Coder').sessionId && task.sessionId !== movedTask?.sessionId, 'the task was lost or still targets the earlier part')
+})
+await step('Coder removes the moved scheduled task', () => api('schedule-delete', { id: movedTask?.id, sessionId: botNamed('Coder').sessionId }), value => expect(!value.tasks.some(task => task.id === movedTask?.id), 'the moved task remains'))
 await step('Coder answers from its folder', () => send(botNamed('Coder').id, '你好'), () => expect(coderParts() === partsBeforeFolder + 1, 'Coder moved on again'))
 await step('Coder goes back to the team workspace', () => api('update-bot', { id: botNamed('Coder').id, workDir: '' }), () => {
   const coder = botNamed('Coder')

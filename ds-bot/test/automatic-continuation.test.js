@@ -27,7 +27,7 @@ function fixture(t, config = {}) {
     for (const listener of ctx.listeners.get('session/event')) listener({ id }, event)
   }
   const end = reason => { emit('turn/start', { turn: 1 }); emit('turn/end', { reason }) }
-  return { rt, ctx, events, calls, prompts, warnings, emit, end, reads: () => reads,
+  return { rt, ctx, agent, events, calls, prompts, warnings, emit, end, reads: () => reads,
     hold: promise => { release = promise } }
 }
 
@@ -119,3 +119,132 @@ test('an exception from native continuation is reported without another attempt'
   assert.deepEqual(f.calls, [])
   assert.deepEqual(f.prompts, [])
 })
+
+test('Retry continues the pending quota turn and replaces its automatic timer', async t => {
+  const f = fixture(t)
+  f.end({ kind: 'error', error: { code: 'QUOTA' } })
+  assert.equal(await f.rt.continuePending('bot'), true)
+  assert.deepEqual(f.calls, [['quota', 1]])
+  t.mock.timers.tick(60000)
+  await flush()
+  assert.deepEqual(f.calls, [['quota', 1]])
+  assert.deepEqual(f.prompts, [])
+  // The native driver accepted, but may not have published turn/start yet.
+  assert.equal(await f.rt.continuePending('bot'), true)
+  assert.deepEqual(f.calls, [['quota', 1]])
+})
+
+test('Retry takes over an automatic lookup already in flight without a second native call', async t => {
+  const f = fixture(t)
+  let release
+  f.hold(new Promise(resolve => { release = resolve }))
+  f.end({ kind: 'error', error: { code: 'QUOTA' } })
+  t.mock.timers.tick(1000)
+  await flush()
+  assert.equal(f.reads(), 1)
+  const manual = f.rt.continuePending('bot')
+  await flush()
+  assert.equal(f.reads(), 2)
+  release()
+  assert.equal(await manual, true)
+  await flush()
+  assert.deepEqual(f.calls, [['quota', 1]])
+  assert.deepEqual(f.prompts, [])
+})
+
+test('Retry during the accepted automatic continuation waits for its turn to start', async t => {
+  const f = fixture(t)
+  f.end({ kind: 'error', error: { code: 'QUOTA' } })
+  t.mock.timers.tick(1000)
+  await flush()
+  assert.deepEqual(f.calls, [['quota', 1]])
+  assert.equal(await f.rt.continuePending('bot'), true)
+  assert.deepEqual(f.calls, [['quota', 1]])
+  f.emit('turn/start', { turn: 2 })
+  assert.equal(await f.rt.continuePending('bot'), false)
+})
+
+test('new input during a manual lookup prevents it from reviving the old turn', async t => {
+  const f = fixture(t)
+  let release
+  f.hold(new Promise(resolve => { release = resolve }))
+  f.end({ kind: 'error', error: { code: 'QUOTA' } })
+  const manual = f.rt.continuePending('bot')
+  await flush()
+  f.emit('user/message', { source: { kind: 'user' } })
+  release()
+  assert.equal(await manual, true)
+  assert.equal(await f.rt.continuePending('bot'), false)
+  t.mock.timers.tick(60000)
+  await flush()
+  assert.deepEqual(f.calls, [])
+  assert.deepEqual(f.prompts, [])
+})
+
+test('Retry returns false only when no pending native turn or no native driver is available', async t => {
+  const f = fixture(t)
+  assert.equal(await f.rt.continuePending('bot'), false)
+  f.end({ kind: 'error', error: { code: 'QUOTA' } })
+  f.agent.continueQuotaFailure = undefined
+  assert.equal(await f.rt.continuePending('bot'), false)
+  assert.deepEqual(f.calls, [])
+  assert.deepEqual(f.prompts, [])
+})
+
+test('a native refusal still handles Retry without sending a replacement message', async t => {
+  const f = fixture(t)
+  f.agent.continueQuotaFailure = seq => { f.calls.push(['refused', seq]); return false }
+  f.end({ kind: 'error', error: { code: 'QUOTA' } })
+  assert.equal(await f.rt.continuePending('bot'), true)
+  assert.deepEqual(f.calls, [['refused', 1]])
+  assert.deepEqual(f.prompts, [])
+})
+
+test('concurrent Retry requests share one pending native lookup', async t => {
+  const f = fixture(t)
+  let release
+  f.hold(new Promise(resolve => { release = resolve }))
+  f.end({ kind: 'error', error: { code: 'QUOTA' } })
+  const one = f.rt.continuePending('bot')
+  const two = f.rt.continuePending('bot')
+  await flush()
+  assert.equal(f.reads(), 1)
+  release()
+  assert.deepEqual(await Promise.all([one, two]), [true, true])
+  assert.deepEqual(f.calls, [['quota', 1]])
+})
+
+test('a failed Retry reports the unknown result and settles the original continuation', async t => {
+  const f = fixture(t)
+  const failures = []
+  f.rt.cancelTurnContinuation = (id, failure) => { if (failure) failures.push([id, failure]) }
+  f.end({ kind: 'error', error: { code: 'QUOTA' } })
+  f.agent.continueQuotaFailure = () => { throw new Error('Unknown native outcome') }
+  await assert.rejects(f.rt.continuePending('bot'), /Unknown native outcome/)
+  assert.deepEqual(failures, [['bot', { code: 'UNKNOWN', message: 'Unknown native outcome' }]])
+  t.mock.timers.tick(60000)
+  await flush()
+  assert.deepEqual(f.calls, [])
+  assert.deepEqual(f.prompts, [])
+})
+
+for (const stop of ['user-stop', 'read-only', 'active-turn', 'dispose']) {
+  test(`a ${stop} during Retry lookup leaves the pending turn stopped`, async t => {
+    const f = fixture(t)
+    let release
+    f.hold(new Promise(resolve => { release = resolve }))
+    f.end({ kind: 'error', error: { code: 'QUOTA' } })
+    const manual = f.rt.continuePending('bot')
+    await flush()
+    if (stop === 'user-stop') f.emit('turn/end', { reason: { kind: 'aborted', reason: { kind: 'user' } } })
+    if (stop === 'read-only') f.rt.readOnly = () => 'another Host owns the team'
+    if (stop === 'active-turn') f.rt.live.set('bot', { turn: 2 })
+    if (stop === 'dispose') await f.ctx.dispose()
+    release()
+    assert.equal(await manual, true)
+    t.mock.timers.tick(60000)
+    await flush()
+    assert.deepEqual(f.calls, [])
+    assert.deepEqual(f.prompts, [])
+  })
+}

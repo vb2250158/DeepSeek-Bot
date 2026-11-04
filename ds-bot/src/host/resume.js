@@ -163,6 +163,40 @@ export function install(rt) {
     attempts.delete(id)
     update(id, () => undefined)
   }
+  // Retry takes over the pending native attempt, not its original inbox claim.
+  // True owns the retry even if a newer input or a native refusal made it a no-op;
+  // false leaves the old-driver fallback to the caller.
+  rt.continuePending = async (id) => {
+    const queued = continuations.get(id)
+    if (queued === undefined) return false
+    if (queued.accepted) return true
+    if (queued.manual !== undefined) return queued.manual
+    clearTimeout(queued.timer)
+    const pending = { endSeq: queued.endSeq }
+    continuations.set(id, pending)
+    pending.manual = (async () => {
+      try {
+        if (stopped || rt.readOnly() !== undefined || !rt.isBotSession(id) || rt.live.get(id)?.turn !== undefined) return true
+        const agent = await rt.resolveAgent(id)
+        if (stopped || continuations.get(id) !== pending || rt.readOnly() !== undefined || !rt.isBotSession(id) || rt.live.get(id)?.turn !== undefined) return true
+        const start = agent.session.snapshotEvents?.().findLast(item => item.type === 'turn/start')
+        const continued = continueNative(agent, { startSeq: start?.seq, endSeq: pending.endSeq })
+        if (continued === undefined) return false
+        pending.accepted = await continued === true
+        return true
+      } catch (error) {
+        if (continuations.get(id) === pending) {
+          rt.cancelTurnContinuation?.(id, { code: 'UNKNOWN', message: String(error?.message ?? error).slice(0, 500) })
+          attempts.delete(id)
+          update(id, () => undefined)
+        }
+        throw error
+      } finally {
+        if (continuations.get(id) === pending && !pending.accepted) continuations.delete(id)
+      }
+    })()
+    return pending.manual
+  }
   const scheduleContinuation = (id, event) => {
     if (stopped || rt.readOnly() !== undefined) return
     clearTimeout(continuations.get(id)?.timer)
@@ -176,7 +210,7 @@ export function install(rt) {
         const agent = await rt.resolveAgent(id)
         if (stopped || continuations.get(id) !== pending || rt.readOnly() !== undefined || !rt.isBotSession(id)) return
         const start = agent.session.snapshotEvents?.().findLast(item => item.type === 'turn/start')
-        if (start) continueNative(agent, { startSeq: start.seq, endSeq: pending.endSeq })
+        if (start) pending.accepted = await continueNative(agent, { startSeq: start.seq, endSeq: pending.endSeq }) === true
       } catch (error) {
         rt.warn('ds-bot: automatic continuation of %s failed: %s', id, error)
         if (!stopped && continuations.get(id) === pending) {
@@ -185,7 +219,7 @@ export function install(rt) {
           update(id, () => undefined)
         }
       } finally {
-        if (continuations.get(id) === pending) continuations.delete(id)
+        if (continuations.get(id) === pending && !pending.accepted) continuations.delete(id)
       }
     }, Math.min(maxDelayMs, delayMs * 2 ** Math.min(attempt, 30)))
     pending.timer.unref?.()

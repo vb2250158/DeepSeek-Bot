@@ -79,6 +79,7 @@ async function start({ fail = {}, services = {}, home: reuse } = {}) {
       agents.set(sessionId, {
         id: sessionId,
         session: { id: sessionId, header: { cwd: cwds.get(sessionId) ?? team }, requestHeader: () => undefined, deriveMessages: () => [] },
+        ctx: { tools: { register: () => () => {} } },
         calls,
         status: 'idle',
         followup(message) { calls.push(['followup', message]) },
@@ -163,7 +164,7 @@ async function start({ fail = {}, services = {}, home: reuse } = {}) {
     if (!keep) rmSync(root, { recursive: true, force: true, maxRetries: 5 })
   }
   await tool('list_bots', {}, 'a')
-  return { ctx, rt, root, home, team, project, created, resolved, archived, agentOf, call, tool, preStep, state, warnings, infos, fail, stop }
+  return { ctx, rt, root, home, team, project, created, resolved, archived, agentOf, call, tool, preStep, state, warnings, infos, fail, flushes: () => flushes, stop }
 }
 
 const settle = () => new Promise(resolve => setTimeout(resolve, 20))
@@ -217,8 +218,10 @@ test('a move that never started keeps carry and one pause note in the inbox; a r
   const fail = { create: true, flush: true }
   const host = await start({ fail, services })
   t.after(host.stop)
+  const restored = () => host.infos.filter(line => line.includes('plugin unloaded during the switch of')).length
   await moveWriter(host, [said('m1', 'keep me', 'e1')])
-  await until(() => host.infos.some(line => line.includes('plugin unloaded')))
+  await until(() => restored() === 1)
+  await host.rt.save()
   assert.equal(host.warnings.length, 0)
   assert.deepEqual(inboxTexts(host.agentOf('b')), [PAUSE, 'keep me'])
   // The part stayed put and kept its input, so it stays marked.
@@ -229,20 +232,43 @@ test('a move that never started keeps carry and one pause note in the inbox; a r
   const retry = () => Promise.all((host.ctx.listeners.get('agent/request-error') ?? [])
     .map(listener => listener({ agent: host.agentOf('b'), failure: { code: 'CONTEXT_WINDOW_EXCEEDED' }, signal: AbortSignal.timeout(60_000) }, async () => undefined)))
   await retry()
-  await until(() => host.infos.filter(line => line.includes('plugin unloaded')).length >= 2)
+  await until(() => restored() === 2)
+  await host.rt.save()
   assert.deepEqual(inboxTexts(host.agentOf('b')), [PAUSE, 'keep me'])
   assert.deepEqual(host.state().switching, { b: { botId: 'b' } })
 
   // With the plugin live again the same input moves on — the note still only once.
   fail.create = false
   fail.flush = false
+  const stateSaved = host.rt.stateSaved
+  const finished = new Promise((resolve) => {
+    host.rt.stateSaved = () => {
+      stateSaved?.()
+      const saved = host.state()
+      if (saved.bots.b.sessionId === 's1' && saved.switching?.b === undefined) resolve()
+    }
+  })
   await retry()
-  await until(() => host.state().bots.b.sessionId === 's1' && host.state().switching?.b === undefined)
+  await finished
+  host.rt.stateSaved = stateSaved
   const forwarded = host.agentOf('s1').calls.filter(([kind]) => kind === 'followup' || kind === 'inject').map(([, message]) => text(message))
   assert.equal(forwarded.filter(line => line === PAUSE).length, 1)
   assert.equal(forwarded.filter(line => line === 'keep me').length, 1)
   assert.deepEqual(inboxTexts(host.agentOf('b')), [])
   // The move finished and nothing stayed behind, so the mark is gone.
+  assert.deepEqual(host.state().switching, {})
+})
+
+test('a move with no carried or pending input needs no Session flush before clearing its mark', async (t) => {
+  const host = await start({ fail: { create: true, flush: true }, services })
+  t.after(host.stop)
+  host.agentOf('b').status = 'running'
+  await host.tool('update_bot', { work_dir: host.project }, 'b')
+  assert.deepEqual(await host.preStep('b', [], 1), { kind: 'enter', messages: [] })
+  await until(() => host.infos.some(line => line.includes('plugin unloaded while')))
+  await host.rt.save()
+  assert.deepEqual(inboxTexts(host.agentOf('b')), [])
+  assert.equal(host.flushes(), 0)
   assert.deepEqual(host.state().switching, {})
 })
 

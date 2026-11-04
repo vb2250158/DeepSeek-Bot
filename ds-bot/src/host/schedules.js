@@ -91,13 +91,37 @@ export function install(rt) {
   }
   const known = owner => owner !== undefined && (owner.botId === undefined ? rt.roomOf(owner.roomId) !== undefined : rt.botOf(owner.botId) !== undefined)
 
+  // Host-wide schedules store their destination separately from the task's manager.
+  // Only a delivered-to existing Session can belong to this team's conversations.
+  const modern = () => typeof service.edit === 'function'
+  const entries = async () => {
+    const catalog = await service.catalog()
+    return modern()
+      ? catalog.filter(entry => entry.target.kind === 'session').map(entry => ({ ...entry, sessionId: entry.target.sessionId }))
+      : catalog
+  }
+  const edit = async (request) => {
+    const result = await service.edit(request)
+    if (result.code !== undefined) {
+      const message = result.code === 'schedule_conflict'
+        ? 'This task changed. Refresh the scheduled tasks and try again.' : 'No such task'
+      throw Object.assign(new Error(message), { code: result.code })
+    }
+    return result
+  }
+
   async function schedulesView() {
     if (service === null) return { available: false, tasks: [] }
+    const now = Date.now()
     const tasks = []
-    for (const entry of await service.catalog()) {
+    for (const entry of await entries()) {
       const owner = ownerOf(entry.sessionId)
       if (!known(owner)) continue
-      tasks.push({ ...entry, ...owner })
+      // The state DSH derives for its own view: a task past its next firing reads
+      // overdue; an inactive one is finished. DSH 0.2.1's catalog() carries the
+      // status but not this state, so it is derived the same way here.
+      const state = entry.state ?? (entry.status === 'active' ? (now >= Date.parse(entry.scheduledAt) ? 'overdue' : 'scheduled') : entry.status === 'paused' ? 'paused' : 'finished')
+      tasks.push({ ...entry, ...owner, state })
     }
     return { available: true, tasks }
   }
@@ -114,21 +138,40 @@ export function install(rt) {
       if (title === '') throw invalid('Give the task a name')
       if (title.length > MAX_TITLE) throw invalid(`Keep the name under ${MAX_TITLE} characters`)
       if (prompt === '') throw invalid('Say what the Bot should do')
-      await service.create(bot ? rt.chatOf(bot.id) : rt.sessionOfRoom(room), { title, prompt, ...selectorOf(body.when) })
+      const sessionId = bot ? rt.chatOf(bot.id) : rt.sessionOfRoom(room)
+      const selector = selectorOf(body.when)
+      if (modern()) {
+        await service.create({ title, prompt, timing: { kind: body.when.kind, ...selector }, target: { kind: 'session', sessionId } })
+      } else {
+        await service.create(sessionId, { title, prompt, ...selector })
+      }
       return schedulesView()
     },
     async 'schedule-delete'(body) {
       if (service === null) throw invalid('Automation tasks are off in DSH')
-      if (ownerOf(body.sessionId) === undefined) throw invalid('No such task')
-      await service.delete({ sessionId: body.sessionId, id: body.id })
+      if (modern()) {
+        const entry = (await entries()).find(task => task.id === body.id && task.sessionId === body.sessionId)
+        if (entry === undefined || !known(ownerOf(entry.sessionId))) throw invalid('No such task')
+        await edit({ id: entry.id, action: 'delete', expectedUpdatedAt: entry.updatedAt ?? null })
+      } else {
+        if (ownerOf(body.sessionId) === undefined) throw invalid('No such task')
+        await service.delete({ sessionId: body.sessionId, id: body.id })
+      }
       return schedulesView()
     },
   }
 
-  // A fresh part takes over the earlier part's active tasks: each is created again on
-  // the fresh Session before the old one goes, so a failure leaves it where it was.
+  // Host-wide tasks keep their identity and history when retargeted. Older services
+  // copy before deleting, so a failed copy leaves the source task available.
   async function moveSchedules(fromId, toId) {
     if (service === null) return
+    if (modern()) {
+      const tasks = (await entries()).filter(entry => entry.sessionId === fromId)
+      for (const task of tasks) {
+        await edit({ id: task.id, action: 'update', expectedUpdatedAt: task.updatedAt ?? null, patch: { target: { kind: 'session', sessionId: toId } } })
+      }
+      return
+    }
     const records = await service.list({ sessionId: fromId })
     for (const record of records) {
       const request = requestOf(record)

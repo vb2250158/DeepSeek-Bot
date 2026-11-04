@@ -8,6 +8,7 @@ node_modules/
 /app/dist-next/
 /app/build/runtime/
 /app/build/runtime-cache/
+/app/build/electron-cache/
 
 # A DeepSeek Harness checkout for the tests and the test bench.
 /deepseek-harness/

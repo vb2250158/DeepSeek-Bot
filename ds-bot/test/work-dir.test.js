@@ -322,7 +322,7 @@ test('a group\'s permissions hold for every member there in place of its own, un
     resolve: (name) => { if (!PRESETS.includes(name)) throw new Error(`permission: unknown preset "${name}"`) },
     set: (session, name) => { presetOf.set(session.id, name) },
   }
-  const { call, tool, preStep, project, state, stop } = await start({ services: { ...approvalServices('allowed-once').services, permissionPresets } })
+  const { call, tool, preStep, project, state, stop, rt } = await start({ services: { ...approvalServices('allowed-once').services, permissionPresets } })
   t.after(stop)
 
   // A preset DSH does not offer changes nothing, not even the rest of the change; the
@@ -350,9 +350,13 @@ test('a group\'s permissions hold for every member there in place of its own, un
   // A fresh part of the group conversation starts on the group's preset; the group's
   // own Session moved for the folder first.
   await call('update-room', { id: 'r1', workDir: project })
-  await until(() => state().rooms.r1.sessionId === 's1')
+  await until(() => rt.state.rooms.r1.sessionId === 's1')
+  await rt.save()
+  assert.equal(state().rooms.r1.sessionId, 's1')
   assert.deepEqual(await preStep('gb'), { kind: 'enter', messages: [] })
-  await until(() => state().rooms.r1.sessions.b === 's2')
+  await until(() => rt.state.rooms.r1.sessions.b === 's2')
+  await rt.save()
+  assert.equal(state().rooms.r1.sessions.b, 's2')
   assert.equal(presetOf.get('s2'), 'read-only')
 
   await call('update-room', { id: 'r1', permission: null })

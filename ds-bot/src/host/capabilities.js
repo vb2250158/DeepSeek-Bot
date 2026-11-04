@@ -406,19 +406,23 @@ export function install(rt) {
   // A run that outlasts the limit goes on in the background, and later requests for the
   // same Agent do not wait for it again.
   const stalled = new WeakSet()
-  const prepare = async (agent, sessionId) => {
-    const run = loadInputs().then(() => reconcileOne(agent)).then(() => true, error => {
+  const prepare = async (agent, sessionId, wait = false) => {
+    const run = loadInputs().then(() => reconcileOne(agent))
+    // Creation may release its UI while a server starts; a message cannot collect
+    // its tools until that same Agent's real mount has finished.
+    if (wait) return run
+    const finished = run.then(() => true, error => {
       rt.warn('ds-bot: capability mount for %s failed: %s', sessionId, error)
       return true
     })
     if (stalled.has(agent)) return
     const timeoutMs = ensureTimeoutMs
     let timer
-    const completed = await Promise.race([run, new Promise(resolve => { timer = setTimeout(resolve, timeoutMs, false) })])
+    const completed = await Promise.race([finished, new Promise(resolve => { timer = setTimeout(resolve, timeoutMs, false) })])
     clearTimeout(timer)
     if (completed) return
     stalled.add(agent)
-    void run.then(() => stalled.delete(agent))
+    void finished.then(() => stalled.delete(agent))
     rt.warn('ds-bot: capability mount for %s did not finish within %dms; continuing', sessionId, timeoutMs)
   }
   async function ensureCapabilities(sessionId) {
@@ -431,10 +435,19 @@ export function install(rt) {
       agent = await rt.resolveAgent(sessionId)
     } catch (error) {
       rt.warn('ds-bot: capability Agent for %s could not be resolved: %s', sessionId, rt.redactSecrets(String(error)))
-      return
+      throw error
     }
     trackAgent(agent)
-    await prepare(agent, sessionId)
+    await prepare(agent, sessionId, true)
+    const current = botOfSession(sessionId)
+    if (stopped || agents.get(sessionId)?.deref() !== agent || current === undefined) {
+      throw new Error('The capability Agent is no longer available for this conversation.')
+    }
+    for (const name of expandCapabilityNames(current.capabilities, library())) {
+      const status = sessionStatuses.get(current.id)?.get(name)?.get(sessionId)
+      if (status?.state === 'ready' || status?.state === 'needs-approval') continue
+      throw Object.assign(new Error(`Capability ${name} could not be loaded: ${status?.error ?? 'the mount is not ready for this conversation'}`), { code: 'bot/capability-unavailable' })
+    }
   }
   const trackAgent = agent => {
     const sessionId = agent?.session?.id

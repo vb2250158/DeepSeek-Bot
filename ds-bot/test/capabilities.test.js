@@ -330,7 +330,82 @@ test('a new Bot Agent waits for its capabilities before creation finishes', asyn
   assert.equal(env.rt.capabilityStatusesView().chief.echo.state, 'ready')
 })
 
-test('a hung mount releases the message after the limit and does not hold up other Bots', async t => {
+test('the first group request waits past the creation budget for its MCP and skill', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  const state = team()
+  state.capabilities = { items: {
+    echo: { ...mcp('echo'), approved: true, createdBy: 'chief' },
+    guide: { name: 'guide', kind: 'skill', description: 'Guide', content: 'Keep the goal.' },
+  } }
+  state.bots.chief.capabilities = ['echo', 'guide']
+  let startMount
+  let releaseMount
+  const started = new Promise(resolve => { startMount = resolve })
+  const gate = new Promise(resolve => { releaseMount = resolve })
+  const env = await setup({ state })
+  const agent = testAgent('room-chief', env.mounts, env.skills, { awaitMount: async (record) => {
+    if (record.config?.serverName !== 'echo') return
+    startMount()
+    await gate
+  } })
+  env.rt.resolveAgent = async () => agent
+  t.after(async () => { releaseMount(); agent.ctx.dispose(); await env.dispose() })
+  let delivered = false
+  const firstRequest = env.rt.ensureCapabilities('room-chief').then(() => { delivered = true })
+  await started
+  t.mock.timers.tick(1001)
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(delivered, false, 'the group must not collect tools while its MCP is still connecting')
+  assert.equal(env.skills.get('room-chief').has('guide'), true)
+  releaseMount()
+  await firstRequest
+  assert.equal(delivered, true)
+  assert.equal(env.rt.capabilityStatusesView().chief.echo.state, 'ready')
+})
+
+test('a failed capability mount stops delivery and a later owner attempt can load it', async t => {
+  const state = team()
+  state.capabilities = { items: { echo: { ...mcp('echo'), approved: true, createdBy: 'chief' } } }
+  state.bots.chief.capabilities = ['echo']
+  const env = await setup({ state })
+  let fail = true
+  const agent = testAgent('room-chief', env.mounts, env.skills, { awaitMount: async () => {
+    if (fail) throw new Error('MCP connection failed')
+  } })
+  env.rt.resolveAgent = async () => agent
+  t.after(async () => { agent.ctx.dispose(); await env.dispose() })
+  await assert.rejects(env.rt.ensureCapabilities('room-chief'), error => error.code === 'bot/capability-unavailable' && /MCP connection failed/.test(error.message))
+  assert.equal(env.mounts.every(mount => mount.disposed), true)
+  fail = false
+  await env.rt.ensureCapabilities('room-chief')
+  assert.equal(env.rt.capabilityStatusesView().chief.echo.state, 'ready')
+  assert.equal(env.mounts.filter(mount => !mount.disposed).length, 1)
+})
+
+test('an Agent disposed during capability startup cannot release a message', async t => {
+  const state = team()
+  state.capabilities = { items: { echo: { ...mcp('echo'), approved: true, createdBy: 'chief' } } }
+  state.bots.chief.capabilities = ['echo']
+  const env = await setup({ state })
+  let startMount
+  let releaseMount
+  const started = new Promise(resolve => { startMount = resolve })
+  const gate = new Promise(resolve => { releaseMount = resolve })
+  const agent = testAgent('room-chief', env.mounts, env.skills, { awaitMount: async () => { startMount(); await gate } })
+  env.rt.resolveAgent = async () => agent
+  t.after(async () => { releaseMount(); await env.dispose() })
+  let delivered = false
+  const delivery = env.rt.ensureCapabilities('room-chief').then(() => { delivered = true })
+  const rejected = assert.rejects(delivery, /no longer available/)
+  await started
+  agent.ctx.dispose()
+  releaseMount()
+  await rejected
+  assert.equal(delivered, false)
+  assert.equal(env.mounts.every(mount => mount.disposed), true)
+})
+
+test('bounded creation does not hold up other Bots while delivery waits for its own mount', async t => {
   const state = team()
   state.capabilities = {
     items: {
@@ -367,18 +442,22 @@ test('a hung mount releases the message after the limit and does not hold up oth
     await env.dispose()
   })
   const timeouts = name => warnings.filter(line => line.includes(`capability mount for ${name} did not finish within 20ms; continuing`)).length
-  await env.rt.ensureCapabilities('chief')
+  await created(env)({ agent: chief })
   await mountStarted
   assert.equal(timeouts('chief'), 1)
   assert.equal(env.rt.capabilityStatusesView().chief.slow.state, 'connecting')
   assert.equal(env.rt.capabilityStatusesView().chief.echo.state, 'ready')
-  await env.rt.ensureCapabilities('chief')
+  let delivered = false
+  const delivery = env.rt.ensureCapabilities('chief').then(() => { delivered = true })
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(delivered, false)
   await env.rt.ensureCapabilities('worker')
   assert.equal(timeouts('chief'), 1)
   assert.equal(timeouts('worker'), 0)
   assert.equal(env.rt.capabilityStatusesView().worker.echo.state, 'ready')
   releaseMount()
-  await env.rt.scheduleCapabilitiesReconcile()
+  await delivery
+  assert.equal(delivered, true)
   assert.equal(env.rt.capabilityStatusesView().chief.slow.state, 'ready')
 })
 

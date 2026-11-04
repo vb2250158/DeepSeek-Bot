@@ -2,6 +2,7 @@ import { createElement as h, Fragment, useEffect } from 'react'
 import { TeamSidebar, BotSettingsLauncher } from './sidebar.js'
 import { DetailsDrawer } from './details-drawer.js'
 import { ActivityIndicator } from './activity-row.js'
+import { GoalIsland, goalView } from './goal.js'
 import { FishLogo } from '@deepseek-ai/dsh-client-ui-primitives'
 import { t } from './i18n.js'
 import { ColumnResizer, useColumnWidth } from './column-resizer.js'
@@ -32,8 +33,14 @@ export function BotConversation(props) {
   const ui = useUi(value => value)
   const [width, onChange] = useColumnWidth('details')
   const owner = roster.byId[sessionId] ?? Object.values(roster.byId).find(bot => bot.sessionId === sessionId)
-  const id = owner?.id ?? sessionId
-  const room = roster.roomsById[id]
+  const room = roster.roomsById[owner?.id ?? sessionId]
+  const id = owner?.id ?? room?.id ?? sessionId
+  const goal = room?.goal
+  const composing = room !== undefined && ui.goalCompose === id
+  const showGoal = room !== undefined && (goal !== undefined || composing)
+  const workKey = props.useWork?.(work => room ? JSON.stringify(work.rooms?.[id] ?? []) : '') ?? ''
+  const roomWork = workKey ? JSON.parse(workKey) : []
+  const view = goal ? goalView(goal, { roster, roomWork }) : null
   const known = owner !== undefined || room !== undefined
   const name = owner?.name ?? room?.name
   useEffect(() => {
@@ -43,8 +50,9 @@ export function BotConversation(props) {
   }, [sessionId, actions])
   return h(Fragment, null,
     h('section', { className: 'bt-chat-column', 'aria-label': t('Message'), style: { '--bt-placeholder': JSON.stringify(name ? t('Message {name}', { name }) : t('Message')) } },
-      renderFactorySlot('conversation.content', { variant: 'embedded', phase: 'active', hero: false, ...(known ? { busyEnterOverride: 'steer' } : {}) }),
-      known ? h(ActivityIndicator, { ...props, key: sessionId, sessionId }) : null),
+      ...(showGoal ? [h(GoalIsland, { key: `goal:${room.id}`, room, goal, view, open: ui.goalOpen === id, composing, roomWork, roster, actions })] : []),
+      h(Fragment, { key: 'conversation' }, renderFactorySlot('conversation.content', { variant: 'embedded', phase: 'active', hero: false, ...(known ? { busyEnterOverride: 'steer' } : {}) })),
+      known ? h(ActivityIndicator, { ...props, key: `activity:${sessionId}`, sessionId }) : null),
     known ? h('aside', { className: 'bt-info-column', 'aria-label': t('View conversation details'), style: { '--bt-details-width': `${width}px` } },
       h(DetailsDrawer, { ...props, key: `${id}:${ui.details === id && ui.renaming ? 'rename' : ''}:${ui.details === id ? ui.tab ?? '' : ''}`, sessionId: id, roster, hasStrip: true, compact: true,
         startRenaming: ui.details === id && ui.renaming, startTab: ui.details === id ? ui.tab : null,
@@ -68,6 +76,7 @@ export const WORKBENCH_CSS = `
 .bt-team-footer{display:flex;align-items:center;gap:8px;padding:8px 12px 12px}
 .bt-team-footer .bt-account{width:100%}
 .bt-chat-column{display:flex;flex:1;flex-direction:column;position:relative;min-width:320px;min-height:0;background:var(--bt-main)}
+.bt-chat-column>.bt-island{flex:none;align-self:stretch;width:auto;margin:8px 16px 0;max-height:45%;overflow:auto;background:var(--bt-card);border-color:var(--bt-line);box-shadow:none}
 .bt-chat-column [class*="_composerSeat"]{margin-top:auto}
 .bt-chat-column [data-conversation-scroll]{padding-top:32px!important}
 .bt-info-column{display:flex;position:relative;box-sizing:border-box;flex:0 1 var(--bt-details-width,320px);min-width:240px;max-width:520px;flex-direction:column;min-height:0;border-left:.5px solid var(--bt-line);background:var(--bt-main)}

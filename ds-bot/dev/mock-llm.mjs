@@ -116,10 +116,10 @@ function isSummary(body) {
 function decide(body) {
   const system = systemText(body.system) + '\n' + (body.messages ?? []).filter(m => m.role === 'system').map(m => textOf(m.content)).join('\n')
   const tools = new Set((body.tools ?? []).map(entry => entry.name))
-  // Clock snapshots are context, not a new scripted user command.
+  // Clock snapshots and a group's memory snapshot are context, not a new scripted user command.
   const messages = (body.messages ?? []).filter(m => m.role !== 'system').map(message => {
     if (message.role !== 'user') return message
-    const isClock = value => value.startsWith('Current time: ') || value.startsWith('Time sampled while preparing turn ')
+    const isClock = value => value.startsWith('Current time: ') || value.startsWith('Time sampled while preparing turn ') || value.startsWith('## Group memory, shared by the members of this group chat')
     const content = typeof message.content === 'string' ? (isClock(message.content) ? '' : message.content)
       : message.content.filter(block => block.type !== 'text' || !isClock(block.text))
     return { ...message, content }
@@ -190,13 +190,17 @@ function decide(body) {
     return [text(note(sections))]
   }
 
-  // A stopped call's result can share a message with the next group turn, which wins.
+  // A concluded card's result can share a message with the next user's input.
+  // Secret-card notices still consume that card's result in their own branch.
+  const result = blocks.find(block => block.type === 'tool_result')
+  const call = result ? [...messages].reverse().find(m => m.role === 'assistant' && Array.isArray(m.content) && m.content.some(b => b.type === 'tool_use')) : undefined
+  const used = call?.content.find(b => b.type === 'tool_use' && b.id === result.tool_use_id) ?? call?.content.find(b => b.type === 'tool_use')
+  const freshText = textOf(last?.content).trim()
   const fresh = textBlocks(last?.content).some(value => value.trimStart().startsWith('[Group chat'))
-  const result = fresh ? undefined : blocks.find(block => block.type === 'tool_result')
-  if (result) {
+    || (['ask_user', 'show_view', 'request_secret'].includes(used?.name) && freshText !== ''
+      && !(used.name === 'request_secret' && freshText.startsWith('[Secret card]')))
+  if (result && !fresh) {
     const resultText = typeof result.content === 'string' ? result.content : textOf(result.content)
-    const call = [...messages].reverse().find(m => m.role === 'assistant' && Array.isArray(m.content) && m.content.some(b => b.type === 'tool_use'))
-    const used = call?.content.find(b => b.type === 'tool_use' && b.id === result.tool_use_id) ?? call?.content.find(b => b.type === 'tool_use')
     // "长任务 N [K]": N steps in one turn, each adding about K thousand characters (default 4).
     const openerAt = messages.findLastIndex(m => m.role === 'user' && !isResults(m) && /^长任务\s*\d+/.test(textOf(m.content).trimStart()))
     if (openerAt !== -1 && used?.name === 'list_bots') {

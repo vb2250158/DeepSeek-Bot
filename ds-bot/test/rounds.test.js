@@ -14,10 +14,13 @@ import { fakeAttachments, fakeContext } from './fake-ctx.js'
 // or steered into the next step.
 // `home`: start on the data of an earlier run, as after a restart.
 let rt
+const deliveryObservers = new WeakMap()
 function start({ home = mkdtempSync(join(tmpdir(), 'ds-bot-rounds-')) } = {}) {
   const ctx = fakeContext()
   const workspaces = new Map()
   const sent = []
+  const observers = new Set()
+  deliveryObservers.set(sent, observers)
   const inboxes = new Map()
   const inboxOf = (sessionId) => {
     if (!inboxes.has(sessionId)) {
@@ -55,7 +58,10 @@ function start({ home = mkdtempSync(join(tmpdir(), 'ds-bot-rounds-')) } = {}) {
     },
     sessionController: {
       create: async () => ({ sessionId: `s${++sessions}` }),
-      resolveAgent: async sessionId => ({ agent: { session: { id: sessionId }, followup: message => sent.push({ sessionId, message }) } }),
+      resolveAgent: async sessionId => ({ agent: { session: { id: sessionId }, followup: (message) => {
+        sent.push({ sessionId, message })
+        for (const notify of observers) notify()
+      } } }),
       selectModel: async () => {},
       prompt: async (request) => {
         const inbox = inboxOf(request.sessionId)
@@ -100,6 +106,8 @@ function start({ home = mkdtempSync(join(tmpdir(), 'ds-bot-rounds-')) } = {}) {
     await emit(sessionId, { type: 'turn/end', data: { reason: { kind: 'stop' } } })
   }
   const stop = async ({ keep = false } = {}) => {
+    for (const notify of observers) notify(true)
+    observers.clear()
     await ctx.dispose()
     if (!keep) rmSync(home, { recursive: true, force: true, maxRetries: 5 })
   }
@@ -115,7 +123,23 @@ const waitFor = async (check) => {
   }
   return undefined
 }
-const turnFor = (sent, ...earlier) => waitFor(() => sent.find(entry => !earlier.includes(entry) && entry.message.source.role === 'room'))
+// The next speaker waits for the previous one's saves, so observe its delivery
+// instead of treating a busy filesystem as a missing member prompt.
+const turnFor = (sent, ...earlier) => {
+  const find = () => sent.find(entry => !earlier.includes(entry) && entry.message.source.role === 'room')
+  const ready = find()
+  if (ready !== undefined) return Promise.resolve(ready)
+  return new Promise((resolve) => {
+    const observers = deliveryObservers.get(sent)
+    const notify = (closed = false) => {
+      const found = find()
+      if (found === undefined && !closed) return
+      observers.delete(notify)
+      resolve(found)
+    }
+    observers.add(notify)
+  })
+}
 
 test('a new group Session waits for capabilities before its first member prompt', async (t) => {
   const { call, emit, userMessage, relay, answer, stop, sent, rt } = start()
@@ -702,6 +726,36 @@ test('calls parked under the old relay limit run in the group\'s next round', as
   assert.equal(state().paused, undefined)
   const saved = JSON.parse(readFileSync(join(home, 'state.json'), 'utf8')).rooms[room.id]
   assert.equal(saved.paused, undefined)
+})
+
+// #872: calls the idle guard parked wait for the user. A round a Bot's post opens
+// leaves them; the user's message that joins that round brings them in.
+test('calls the idle guard parked wait for the user\'s message, also one that joins a running round', async (t) => {
+  const { call, emit, compose, relay, answer, stop, sent, rt } = start()
+  t.after(stop)
+  const room = await team(call, sent)
+  await call('update-room', { id: room.id, mode: 'admin' })
+  const chief = rt.state.mainBotIds[0]
+  const writer = Object.values(rt.state.bots).find(bot => bot.name === 'Writer')
+  const state = () => rt.state.rooms[room.id]
+  state().paused = [{ id: writer.id, name: 'Writer', note: 'Chief mentioned you', by: chief, idle: true }]
+  await rt.save()
+
+  await emit(room.id, { type: 'user/message', data: { source: { kind: 'bot', form: 'relay', role: 'post', exchangeId: 'p1', senderSessionId: writer.id, senderName: 'Writer', roomId: room.id }, content: [{ type: 'text', text: '[Group post from Writer]\n@Chief the draft is up' }] } })
+  const running = relay(room.id, 'relay')
+  const first = await turnFor(sent)
+  assert.equal(first.sessionId, state().sessions[chief])
+  assert.equal(state().paused.length, 1, 'a Bot\'s post does not bring the parked call in')
+
+  await compose(room.id, 'Go on, both of you')
+  await answer(first.sessionId, first.message.source.exchangeId, 'Thanks.', 1)
+  const parked = await waitFor(() => sent.find(entry => entry !== first && entry.message.source.role === 'room' && /Chief mentioned you/.test(entry.message.content[0].text)))
+  assert.ok(parked, 'the user\'s message brings the parked call in')
+  assert.equal(state().paused, undefined)
+  const again = await waitFor(() => sent.find(entry => entry !== first && entry !== parked && entry.message.source.role === 'room'))
+  await answer(parked.sessionId, parked.message.source.exchangeId, 'On it.', 1)
+  await answer(again.sessionId, again.message.source.exchangeId, 'Fine.', 2)
+  await running
 })
 
 test('a member the reply timeout cut short is told to the group, not left as silence', async (t) => {

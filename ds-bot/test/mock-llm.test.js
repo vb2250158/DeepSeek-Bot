@@ -92,3 +92,36 @@ test('a Bot message hands work on with 转告 and takes its time with 慢慢做'
   const back = await call(url, [{ role: 'user', content: '[Reply from Coder · for the work Chief asked you for; your answer goes to Chief once everything you handed on is back]\n做完了' }], tools)
   assert.deepEqual([back.text, back.tools], ['Coder 交回了，我把结果交给 Chief。', []])
 })
+
+const withResult = (name, fresh, { result = "The view is on screen; the user's answer arrives as their next message.", input = {} } = {}) => [
+  { role: 'user', content: 'Earlier request' },
+  { role: 'assistant', content: [{ type: 'tool_use', id: 'earlier-call', name, input }] },
+  { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'earlier-call', content: result }, ...(fresh === undefined ? [] : [{ type: 'text', text: fresh }])] },
+]
+
+test('a new user command or answer takes priority over the result of a concluded card', async (t) => {
+  const url = await startMock(t)
+  for (const earlier of ['show_view', 'ask_user', 'request_secret']) {
+    for (const command of ['大视图', '视图表单']) {
+      const response = await call(url, withResult(earlier, command), ['show_view'])
+      assert.deepEqual(response.tools.map(tool => tool.name), ['show_view'], `${earlier}: ${command}`)
+    }
+  }
+  const answer = '{"kind":"answer_to_pending_view","action":"lane","values":{"selected":["Ship now"]}}'
+  const response = await call(url, withResult('show_view', answer), ['show_view'])
+  assert.match(response.text, /^收到：/)
+  assert.ok(response.text.includes('answer_to_pending_view'))
+})
+
+test('merged question, secret and group messages retain their specific behavior', async (t) => {
+  const url = await startMock(t)
+  const picked = await call(url, withResult('ask_user', '先定目标', { input: { options: [{ label: '先定目标' }] } }))
+  assert.match(picked.text, /好，就从「先定目标」开始/)
+  const secret = await call(url, withResult('request_secret', '[Secret card]\nThe user saved DEMO_TOKEN.', { input: { name: 'DEMO_TOKEN' }, result: 'The card is on screen.' }), ['bash'])
+  assert.match(secret.text, /收到 DEMO_TOKEN/)
+  assert.deepEqual(secret.tools.map(tool => tool.name), ['bash'])
+  const group = await call(url, withResult('show_view', '[Group chat "Ops" · your turn]\nThe user just created this group'))
+  assert.match(group.text, /群建好了/)
+  const ordinaryResult = await call(url, withResult('show_view', undefined))
+  assert.match(ordinaryResult.text, /这些都是示例数据/)
+})
