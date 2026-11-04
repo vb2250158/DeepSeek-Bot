@@ -1,5 +1,5 @@
 // Generated from src/client by `npm run build` (scripts/build-client.mjs). Do not edit by hand.
-// Plain CJS body evaluated by the thin client.js after web boot (GET /api/bot/client-app.js).
+// Plain CJS body awaited by the thin client.js (GET /api/ds-bot-client-app?v=<sha256>).
 var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;

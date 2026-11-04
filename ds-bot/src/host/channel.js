@@ -1,6 +1,5 @@
 // Client channel: the team view the browser renders, and the POST /api/bot endpoints.
 import { randomUUID } from 'node:crypto'
-import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
@@ -9,6 +8,7 @@ import { install as installSide } from './side.js'
 import { handoffReply, questionReply, viewReply } from './parts.js'
 import { validateViewAnswer } from 'deep-view/core'
 import { COLORS, EXTRA_COLORS, ROUTE } from './constants.js'
+import { createClientAsset } from './client-asset.js'
 
 const LANGUAGES = { zh: 'Chinese (简体中文)', en: 'English' }
 const RUN_STATS = ['sessionStats', 'tokenUsage', 'contextPressure']
@@ -679,28 +679,15 @@ export function install(rt) {
     },
   }), 'ds-bot: Rabi avatar')
 
-  // Heavy browser UI stays out of the ModuleLoader combo (full client.js blocked markdown/unity).
-  // Served on demand after activation; load failures must not block plugin activation.
-  ctx.effect(() => ctx.connection.fetch.register({
-    path: '/api/ds-bot-client-app',
-    methods: ['GET'],
-    requestBody: 'buffered',
-    fetch: async () => {
-      try {
-        const file = join(dirname(fileURLToPath(import.meta.url)), '../../client-app.js')
-        const body = readFileSync(file)
-        return new Response(body, {
-          status: 200,
-          headers: {
-            'content-type': 'application/javascript; charset=utf-8',
-            'cache-control': 'no-cache',
-          },
-        })
-      } catch (error) {
-        return new Response(String(error?.message ?? error), { status: 404, headers: { 'content-type': 'text/plain; charset=utf-8' } })
-      }
-    },
-  }), 'ds-bot: client-app')
+  // Content-addressed bytes can be reused across refreshes; apply still awaits the client registrations.
+  ctx.effect(() => {
+    const asset = createClientAsset(join(dirname(fileURLToPath(import.meta.url)), '../../client-app.js'))
+    const unregister = ctx.connection.fetch.register({
+      path: '/api/ds-bot-client-app', methods: ['GET'], requestBody: 'buffered',
+      fetch: request => asset.fetch(request),
+    })
+    return () => { asset.dispose(); return unregister() }
+  }, 'ds-bot: client-app')
 
   ctx.effect(() => {
     void rt.load()

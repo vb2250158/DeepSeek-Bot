@@ -1,9 +1,10 @@
 // Builds the browser half from src/client.
 //
 //   node scripts/build-client.mjs
-//     writes client-app.js  (heavy CJS UI body, loaded after boot)
-//     writes client.js      (thin ModuleLoader entry; does not block sibling plugins)
+//     writes client-app.js  (heavy CJS UI body awaited by apply)
+//     writes client.js      (thin ModuleLoader entry with the body's content hash)
 import { readFileSync, realpathSync, writeFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { createRequire } from 'node:module'
 import { dirname, isAbsolute, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -49,7 +50,7 @@ export async function bundleClientApp() {
   if (result.warnings.length > 0) throw new Error('esbuild warnings:\n' + result.warnings.map(w => w.text).join('\n'))
   return [
     '// Generated from src/client by `npm run build` (scripts/build-client.mjs). Do not edit by hand.',
-    '// Plain CJS body evaluated by the thin client.js after web boot (GET /api/bot/client-app.js).',
+    '// Plain CJS body awaited by the thin client.js (GET /api/ds-bot-client-app?v=<sha256>).',
     result.outputFiles[0].text.trimEnd(),
     '',
   ].join('\n')
@@ -77,13 +78,14 @@ export async function bundleOffice() {
   return result.outputFiles[0].text
 }
 
-export function thinClientEntry() {
-  return readFileSync(join(PLUGIN, 'scripts/thin-client.js'), 'utf8')
+export function thinClientEntry(app = readFileSync(OUTPUT_APP, 'utf8')) {
+  const hash = createHash('sha256').update(app).digest('hex')
+  return readFileSync(join(PLUGIN, 'scripts/thin-client.js'), 'utf8').replace('__DS_BOT_CLIENT_APP_HASH__', hash)
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const app = await bundleClientApp()
-  const entry = thinClientEntry()
+  const entry = thinClientEntry(app)
   const office = await bundleOffice()
   if (process.argv.includes('--check')) {
     let currentApp = null

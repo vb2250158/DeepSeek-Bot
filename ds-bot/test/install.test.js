@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
@@ -7,15 +8,26 @@ import { createRuntime } from '../index.js'
 import { fakeContext } from './fake-ctx.js'
 
 let rt
-function start(state, { config = {}, services } = {}) {
+function start(state, { config = {}, services, unregisterAsset } = {}) {
   const home = mkdtempSync(join(tmpdir(), 'ds-bot-install-'))
   if (state) writeFileSync(join(home, 'state.json'), JSON.stringify(state))
   const ctx = fakeContext({ services })
   let route
+  let assetRoute
+  let assetDisposer
+  const effect = ctx.effect
+  ctx.effect = (execute, label) => label === 'ds-bot: client-app'
+    ? effect(() => { assetDisposer = execute(); return assetDisposer }, label)
+    : effect(execute, label)
   const register = ctx.connection.fetch.register
   ctx.connection.fetch.register = (options) => {
     if (options.path === '/api/bot') route = options
-    return register(options)
+    if (options.path === '/api/ds-bot-client-app') assetRoute = options
+    const dispose = register(options)
+    let removing
+    return options.path === '/api/ds-bot-client-app' && unregisterAsset
+      ? () => removing ??= (async () => { await unregisterAsset(); return dispose() })()
+      : dispose
   }
   rt = createRuntime(ctx, { home, ...config })
   const call = async (endpoint, payload) => {
@@ -26,8 +38,55 @@ function start(state, { config = {}, services } = {}) {
     await ctx.dispose()
     rmSync(home, { recursive: true, force: true, maxRetries: 5 })
   }
-  return { ctx, call, stop, rt }
+  return { ctx, call, stop, rt, asset: request => assetRoute.fetch(request), unloadAsset: () => assetDisposer() }
 }
+
+test('installed client asset keeps exact build identity, team data and unload ownership', async t => {
+  const { asset, stop, rt } = start()
+  t.after(stop)
+  await rt.load()
+  const before = JSON.stringify(rt.state)
+  const bytes = readFileSync(new URL('../client-app.js', import.meta.url))
+  const hash = createHash('sha256').update(bytes).digest('hex')
+  const versioned = asset(new Request(`http://localhost/api/ds-bot-client-app?v=${hash}`))
+  assert.equal(versioned.status, 200)
+  assert.deepEqual(Buffer.from(await versioned.arrayBuffer()), bytes)
+  assert.equal(versioned.headers.get('cache-control'), 'private, max-age=31536000, immutable')
+  const cached = asset(new Request('http://localhost/api/ds-bot-client-app', { headers: { 'if-none-match': `"${hash}"` } }))
+  assert.equal(cached.status, 304)
+  assert.equal((await cached.arrayBuffer()).byteLength, 0)
+  const unknown = asset(new Request(`http://localhost/api/ds-bot-client-app?v=${'0'.repeat(64)}`))
+  assert.equal(unknown.status, 404)
+  assert.equal(unknown.headers.get('cache-control'), 'no-store')
+  assert.equal(JSON.stringify(rt.state), before)
+  await stop()
+  const stale = asset(new Request('http://localhost/api/ds-bot-client-app'))
+  assert.equal(stale.status, 404)
+  assert.equal(stale.headers.get('cache-control'), 'no-store')
+})
+
+test('asset unload waits for asynchronous route removal and repeated dispose does not remove it again', async t => {
+  const removal = Promise.withResolvers()
+  let removals = 0
+  const { asset, stop, rt, unloadAsset } = start(undefined, { unregisterAsset: () => { removals++; return removal.promise } })
+  t.after(async () => { removal.resolve(); await stop() })
+  await rt.load()
+  asset(new Request('http://localhost/api/ds-bot-client-app'))
+  let stopped = false
+  const removing = unloadAsset()
+  assert.equal(typeof removing?.then, 'function')
+  const stopping = removing.then(() => { stopped = true })
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(removals, 1)
+  assert.equal(stopped, false)
+  assert.equal(asset(new Request('http://localhost/api/ds-bot-client-app')).status, 404)
+  removal.resolve()
+  await stopping
+  assert.equal(stopped, true)
+  await unloadAsset()
+  await stop()
+  assert.equal(removals, 1)
+})
 
 // Listeners run in registration order; the team tools are not in this list
 // because they are registered per Bot session scope, not globally.

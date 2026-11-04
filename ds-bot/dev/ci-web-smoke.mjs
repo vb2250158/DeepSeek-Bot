@@ -1,5 +1,6 @@
 // Current-source Web composition: a private profile, authenticated API/assets, public shutdown.
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import { spawn, execSync } from 'node:child_process'
 import { once } from 'node:events'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
@@ -64,7 +65,25 @@ if (process.argv[2] === '--host') {
     assert.equal((await api.json()).ok, true)
     const asset = await fetch(`${base}/api/ds-bot-client-app`, { headers: { cookie }, signal: AbortSignal.timeout(15_000) })
     assert.equal(asset.status, 200)
-    assert.ok(Buffer.from(await asset.arrayBuffer()).equals(await readFile(join(plugin, 'client-app.js'))), 'Served client-app.js differs from source')
+    const clientBytes = await readFile(join(plugin, 'client-app.js'))
+    const hash = createHash('sha256').update(clientBytes).digest('hex')
+    const etag = `"${hash}"`
+    assert.ok(Buffer.from(await asset.arrayBuffer()).equals(clientBytes), 'Served client-app.js differs from source')
+    assert.equal(asset.headers.get('etag'), etag)
+    assert.equal(asset.headers.get('cache-control'), 'private, no-cache')
+    const unchanged = await fetch(`${base}/api/ds-bot-client-app`, {
+      headers: { cookie, 'if-none-match': etag }, signal: AbortSignal.timeout(15_000),
+    })
+    assert.equal(unchanged.status, 304)
+    assert.equal((await unchanged.arrayBuffer()).byteLength, 0)
+    const versioned = await fetch(`${base}/api/ds-bot-client-app?v=${hash}`, { headers: { cookie }, signal: AbortSignal.timeout(15_000) })
+    assert.equal(versioned.status, 200)
+    assert.equal(versioned.headers.get('cache-control'), 'private, max-age=31536000, immutable')
+    assert.equal(versioned.headers.get('etag'), etag)
+    assert.ok(Buffer.from(await versioned.arrayBuffer()).equals(clientBytes))
+    const unknown = await fetch(`${base}/api/ds-bot-client-app?v=${'0'.repeat(64)}`, { headers: { cookie }, signal: AbortSignal.timeout(15_000) })
+    assert.equal(unknown.status, 404)
+    assert.equal(unknown.headers.get('cache-control'), 'no-store')
     child.send('shutdown')
     const [code, signal] = await Promise.race([exited, new Promise((_, reject) => {
       const timer = setTimeout(() => reject(new Error('Host did not stop through public shutdown')), 30_000)
@@ -76,7 +95,7 @@ if (process.argv[2] === '--host') {
     try {
       await assert.rejects(once(socket, 'connect', { signal: AbortSignal.timeout(5000) }), { code: 'ECONNREFUSED' })
     } finally { socket.destroy() }
-    console.log('Source Web smoke passed: page, Bot API, exact client bytes, public exit 0, port closed')
+    console.log('Source Web smoke passed: page, Bot API, exact client bytes, content hash and ETag, public exit 0, port closed')
   } catch (error) {
     console.error(output.replace(/([?&]token=)[^&\s]+/gu, '$1<hidden>').slice(-4000))
     throw error
