@@ -219,3 +219,7 @@ Cline (Cline Bot Inc.), Qwen (Alibaba Cloud), Devin (Cognition AI),
 OpenAI (OpenAI). DS Bot is not affiliated with or endorsed by these owners.
 Vector marks from Simple Icons (https://simpleicons.org), CC0-1.0.
 Devin and OpenAI marks from the vendors' application icons.
+
+read-cmd-shim (https://github.com/npm/read-cmd-shim), ISC, GitHub Inc.:
+Resolves npm's Windows launchers to the program they invoke. Used as a runtime
+dependency; its license is distributed with the package.

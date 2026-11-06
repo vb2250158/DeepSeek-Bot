@@ -40,10 +40,10 @@ export function validateCustom({ name, command, args }) {
   const clean = {
     name: String(name ?? '').trim().slice(0, 40),
     command: String(command ?? '').trim(),
-    args: (Array.isArray(args) ? args : String(args ?? '').split(' ')).map(arg => String(arg).trim()).filter(Boolean),
+    args: Array.isArray(args) ? args.map(String) : String(args ?? '').split(' ').filter(Boolean),
   }
   if (clean.name === '') throw new Error('Name is required')
-  if (clean.command === '' || /[\s]/.test(clean.command) || !(clean.command.startsWith('/') || clean.command.startsWith('~/') || /^[A-Za-z]:[\\/]/.test(clean.command) || /^[\w.-]+$/.test(clean.command))) {
+  if (clean.command === '' || /[\0\r\n]/.test(clean.command) || !(clean.command.startsWith('/') || clean.command.startsWith('~/') || /^[A-Za-z]:[\\/]/.test(clean.command) || /^[\w.-]+$/.test(clean.command))) {
     throw new Error('Command must be a program name, an absolute path, or a ~/path')
   }
   if (clean.args.some(arg => arg.includes('\0') || /[\r\n]/.test(arg))) throw new Error('Arguments must not contain newlines')

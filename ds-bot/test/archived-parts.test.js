@@ -92,21 +92,24 @@ test('opening an earlier part takes it out of the archive and archives the part 
   assert.deepEqual(saved.segments.map(segment => segment.sessionId), ['w2'])
 })
 
-test('current team Sessions held archived in DSH are taken back out; earlier parts stay', async (t) => {
+test('loading the team preserves current and earlier DSH Session archives', async (t) => {
   const { registry, call } = await team(t, ['w1', 'w2', 'g1', 'gw', 'outside'])
+  const unarchive = t.mock.method(registry, 'unarchiveSession')
   await call('state')
-  await settled(() => registry.archivedSessionIds.length === 2)
-  assert.deepEqual([...registry.archivedSessionIds].sort(), ['outside', 'w1'])
+  assert.equal(unarchive.mock.callCount(), 0)
+  assert.deepEqual([...registry.archivedSessionIds].sort(), ['g1', 'gw', 'outside', 'w1', 'w2'])
 })
 
-test('a current Session archived in DSH while the team runs is taken back out', async (t) => {
-  const { registry, call } = await team(t, [])
+test('indexing the team preserves a current Session explicitly archived with stopActivity', async (t) => {
+  const { registry, call, rt } = await team(t, [])
+  const unarchive = t.mock.method(registry, 'unarchiveSession')
   await call('state')
   await registry.archiveSession(SessionId('w2'), { stopActivity: true })
   await registry.archiveSession(SessionId('gw'))
   await registry.archiveSession(SessionId('outside'))
-  await settled(() => registry.archivedSessionIds.length === 1)
-  assert.deepEqual([...registry.archivedSessionIds], ['outside'])
+  await rt.save()
+  assert.equal(unarchive.mock.callCount(), 0)
+  assert.deepEqual([...registry.archivedSessionIds].sort(), ['gw', 'outside', 'w2'])
 })
 
 test('a failed task move keeps the replaced part marked for the restart pass', async (t) => {

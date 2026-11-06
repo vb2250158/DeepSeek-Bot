@@ -1,7 +1,7 @@
 // Finding agent CLIs and the environment they run in: PATH plus the user's
 // login-shell PATH plus the usual install folders, and an environment that
 // keeps their own sign-in but leaks nothing of ours.
-import { execFile } from 'node:child_process'
+import { execAgent } from './command.js'
 import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { delimiter, join } from 'node:path'
@@ -27,7 +27,7 @@ export function cleanEnv(extra = {}) {
 // host, and a blocking child process there freezes every Session.
 const outputOf = (file, args) => new Promise((resolve) => {
   try {
-    execFile(file, args, { encoding: 'utf8', timeout: 5_000, env: cleanEnv() }, (error, stdout) => resolve(error === null ? stdout : undefined))
+    execAgent(file, args, { encoding: 'utf8', timeout: 5_000, env: cleanEnv() }, (error, stdout) => resolve(error === null ? stdout : undefined))
   } catch { resolve(undefined) }
 })
 
@@ -91,9 +91,11 @@ export function findExecutable(name) {
 // One `--version` call, bounded; the version line is for display only.
 export function probeVersion(executable, args, env) {
   return new Promise((resolve) => {
-    execFile(executable, args, { encoding: 'utf8', timeout: 10_000, env }, (error, stdout, stderr) => {
-      const text = `${stdout ?? ''}${stderr ?? ''}`.split('\n').map(line => line.trim()).find(Boolean)
-      resolve({ ok: error === null, version: text })
-    })
+    try {
+      execAgent(executable, args, { encoding: 'utf8', timeout: 10_000, env: env ?? cleanEnv() }, (error, stdout, stderr) => {
+        const text = `${stdout ?? ''}${stderr ?? ''}`.split('\n').map(line => line.trim()).find(Boolean)
+        resolve({ ok: error === null, version: text })
+      })
+    } catch (error) { resolve({ ok: false, error: error.code }) }
   })
 }

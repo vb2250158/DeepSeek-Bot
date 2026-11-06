@@ -8,11 +8,11 @@ This fork tests its current DS Bot behavior on one source Web host. It does not 
 | Node.js | `24.15.0` |
 | npm, plugin tools | `11.12.1` |
 | pnpm, Core source dependencies | `11.28.5` |
-| Core source | [`vb2250158/deepseek-harness@3ff2154e44fcec3b98e1c529ae9f62b26b20096c`](https://github.com/vb2250158/deepseek-harness/commit/3ff2154e44fcec3b98e1c529ae9f62b26b20096c) |
-| Core host version | `0.2.2-alpha.3` |
+| Core source | [`vb2250158/deepseek-harness@d037bdbe8b5dba993bf778a5dc1415e87bed2664`](https://github.com/vb2250158/deepseek-harness/commit/d037bdbe8b5dba993bf778a5dc1415e87bed2664) |
+| Core host version | `0.2.2-rc.1` |
 | Runtime entry | Source `dsh` Web profile through `@deepseek-ai/dsh/profile-boot` |
 
-The recorded production Core baseline on 2026-11-07 is `3ff2154e44fcec3b98e1c529ae9f62b26b20096c` / `0.2.2-alpha.3`, with DS Bot `0.2.7-rabi.2`. DS Bot `0.3.0-rabi.1` is a source candidate until the maintenance owner verifies its actual installation. Production switching belongs to the environment-maintenance owner.
+This table declares the source verification target; it does not report a production installation. DS Bot `0.3.0-rabi.2` remains a candidate until its actual profile installation, loaded source and Web behavior are verified. Production switching belongs to the environment-maintenance owner.
 
 ## Prepare the source host
 

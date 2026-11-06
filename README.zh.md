@@ -4,9 +4,9 @@
 
 [English](README.md) | 中文
 
-![版本](https://img.shields.io/badge/版本-v0.3.0--rabi.1-blue) ![DSH](https://img.shields.io/badge/DSH-0.2.2--alpha.3-4D6BFE) ![许可](https://img.shields.io/badge/许可-Apache_2.0-green)
+![版本](https://img.shields.io/badge/版本-v0.3.0--rabi.2-blue) ![DSH](https://img.shields.io/badge/DSH-0.2.2--rc.1-4D6BFE) ![许可](https://img.shields.io/badge/许可-Apache_2.0-green)
 
-本 fork 已合并上游 0.3.0（0.3.0-rabi.1），保留公开 Bot 平等管理、Rabi 助手预设和延迟加载。私密 Bot 通过原生 Bot 工具向团队发布内容前需要批准；删除后，其文件夹、记忆和聊天仍受保护，可在设置中解除。Rabi 绑定 Bot 的记忆和学习技能继续由 Rabi 管理，项目 AGENTS.md 提案仍可使用。Office 目录输入拒绝内部链接，PNG 读取限制内存并拒绝截断图像。
+本 fork 已合并上游 0.3.0（0.3.0-rabi.2），保留公开 Bot 平等管理、Rabi 助手预设和延迟加载。私密 Bot 通过原生 Bot 工具向团队发布内容前需要批准；删除后，其文件夹、记忆和聊天仍受保护，可在设置中解除。Rabi 绑定 Bot 的记忆和学习技能继续由 Rabi 管理，项目 AGENTS.md 提案仍可使用。Office 目录输入拒绝内部链接，PNG 读取限制内存并拒绝截断图像。
 
 **[Download DS Bot for Windows 10/11 (64-bit) / 下载 Windows 10/11（64 位）版](https://github.com/Fei2411/DS-Bot/releases/latest)**, about 212 MB / 约 212 MB. A community project, not an official DeepSeek product. / 社区开源项目，不是 DeepSeek 官方产品。
 
@@ -40,9 +40,11 @@ Still stuck? [Report an install problem](https://github.com/Fei2411/DS-Bot/issue
 
 ## 受测宿主与环境
 
-本维护 fork 的单一受测目标为 Windows x64、Node.js `24.15.0`、npm `11.12.1`、pnpm `11.28.5`，使用公开 Core 源码 `vb2250158/deepseek-harness@3ff2154e44fcec3b98e1c529ae9f62b26b20096c`（`0.2.2-alpha.3`）运行 Web。CI runner 为 `windows-2025`。不运行旧宿主或跨平台兼容矩阵。
+本维护 fork 的单一受测目标为 Windows x64、Node.js `24.15.0`、npm `11.12.1`、pnpm `11.28.5`，使用公开 Core 源码 `vb2250158/deepseek-harness@d037bdbe8b5dba993bf778a5dc1415e87bed2664`（`0.2.2-rc.1`）运行 Web。CI runner 为 `windows-2025`。不运行旧宿主或跨平台兼容矩阵。
 
-2026-11-04 记录的正式基线仍为 Core `564bd14e9ec1d82d3e2985dbd8dea9f40129d71a`（`0.2.2-alpha.2`）；上述候选不代表已实装。源码准备、行为与历史数据回归、Web smoke 及 CI 范围见[测试标准](docs/dev/testing.md)。
+Windows 本地 Agent 发现及 Codex、Claude、ACP 驱动会把 npm `.cmd` 启动器解析为 Node 入口，不经过 shell，也不弹出控制台窗口。含空格的路径和数组参数保持原样；取消和超时直接作用于 CLI 进程。任意 `.cmd`/`.bat` 脚本会以 `UNSUPPORTED_AGENT_WRAPPER` 明确拒绝，请选择可执行文件或 Node npm 入口。不会自动登录本地 Agent 账号。
+
+上述目标不代表已正式安装。加载或重建团队索引会保留 DSH Session 的既有归档，包括明确归档并停止活动的状态；用户显式打开较早部分时，仍会解除该部分的归档。源码准备、当前行为与已存数据回归、Web smoke 和 CI 范围见[测试策略](docs/dev/testing.md)。
 
 **DS Bot**: the desktop app, the project and the plugin / 桌面应用、项目和插件 · **DeepSeek Harness (DSH)**: what they are built on / 它们的底层
 

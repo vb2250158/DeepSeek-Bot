@@ -633,7 +633,7 @@ test('findBot unquotes a Bot ref before matching the name', async (t) => {
 })
 
 
-test('0.2.4 fork state preserves identities, bindings, permissions and conversation parts on 0.2.6', async t => {
+test('saved fork state preserves identities, bindings, permissions and conversation parts', async t => {
   const old = {
     version: 1, revision: 40, whaleStored: true, mainBotIds: ['chief'],
     bots: {
@@ -664,4 +664,25 @@ test('0.2.4 fork state preserves identities, bindings, permissions and conversat
   const reopened = runtime(t, saved)
   await reopened.rt.load()
   assert.deepEqual(JSON.parse(fs.readFileSync(reopened.statePath, 'utf8')), saved)
+})
+
+test('loading and indexing preserve explicit archives, paused work and closed cards', async t => {
+  const saved = {
+    version: 1, whaleStored: true, bots: { bot: { id: 'bot', name: 'Fixture', sessionId: 'current', segments: [{ sessionId: 'past' }] } },
+    rooms: { room: { id: 'room', name: 'Fixture room', members: ['bot'], sessions: { bot: 'group' } } },
+    works: { work: { state: 'paused' } }, closedCards: { current: { question: 'dismissed' } },
+  }
+  const { rt, statePath } = runtime(t, saved)
+  const archived = ['current', 'past', 'group', 'room', 'outside']
+  const opened = []
+  rt.ctx.workspaceRegistry = { archivedSessionIds: archived, unarchiveSession: async id => opened.push(id) }
+  await rt.load()
+  await rt.save()
+  assert.deepEqual(opened, [])
+  assert.deepEqual(rt.ctx.workspaceRegistry.archivedSessionIds, archived)
+  assert.equal(rt.chatOwners.get('current'), 'bot')
+  const persisted = JSON.parse(fs.readFileSync(statePath, 'utf8'))
+  assert.deepEqual(persisted.works, saved.works)
+  assert.deepEqual(persisted.closedCards, saved.closedCards)
+  assert.deepEqual(persisted.bots.bot.segments, saved.bots.bot.segments)
 })

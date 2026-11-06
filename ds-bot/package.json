@@ -1,6 +1,6 @@
 {
   "name": "ds-bot",
-  "version": "0.3.0-rabi.1",
+  "version": "0.3.0-rabi.2",
   "description": "DS Bot: a team of long-lived Bots for DeepSeek Harness, with shared team management, pinned chats and group chats",
   "keywords": [
     "dsh-plugin",
@@ -76,6 +76,7 @@
     "deep-view": "0.1.2",
     "imapflow": "2.9.1",
     "mailparser": "3.12.4",
-    "nodemailer": "10.2.1"
+    "nodemailer": "10.2.1",
+    "read-cmd-shim": "7.0.1"
   }
 }

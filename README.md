@@ -4,9 +4,9 @@
 
 English | [中文](README.zh.md)
 
-![version](https://img.shields.io/badge/version-v0.3.0--rabi.1-blue) ![DSH](https://img.shields.io/badge/DSH-0.2.2--alpha.3-4D6BFE) ![license](https://img.shields.io/badge/license-Apache_2.0-green)
+![version](https://img.shields.io/badge/version-v0.3.0--rabi.2-blue) ![DSH](https://img.shields.io/badge/DSH-0.2.2--rc.1-4D6BFE) ![license](https://img.shields.io/badge/license-Apache_2.0-green)
 
-This fork integrates upstream 0.3.0 (0.3.0-rabi.1) with shared management for public Bots, Rabi assistant presets and deferred client loading. Private Bots require approval before native Bot tools publish their content to the team. Deleted private Bots retain protected folders, memory and chats until you release them in Settings. Rabi-bound Bots keep memory and learned skills under Rabi ownership; project AGENTS.md proposals remain available. Office directory inputs reject internal links, and PNG decoding bounds allocation and rejects truncated image data.
+This fork integrates upstream 0.3.0 (0.3.0-rabi.2) with shared management for public Bots, Rabi assistant presets and deferred client loading. Private Bots require approval before native Bot tools publish their content to the team. Deleted private Bots retain protected folders, memory and chats until you release them in Settings. Rabi-bound Bots keep memory and learned skills under Rabi ownership; project AGENTS.md proposals remain available. Office directory inputs reject internal links, and PNG decoding bounds allocation and rejects truncated image data.
 
 **[Download DS Bot for Windows 10/11 (64-bit) / 下载 Windows 10/11（64 位）版](https://github.com/Fei2411/DS-Bot/releases/latest)**, about 212 MB / 约 212 MB. A community project, not an official DeepSeek product. / 社区开源项目，不是 DeepSeek 官方产品。
 
@@ -40,9 +40,11 @@ Still stuck? [Report an install problem](https://github.com/Fei2411/DS-Bot/issue
 
 ## Tested host and environment
 
-This maintenance fork tests Windows x64, Node.js `24.15.0`, npm `11.12.1` and pnpm `11.28.5`, running Web from public Core source `vb2250158/deepseek-harness@3ff2154e44fcec3b98e1c529ae9f62b26b20096c` (`0.2.2-alpha.3`). The CI runner is `windows-2025`. Earlier-host and cross-platform compatibility matrices are outside this target.
+This maintenance fork tests Windows x64, Node.js `24.15.0`, npm `11.12.1` and pnpm `11.28.5`, running Web from public Core source `vb2250158/deepseek-harness@d037bdbe8b5dba993bf778a5dc1415e87bed2664` (`0.2.2-rc.1`). The CI runner is `windows-2025`. Earlier-host and cross-platform compatibility matrices are outside this target.
 
-The recorded production baseline on 2026-11-04 remains Core `564bd14e9ec1d82d3e2985dbd8dea9f40129d71a` (`0.2.2-alpha.2`); the candidate above is not a formal-installation claim. See the [test policy](docs/dev/testing.md) for source preparation, behavior and saved-data regressions, Web smoke and CI scope.
+Windows local-agent discovery and the Codex, Claude and ACP drivers resolve npm `.cmd` shims to their Node entry point and run without a shell or console window. Paths with spaces and array arguments are preserved; cancellation and timeouts target the CLI process itself. Arbitrary `.cmd`/`.bat` scripts are rejected with `UNSUPPORTED_AGENT_WRAPPER`: select the executable or a Node npm entry point instead. No local-agent account is signed in automatically.
+
+The target above is not a formal-installation claim. Loading or reindexing the team preserves existing DSH Session archives, including an explicit archive with activity stopped. Opening an earlier part remains an explicit action that unarchives that part. See the [test policy](docs/dev/testing.md) for source preparation, behavior and saved-data regressions, Web smoke and CI scope.
 
 **DS Bot**: the desktop app, the project and the plugin / 桌面应用、项目和插件 · **DeepSeek Harness (DSH)**: what they are built on / 它们的底层
 

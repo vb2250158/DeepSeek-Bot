@@ -1,7 +1,7 @@
 // The Agent Client Protocol engine: one child process per route, ACP over
 // stdio. A process multiplexes sessions: each DS Bot Session maps to one ACP
 // session, created or resumed with our loopback MCP server attached.
-import { spawn } from 'node:child_process'
+import { spawnAgent } from './command.js'
 import { JsonRpcPeer, wireProcess, EventQueue } from './jsonrpc.js'
 import { cleanEnv } from './discover.js'
 
@@ -28,7 +28,7 @@ export class AcpEngine {
       ? this.findExecutable(this.engine.command)
       : this.findExecutable(this.engine.command)
     if (bin === undefined) throw Object.assign(new Error(`${this.engine.name} is not installed`), { code: 'NO_ADAPTER' })
-    const child = spawn(bin, this.engine.args ?? [], {
+    const child = spawnAgent(bin, this.engine.args ?? [], {
       env: cleanEnv(this.engine.env ?? {}),
       stdio: ['pipe', 'pipe', 'inherit'],
       windowsHide: true,
