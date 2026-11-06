@@ -33,7 +33,7 @@ From `ds-bot/`, with `DSH_HARNESS` set to the absolute Core checkout path:
 
 ```powershell
 npm ci --no-fund --no-audit
-npm test -- --test-concurrency=4
+node --import ./test/harness-resolve.mjs --test --test-concurrency=4 --test-reporter=tap "test/*.test.js"
 node scripts/build-client.mjs --check
 npm run lint
 node dev/ci-web-smoke.mjs

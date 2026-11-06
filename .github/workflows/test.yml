@@ -74,7 +74,7 @@ jobs:
         run: npm ci --no-fund --no-audit
       - name: Current behavior and saved-data regressions
         working-directory: ds-bot
-        run: npm test -- --test-concurrency=4 --test-reporter=tap
+        run: node --import ./test/harness-resolve.mjs --test --test-concurrency=4 --test-reporter=tap "test/*.test.js"
       - name: Check generated plugin artifacts
         working-directory: ds-bot
         run: node scripts/build-client.mjs --check
