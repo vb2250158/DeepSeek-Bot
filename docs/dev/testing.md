@@ -43,7 +43,7 @@ The Web smoke creates and removes its own temporary Home/profile, starts the pub
 
 ## Default CI and local evidence
 
-[`Test`](../../.github/workflows/test.yml) has one Windows job named **Test result**. Pushes to `main`, pull requests and manual dispatch run current behavior regressions, generated-artifact checks, lint, source Host Web smoke and a leak scan of the tracked publication tree. No old DSH, multi-Node or multi-OS matrix runs. Desktop, mobile, Docker and SDK packaging are outside this automatic test workflow; it offers no optional package build path.
+[`Test`](../../.github/workflows/test.yml) has one Windows job named **Test result**. Pushes to `main`, pull requests and manual dispatch run current behavior regressions, generated-artifact checks, lint, source Host Web smoke and a leak scan of the tracked publication tree. The native TAP reporter retains a test file's exit code and signal even when it exits before reporting an individual case. No old DSH, multi-Node or multi-OS matrix runs. Desktop, mobile, Docker and SDK packaging are outside this automatic test workflow; it offers no optional package build path.
 
 Locally, select checks for the changed surface and reuse passing results whose inputs have not changed. Configuration-only or documentation-only changes do not require replaying the historical full behavior suite or desktop acceptance. Validate the new workflow and any changed smoke fixture; CI runs the declared current target. A change to runtime behavior still needs its affected behavior and current-data regressions. Keep assertions that protect production history; do not remove them to make a host update pass.
 
