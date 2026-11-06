@@ -44,6 +44,8 @@ Still stuck? [Report an install problem](https://github.com/Fei2411/DS-Bot/issue
 
 Windows 本地 Agent 发现及 Codex、Claude、ACP 驱动会把 npm `.cmd` 启动器解析为 Node 入口，不经过 shell，也不弹出控制台窗口。含空格的路径和数组参数保持原样；取消和超时直接作用于 CLI 进程。任意 `.cmd`/`.bat` 脚本会以 `UNSUPPORTED_AGENT_WRAPPER` 明确拒绝，请选择可执行文件或 Node npm 入口。不会自动登录本地 Agent 账号。
 
+本地 Agent 不继承名称含 `KEY`、`TOKEN`、`SECRET` 或 `PASSWORD` 的环境变量，也不继承 DSH 自有变量。引擎显式指定的环境设置及 CLI 自己保存在文件中的登录状态另行保留。
+
 上述目标不代表已正式安装。加载或重建团队索引会保留 DSH Session 的既有归档，包括明确归档并停止活动的状态；用户显式打开较早部分时，仍会解除该部分的归档。源码准备、当前行为与已存数据回归、Web smoke 和 CI 范围见[测试策略](docs/dev/testing.md)。
 
 **DS Bot**: the desktop app, the project and the plugin / 桌面应用、项目和插件 · **DeepSeek Harness (DSH)**: what they are built on / 它们的底层

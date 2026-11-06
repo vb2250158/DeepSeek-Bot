@@ -44,6 +44,8 @@ This maintenance fork tests Windows x64, Node.js `24.15.0`, npm `11.12.1` and pn
 
 Windows local-agent discovery and the Codex, Claude and ACP drivers resolve npm `.cmd` shims to their Node entry point and run without a shell or console window. Paths with spaces and array arguments are preserved; cancellation and timeouts target the CLI process itself. Arbitrary `.cmd`/`.bat` scripts are rejected with `UNSUPPORTED_AGENT_WRAPPER`: select the executable or a Node npm entry point instead. No local-agent account is signed in automatically.
 
+Inherited environment variables whose names contain `KEY`, `TOKEN`, `SECRET` or `PASSWORD`, and DSH-owned variables, are withheld from local agents. Explicit engine environment settings and the CLI's own file-based sign-in remain separate.
+
 The target above is not a formal-installation claim. Loading or reindexing the team preserves existing DSH Session archives, including an explicit archive with activity stopped. Opening an earlier part remains an explicit action that unarchives that part. See the [test policy](docs/dev/testing.md) for source preparation, behavior and saved-data regressions, Web smoke and CI scope.
 
 **DS Bot**: the desktop app, the project and the plugin / 桌面应用、项目和插件 · **DeepSeek Harness (DSH)**: what they are built on / 它们的底层

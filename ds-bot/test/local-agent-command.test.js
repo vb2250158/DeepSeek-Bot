@@ -5,7 +5,7 @@ import { syncBuiltinESMExports } from 'node:module'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { agentCommand, execAgent, spawnAgent } from '../src/host/local-agents/command.js'
-import { findExecutable, probeVersion } from '../src/host/local-agents/discover.js'
+import { cleanEnv, findExecutable, probeVersion } from '../src/host/local-agents/discover.js'
 import { validateCustom } from '../src/host/local-agents/engines.js'
 import { AcpEngine } from '../src/host/local-agents/acp.js'
 import { CodexEngine } from '../src/host/local-agents/codex.js'
@@ -22,6 +22,22 @@ const closeChild = async child => {
   child.kill('SIGTERM')
   await closed
 }
+
+test('agent environments omit inherited credential variables while keeping explicit CLI settings', () => {
+  const keys = ['DSBOT_FIXTURE_API_KEY', 'DSBOT_FIXTURE_TOKEN', 'DSBOT_FIXTURE_SECRET', 'DSBOT_FIXTURE_PASSWORD', 'dsh_fixture_variable']
+  const before = keys.map(key => [key, process.env[key]])
+  try {
+    for (const key of keys) process.env[key] = 'fake-env-value'
+    const env = cleanEnv({ EXPLICIT_CLI_TOKEN: 'fake-explicit-value' })
+    for (const key of keys) assert.equal(Object.hasOwn(env, key), false, key)
+    assert.equal(env.EXPLICIT_CLI_TOKEN, 'fake-explicit-value')
+  } finally {
+    for (const [key, value] of before) {
+      if (value === undefined) delete process.env[key]
+      else process.env[key] = value
+    }
+  }
+})
 
 test('custom command paths and array arguments retain spaces and empty arguments', () => {
   const args = [' leading ', '', 'a"b', 'x & y']
