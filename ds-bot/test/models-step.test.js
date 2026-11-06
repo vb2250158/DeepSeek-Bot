@@ -117,3 +117,16 @@ test('Harness settings opens DSH settings', () => {
   plain.button.props.onClick()
   assert.deepEqual(plain.calls, ['close', 'settings'])
 })
+
+test('General settings leaves native Agent navigation with the account menu', () => {
+  const calls = []
+  const roster = { byId: {}, roomsById: {}, bots: [], rooms: [], models: [], prefs: {} }
+  const tree = SettingsDialog({
+    page: 'general', id: null, roster, useUpdate: pick => pick({}),
+    actions: { closeSettings() {}, openSettings() {}, setSurface: mode => calls.push(mode) },
+  })
+  const [general] = walk(tree, node => typeof node.type === 'function' && node.type.name === 'GeneralPage')
+  const [row] = walk(general.type(general.props), node => node.props?.label === 'Classic Agent mode')
+  assert.equal(row, undefined)
+  assert.deepEqual(calls, [])
+})

@@ -3,6 +3,7 @@ import { isMainOf } from './sources.js'
 import { HEADER, currentPart, runStatsOf, stripHeader, usageOf } from './text.js'
 import { PlusIcon, ShareIcon, CloseIcon, ChevronLeftIcon, GearIcon, InfoIcon, FolderIcon, PeopleIcon } from './icons.js'
 import { botState, BotMark, BotAvatar } from './mark.js'
+import { call } from './api.js'
 import { GlobeIcon, Favicon, PanelMenu, menuItemFor } from './browser-pane.js'
 import { drawerMenuKeys } from './side-model.js'
 import { useEscape } from './overlay-hooks.js'
@@ -18,6 +19,8 @@ import { StopRoomWork, useMemberWork } from './member-status.js'
 import { GroupLibrary } from './group-library.js'
 import { canSetGoal, goalView, hasGoalAdmin } from './goal.js'
 import { PermissionPicker, presetDanger, presetName } from './permission-picker.js'
+import { BotConnectors } from './connectors.js'
+import { ComputerView } from './computer.js'
 import { t } from './i18n.js'
 import { RabiWorkspace } from './rabi-workspace.js'
 
@@ -33,7 +36,7 @@ function transcriptOf(list, id, name, hiddenTurns = []) {
   return lines.join('\n\n')
 }
 
-const TAB_LABELS = { details: 'Details', browser: 'Browser', library: 'Library', members: 'Members' }
+const TAB_LABELS = { details: 'Details', browser: 'Browser', computer: 'Computer', library: 'Library', members: 'Members' }
 
 const hostOf = (url) => { try { return new URL(url).hostname.replace(/^www\./, '') } catch { return '' } }
 const shortUrl = url => String(url ?? '').replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/$/, '')
@@ -168,7 +171,34 @@ function GroupOverview({ room, roster, actions, usage, useWork, openSettings }) 
   ]
 }
 
-export function DetailsDrawer({ sessionId, startRenaming, startTab, hasStrip, compact = false, roster, actions, useSessions, useSessionStatus, useActivity, useWork, useBrowserTabs, useBrowserPages }) {
+// A local agent Bot's sessions: the current one first, then the earlier ones,
+// newest first. Each row names when it started and how it was last titled.
+function AgentSessions({ bot, part, run, useSessions }) {
+  const ids = [part, ...(bot.parts ?? []).filter(id => id !== part).slice().reverse()]
+  const rows = useSessions(list => ids.map(id => list.byId?.[id]), rowsEqual)
+  const total = ids.length
+  return h('div', { className: 'bt-drawer-model' },
+    h('div', { className: 'bt-agent-sessions-head' },
+      h('div', { className: 'bt-section-title' }, t('Sessions')),
+      h('button', { type: 'button', className: 'bt-agent-sessions-new', onClick: () => run(call('bot-new-part', { botId: bot.id })) }, h(PlusIcon), t('New session'))),
+    h('div', { className: 'bt-agent-sessions' }, ids.map((id, index) => {
+      const row = rows[index]
+      const current = index === 0
+      const when = row?.updatedAt ?? row?.createdAt
+      const label = row?.title && row.title.trim() !== '' ? row.title : t('Session {number}', { number: total - index })
+      return h('button', {
+        key: id, type: 'button', disabled: current,
+        className: `bt-agent-session${current ? ' is-current' : ''}`,
+        title: current ? t('Current session') : t('Open this earlier session'),
+        onClick: current ? undefined : () => run(call('bot-open-part', { botId: bot.id, sessionId: id })),
+      },
+        h('span', { className: 'bt-agent-session-name' }, label),
+        h('span', { className: 'bt-agent-session-meta' }, current ? t('Current') : when ? new Date(when).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''))
+    })))
+}
+const rowsEqual = (a, b) => a.length === b.length && a.every((row, index) => row?.title === b[index]?.title && row?.updatedAt === b[index]?.updatedAt)
+
+export function DetailsDrawer({ sessionId, startRenaming, startTab, hasStrip, compact = false, roster, actions, useSessions, useSessionStatus, useActivity, useWork, useBrowserTabs, useBrowserPages, useComputer }) {
   const owner = roster.byId[sessionId]
   const part = owner ? currentPart(owner) : sessionId
   const isMainBot = isMainOf(roster, owner?.id)
@@ -243,7 +273,7 @@ export function DetailsDrawer({ sessionId, startRenaming, startTab, hasStrip, co
     if (room) await run(actions.updateRoom(room.id, { name: next }))
   }
   const subtitle = bot ? bot.role : roomSubtitle(room, roster)
-  const tabs = bot ? (compact ? ['details', 'library'] : ['details', 'browser']) : ['details', 'library', 'members']
+  const tabs = bot ? (compact ? ['details', 'library'] : roster.computer?.enabled === true ? ['details', 'browser', 'computer'] : ['details', 'browser']) : ['details', 'library', 'members']
   return [h(Fragment, { key: 'top' }, top),
     h('div', { key: 'id', className: 'bt-drawer-id', 'data-move': side },
       bot ? h(BotAvatar, { bot, size: 64, state: botState(running, doing, roster.questions?.[part] !== undefined), main: isMainBot, badge: false, gaze: true, pokeable: true })
@@ -265,6 +295,7 @@ export function DetailsDrawer({ sessionId, startRenaming, startTab, hasStrip, co
       bot && compact && tab === 'details' ? h('div', { className: 'bt-drawer-current-model', 'aria-label': t('Model') }, h(BotModelControl, { bot, roster, actions, run })) : null,
       errorLine,
       room && tab === 'details' ? h(GroupOverview, { room, roster, actions, usage, useWork, openSettings: () => setView('settings') }) : null,
+      bot && tab === 'computer' ? h(ComputerView, { bot, actions, hooks: { useComputer } }) : null,
       room && tab === 'library' ? h(GroupLibrary, { key: room.id, room, roster, actions }) : null,
       room && tab === 'members' ? h(GroupMembers, { key: room.id, room, roster, actions, useWork, run }) : null,
       bot && tab === 'details' && !compact ? [
@@ -272,8 +303,11 @@ export function DetailsDrawer({ sessionId, startRenaming, startTab, hasStrip, co
         h('div', { key: 'model', className: 'bt-drawer-model' },
           h('div', { className: 'bt-section-title' }, t('Model')),
           h(ModelMenu, { bot, roster, actions, run, wide: true }),
-          modelOf(bot, roster) ? null : h('div', { className: 'bt-note' }, t('Pick a model and {name} can start.', { name: bot.name }))),
+          modelOf(bot, roster) ? null : h('div', { className: 'bt-note' }, t('Pick a model and {name} can start.', { name: bot.name })),
+        ),
+        bot.engine ? h(AgentSessions, { key: 'sessions', bot, part, run, useSessions }) : null,
         h(PermissionRow, { key: 'permission', bot, roster, actions, run }),
+        h(BotConnectors, { key: 'connectors', bot, roster, actions, run }),
         h('div', { key: 'folder', className: 'bt-drawer-model' },
           h('div', { className: 'bt-section-title' }, t('Working folder')),
           h(FolderMenu, { value: bot.workDir, actions, run, wide: true, onPick: workDir => run(actions.updateBot(bot.id, { workDir })) })),

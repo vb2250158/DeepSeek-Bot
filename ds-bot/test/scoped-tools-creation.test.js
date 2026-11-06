@@ -187,6 +187,24 @@ test('a Bot Session gets every team tool in its own scope', async (t) => {
   assert.deepEqual(scopedNames(host, 'a').sort(), [...TEAM_TOOLS].filter(name => name !== 'read_browser').sort())
 })
 
+test('a Bot moved onto a local agent route gets the approval bridge, and loses it moving off', async (t) => {
+  const host = start()
+  t.after(host.stop)
+  await host.call('state', {})
+  await host.agentCreated('b')
+  assert.equal(scopedNames(host, 'b').includes('approve_agent_action'), false)
+  rt.isLocalAgentRef = ref => typeof ref === 'string' && ref.startsWith('acp-')
+  const bot = rt.botOf('b')
+  bot.model = 'acp-fake/default'
+  rt.hideBotUnusedTools(host.agentOf('b'))
+  assert.equal(scopedNames(host, 'b').includes('approve_agent_action'), true)
+  assert.equal(scopedNames(host, 'b').filter(name => name === 'message_bot').length, 1)
+  bot.model = 'deepseek-official/deepseek-flash'
+  rt.hideBotUnusedTools(host.agentOf('b'))
+  assert.equal(scopedNames(host, 'b').includes('approve_agent_action'), false)
+  assert.equal(scopedNames(host, 'b').includes('message_bot'), true)
+})
+
 test('a Session ds-bot does not own sees none of the team tools', async (t) => {
   const host = start()
   t.after(host.stop)
@@ -463,4 +481,34 @@ test('a live Bot Session gets its team tools back after a disable and re-enable'
   await second.call('state', {})
   assert.ok(hasShowView(second, 'a'), 'the scoped team tools are back')
   assert.ok(denied(second, 'a'), 'the blocking question tool is denied again')
+})
+
+// Mail account tools can arrive after Agents have already acquired their scopes.
+test('removing a dynamically added team tool withdraws every already-scoped registration', async (t) => {
+  const host = start()
+  t.after(host.stop)
+  await rt.load()
+  const a = await rt.resolveAgent('a')
+  const b = await rt.resolveAgent('b')
+  const name = 'mail_dynamic_test'
+  const def = { name, description: 'synthetic mail account tool', parameters: { type: 'object' }, execute: async () => 'ok' }
+  const served = agent => host.ctx.tools.schemas(agent).some(tool => tool.name === name)
+  assert.equal(served(a), false)
+  assert.equal(served(b), false)
+  rt.addTeamTool(def)
+  assert.equal(served(a), true)
+  assert.equal(served(b), true)
+  rt.addTeamTool(def)
+  assert.equal(host.scoped.filter(entry => entry.name === name).length, 2)
+  rt.removeTeamTool(name)
+  assert.equal(rt.teamTools.some(tool => tool.name === name), false)
+  assert.equal(served(a), false)
+  assert.equal(served(b), false)
+  assert.equal(host.scoped.filter(entry => entry.name === name).length, 0)
+  rt.addTeamTool(def)
+  assert.equal(served(a), true)
+  assert.equal(served(b), true)
+  rt.removeTeamTool(name)
+  assert.equal(served(a), false)
+  assert.equal(served(b), false)
 })

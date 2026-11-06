@@ -42,6 +42,14 @@ registerHooks({
   resolve(specifier, context, nextResolve) {
     if (specifier.startsWith('@deepseek-ai/') && context.parentURL?.startsWith(pluginUrl)) {
       // These test-only protocol imports are outside the base bundle's dependencies.
+      const testOwners = {
+        '@deepseek-ai/dsh-workspace': 'packages/workspace/workspace',
+        '@deepseek-ai/dsh-agent-loop-testkit': 'packages/test-support/agent-loop-testkit',
+      }
+      const owner = testOwners[specifier]
+      if (owner !== undefined && existsSync(resolve(harness, owner, 'package.json'))) {
+        return nextResolve(specifier, { ...context, parentURL: pathToFileURL(resolve(harness, owner, 'package.json')).href })
+      }
       const scope = resolve(harness, 'packages/core/scope/package.json')
       if (specifier === '@deepseek-ai/dsh-scope' && existsSync(scope)) {
         return nextResolve(specifier, { ...context, parentURL: pathToFileURL(scope).href })

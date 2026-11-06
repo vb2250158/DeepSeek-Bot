@@ -240,17 +240,16 @@ test('a move that never started keeps carry and one pause note in the inbox; a r
   // With the plugin live again the same input moves on — the note still only once.
   fail.create = false
   fail.flush = false
-  const stateSaved = host.rt.stateSaved
+  let off
   const finished = new Promise((resolve) => {
-    host.rt.stateSaved = () => {
-      stateSaved?.()
+    off = host.rt.onSaved(() => {
       const saved = host.state()
       if (saved.bots.b.sessionId === 's1' && saved.switching?.b === undefined) resolve()
-    }
+    })
   })
   await retry()
   await finished
-  host.rt.stateSaved = stateSaved
+  off()
   const forwarded = host.agentOf('s1').calls.filter(([kind]) => kind === 'followup' || kind === 'inject').map(([, message]) => text(message))
   assert.equal(forwarded.filter(line => line === PAUSE).length, 1)
   assert.equal(forwarded.filter(line => line === 'keep me').length, 1)

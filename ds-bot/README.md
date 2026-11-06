@@ -1,6 +1,8 @@
 # ds-bot
 
-Fork 0.2.7-rabi.1 keeps Rabi assistant presets, persona-owned memory and skills, shared Bot management, pinned chats and the native DSH team workspace. Group goals and memory change history are available in that workspace, including later conversation parts; the Enter key preference applies to its composers. Scheduled tasks follow new conversation parts without losing task identity or delivery history on current DSH hosts. A failed move keeps the original input and recovery marker.
+Fork 0.3.0-rabi.1 integrates upstream 0.3.0 and keeps Rabi assistant presets, persona-owned memory and skills, shared Bot management, pinned chats and the native DSH team workspace. Group goals and memory change history are available in that workspace, including later conversation parts; the Enter key preference applies to its composers. Scheduled tasks follow new conversation parts without losing task identity or delivery history on current DSH hosts. A failed move keeps the original input and recovery marker.
+
+The current source-Web target is Core `3ff2154e44fcec3b98e1c529ae9f62b26b20096c` / `0.2.2-alpha.3` with Node `24.15.0`; see [tested environment](../docs/dev/testing.md). This is a plugin candidate, not a formal-installation claim. New upstream mail, IM, local-agent and Computer settings use their documented account/enablement controls; tests use synthetic data and no real routes. Native DSH delegation stays available. Schedule access follows the exact live subagent root's Bot/group owner without changing the executing Agent; ordinary human Sessions keep the Host view. Mail retains its direct-Bot requirement. Removing the last mail account withdraws dynamically added tools from already-scoped Agents.
 
 0.2.6-rabi.1 integrates upstream 0.2.6 while preserving equal public-Bot management, Rabi assistant bindings, private-Bot protections and the native DSH workbench.
 
@@ -44,7 +46,7 @@ The DS Bot plugin for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek
 
 > Early release (v0.2). Features, tools and the saved data format can still change.
 
-Tested with dsh `0.2.1-rc.5` (Web and Desktop).
+Tested with dsh `0.2.2-rc.1` (Web and Desktop).
 
 The chat tail reports submitted messages and live Rabi Hook progress, with explicit stopped-Host, recovery and uncertain-result notices. Bound Bots discover Rabi automatically; progress codes require adapter 0.13.36 or newer.
 

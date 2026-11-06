@@ -192,11 +192,13 @@ test('Sign in to DeepSeek shows only while the account plugin says signed out', 
 
 // #452: the Connect plugins button left the Bot footer; the account menu that
 // stays keeps the way into the connectors and the automation panel.
-test('the account menu opens the connectors and the automation panel', () => {
+test('the account menu keeps connectors, automation and native Agent navigation', () => {
   const calls = []
-  const side = launcher({ actions: { openConnectors: () => calls.push('connectors'), selectPanel: id => calls.push(id) } })
+  const side = launcher({ actions: { openConnectors: () => calls.push('connectors'), selectPanel: id => calls.push(id), setSurface: mode => calls.push(mode) } })
   const menu = side.open()
+  assert.ok(side.item(menu, 'Switch to classic Agent mode'))
+  side.item(menu, 'Switch to classic Agent mode').props.onClick()
   side.item(menu, 'Connectors').props.onClick()
   side.item(menu, 'Automation tasks').props.onClick()
-  assert.deepEqual(calls, ['connectors', 'schedules'])
+  assert.deepEqual(calls, ['agent', 'connectors', 'schedules'])
 })

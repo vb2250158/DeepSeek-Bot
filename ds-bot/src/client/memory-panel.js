@@ -7,7 +7,7 @@ import { useEscape } from './overlay-hooks.js'
 import { ArrowUpIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, CloseIcon, DotsIcon, MemoryIcon, TrashIcon } from './icons.js'
 import { dateLocale, hostText, t } from './i18n.js'
 import { summaryBlocks } from './text.js'
-import { useLinger } from './motion.js'
+import { stepMenuFocus, useLinger } from './motion.js'
 import { RabiWorkspaceDialog } from './rabi-workspace.js'
 
 const POLL_MS = 1500
@@ -310,7 +310,10 @@ function LocalMemoryDialog({ owner, actions, leaving = false }) {
       if (menuRef.current?.contains(event.target) || dotsRef.current?.contains(event.target)) return
       setMenu(false)
     }
-    const onKey = (event) => { if (event.key === 'Escape') { event.stopPropagation(); setMenu(false); dotsRef.current?.focus() } }
+    const onKey = (event) => {
+      if (stepMenuFocus(menuRef.current, event, dotsRef.current)) return
+      if (event.key === 'Escape') { event.stopPropagation(); setMenu(false); dotsRef.current?.focus() }
+    }
     window.addEventListener('mousedown', onDown)
     window.addEventListener('keydown', onKey, true)
     return () => {

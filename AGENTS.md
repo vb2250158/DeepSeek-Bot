@@ -21,13 +21,13 @@ The Bot team:
 
 1. **Build on DSH; never patch it.** Bot features use the documented plugin APIs. The desktop app starts DSH only through its documented entry points (`@deepseek-ai/dsh/profile-boot`, the `dsh` CLI). Never patch DeepSeek Harness or depend on files inside a DSH install. If something is missing in DSH, stop and say so; do not work around it with a patch.
 2. **No secrets.** Never write, print or commit API keys, tokens, cookies or `DSH_HOME` contents. Use the mock model (`ds-bot/dev/mock-llm.mjs`) for tests; it needs no key.
-3. **Only original material.** Do not copy code, text, icons, logos or graphics from other products or websites. Code under a license compatible with Apache 2.0 is the only exception: say where it comes from and add its notice to the `NOTICE` file.
+3. **Only original material.** Do not copy code, text, icons, logos or graphics from other products or websites. Code under a license compatible with Apache 2.0 is the only exception: say where it comes from and add its notice to the `NOTICE` file. This rule is about DS Bot's own interface. To name a third-party product that DS Bot connects to (for example the agent CLI a Bot runs on), use that product's official logo, and list it in `NOTICE` with its source and owner.
 4. **`client.js` is generated.** Change `ds-bot/src/client/`, then run `npm run build` and commit both files. Never edit `client.js` by hand.
 5. **Do not touch the user's own DSH data.** The desktop app keeps its data in its own `DSH_HOME`; its import only reads `~/.dsh` and never writes there. The test bench keeps its data in `.dsh-test-<name>/`. Never point a test at `~/.dsh`, at the desktop app's data or at a DSH that the user runs.
 
 ## Commands
 
-Use the current Windows source Web target in [docs/dev/testing.md](docs/dev/testing.md): Node `24.15.0`, npm `11.12.1`, pnpm `11.28.5`, Core `de3fc0d70888e6ef7c2c6b64cb6d4f0c11db4ca2` / `0.2.2-alpha.3`. Set `DSH_HARNESS` to that independent Core source checkout. Prepare only the existing native Host, Host/Client library and Web build steps listed there; do not install older npm Core versions for compatibility or build SDK executables and desktop/mobile packages.
+Use the current Windows source Web target in [docs/dev/testing.md](docs/dev/testing.md): Node `24.15.0`, npm `11.12.1`, pnpm `11.28.5`, Core `3ff2154e44fcec3b98e1c529ae9f62b26b20096c` / `0.2.2-alpha.3`. Set `DSH_HARNESS` to that independent Core source checkout. Prepare only the existing native Host, Host/Client library and Web build steps listed there; do not install older npm Core versions for compatibility or build SDK executables and desktop/mobile packages.
 
 In `ds-bot/`:
 
@@ -39,7 +39,7 @@ npm run lint
 node dev/ci-web-smoke.mjs
 ```
 
-Select local checks by the changed surface and reuse passing evidence with unchanged inputs. Keep current behavior and production-history regressions. CI runs this one Windows target plus the tracked-tree leak scan; documentation and configuration changes do not justify replaying unrelated historical suites. The recorded formal Core564 / `0.2.2-alpha.2` baseline is separate from the tested candidate.
+Select local checks by the changed surface and reuse passing evidence with unchanged inputs. Keep current behavior and production-history regressions. CI runs this one Windows target plus the tracked-tree leak scan; documentation and configuration changes do not justify replaying unrelated historical suites. The recorded formal Core is `3ff2154e44fcec3b98e1c529ae9f62b26b20096c` / `0.2.2-alpha.3` with DS Bot `0.2.7-rabi.2`; the new plugin candidate is separate from its formal installation.
 
 ## Branches, pull requests and issues
 

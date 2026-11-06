@@ -392,7 +392,7 @@ test('a paused goal and a room at work do not get a goal check', async (t) => {
 test('the goal tracks tasks as the admin calls and members answer', async (t) => {
   const host = await start(t)
   await startGoal(host)
-  const writerTask = () => goal(host).stages[0].tasks.find(task => task.botId === 'b')
+  const writerTask = () => host.rt.roomOf('r1').goal.stages[0].tasks.find(task => task.botId === 'b')
   const result = host.round('c1', host.say('@Chief go'))
   await settle(() => host.agentOf('ga').calls.length === 1)
   host.begin('ga')
@@ -403,13 +403,15 @@ test('the goal tracks tasks as the admin calls and members answer', async (t) =>
   host.finish('gb', 'draft written, see out.md')
   await settle(() => writerTask().status === 'reported')
   await settle(() => result() !== undefined)
+  await host.rt.save()
+  assert.equal(goal(host).stages[0].tasks.find(task => task.botId === 'b').status, 'reported')
 })
 
 test('a failed model call and a user stop put the task back with a note', async (t) => {
   t.mock.timers.enable({ apis: ['setTimeout'] })
   const host = await start(t)
   await startGoal(host)
-  const writerTask = () => goal(host).stages[0].tasks.find(task => task.botId === 'b')
+  const writerTask = () => host.rt.roomOf('r1').goal.stages[0].tasks.find(task => task.botId === 'b')
   const result = host.round('c1', host.say('@Chief go'))
   await settle(() => host.agentOf('ga').calls.length === 1)
   host.begin('ga')
@@ -419,9 +421,14 @@ test('a failed model call and a user stop put the task back with a note', async 
   host.emit('gb', 'tool/call', { callId: 'k1', name: 'pwsh', arguments: '{}' })
   t.mock.timers.tick(ROOM_WORK_GRACE_MS * 2)
   await settle(() => result() !== undefined)
+  // Only the group grace is synthetic; Windows file-replace retries need real timers.
+  t.mock.timers.reset()
   // Its model call fails after the round moved on.
   host.emit('gb', 'turn/end', { turn: 1, reason: { kind: 'error', error: { code: 'RATE_LIMIT', status: 429, message: 'Too many requests' } } })
   await settle(() => writerTask().status === 'pending' && writerTask().note === 'Could not finish: its model call failed')
+  await host.rt.save()
+  const persisted = goal(host).stages[0].tasks.find(task => task.botId === 'b')
+  assert.deepEqual([persisted.status, persisted.note], ['pending', 'Could not finish: its model call failed'])
 })
 
 test('the user stopping a member puts its task back with a note', async (t) => {
@@ -550,6 +557,18 @@ test('stop-room-work sets the goal waiting and no check follows the notice', asy
   assert.equal(host.agentOf('ga').calls.length, 1)
   assert.equal(host.takeGoal(), undefined)
 })
+
+for (const [endpoint, body] of [['stop-room-work', { roomId: 'r1' }], ['stop-member-work', { roomId: 'r1', botId: 'b' }]]) {
+  test(`${endpoint} that fails still sets the goal waiting`, async (t) => {
+    const host = await start(t)
+    await startGoal(host)
+    host.emit('gb', 'turn/start', { turn: 1 })
+    host.agentOf('gb').cancel = () => { throw new Error('cancel failed') }
+    assert.equal((await host.call(endpoint, body)).ok, false)
+    const { rooms } = (await host.call('state', {})).value
+    assert.equal(rooms.find(room => room.id === 'r1').goal.idle, true)
+  })
+}
 
 test('a batch member that finishes first is reported while its peer still works', async (t) => {
   t.mock.timers.enable({ apis: ['setTimeout'] })

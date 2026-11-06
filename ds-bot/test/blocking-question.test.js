@@ -7,7 +7,8 @@ import { createRuntime } from '../index.js'
 import { fakeContext } from './fake-ctx.js'
 
 const QUESTION = 'ask_user_question'
-const DELEGATION = ['subagent', 'subagent_fork', 'subagent_codex', 'subagent_claude_code', 'list_subagent_models', 'send_message', 'interrupt_agent', 'list_agents', 'workflow', 'ralph']
+const AGENT_TEAMS = ['spawn_teammate', 'wait_agent', 'team_task_create', 'team_task_get', 'team_task_list', 'team_task_update']
+const DELEGATION = ['subagent', 'subagent_fork', 'subagent_codex', 'subagent_claude_code', 'list_subagent_models', 'send_message', 'interrupt_agent', 'list_agents', 'workflow', 'ralph', ...AGENT_TEAMS]
 
 const team = () => ({
   version: 1,
@@ -256,11 +257,11 @@ test('Bot Sessions filter the hidden tools and their guidance out of the prompt 
   t.after(stop)
   for (const id of ['chief', 'room-writer', 'plain']) await agentFor(id)
   const filters = scopedListeners.filter(record => record.event === 'system-prompt/assemble')
-  assert.deepEqual(filters.map(record => record.sessionId), ['chief', 'room-writer'])
+  assert.deepEqual(filters.map(record => record.sessionId), ['room', 'chief', 'chief', 'room-writer', 'room-writer', 'plain'])
   // Resolving the same Agent again adds no listener.
   await rt.resolveAgent('chief')
-  assert.equal(scopedListeners.filter(record => record.event === 'system-prompt/assemble').length, 2)
-  const filtered = await filters[0].listener({}, {}, async () => ({
+  assert.equal(scopedListeners.filter(record => record.event === 'system-prompt/assemble').length, 6)
+  const filtered = await filters[1].listener({}, {}, async () => ({
     sections: [{ name: 'bot-identity' }, { name: 'tool:goal' }, { name: 'tool:workflow' }, { name: 'tool:subagent' }, { name: 'tool:bash' }],
     contexts: [{ name: 'x' }],
     tools: [{ name: 'read' }, { name: 'subagent' }, { name: 'workflow' }, { name: 'send_message' }, { name: 'message_bot' }, { name: 'ask_user_question' }],
@@ -269,11 +270,23 @@ test('Bot Sessions filter the hidden tools and their guidance out of the prompt 
   assert.deepEqual(filtered.sections.map(section => section.name), ['bot-identity', 'tool:workflow', 'tool:subagent', 'tool:bash'])
   assert.deepEqual(filtered.tools.map(tool => tool.name), ['read', 'subagent', 'workflow', 'send_message', 'message_bot'])
   const presentation = { sections: [{ name: 'bot-identity' }, { name: 'tool:goal' }, { name: 'tool:workflow' }, { name: 'tool:subagent' }, { name: 'tool:bash' }], contexts: [], variables: {} }
-  const current = await filters[0].listener(presentation, {}, async () => presentation)
+  const current = await filters[1].listener(presentation, {}, async () => presentation)
   assert.equal(Object.hasOwn(current, 'tools'), false)
   assert.deepEqual(current.sections.map(section => section.name), ['bot-identity', 'tool:workflow', 'tool:subagent', 'tool:bash'])
   assert.deepEqual(filtered.contexts, [{ name: 'x' }])
   assert.deepEqual(filtered.variables, { a: 1 })
   await stop()
   for (const record of scopedListeners) assert.equal(record.disposed, true)
+})
+
+test('native Agent Teams guidance and tools remain available to Bot Sessions', async (t) => {
+  const { agentFor, scopedListeners, guard, stop } = await setup({ served: ['read', ...DELEGATION] })
+  t.after(stop)
+  await agentFor('chief')
+  for (const name of DELEGATION) assert.equal(guard(name, 'chief'), undefined)
+  const filter = scopedListeners.find(record => record.sessionId === 'chief' && record.event === 'system-prompt/assemble')
+  const input = { sections: [{ name: 'team:policy' }, { name: 'tool:spawn_teammate' }, { name: 'tool:goal' }], tools: [{ name: 'spawn_teammate' }, { name: 'create_goal' }] }
+  const result = await filter.listener({}, {}, async () => input)
+  assert.deepEqual(result.sections.map(section => section.name), ['team:policy', 'tool:spawn_teammate'])
+  assert.deepEqual(result.tools.map(tool => tool.name), ['spawn_teammate'])
 })

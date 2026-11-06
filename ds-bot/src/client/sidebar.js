@@ -1,3 +1,4 @@
+import { AgentBadge } from './agent-badge.js'
 import { createElement as h, Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import { FishLogo } from './dsh-primitives.js'
@@ -106,7 +107,7 @@ function BotRow({ bot, roster, actions, useSessions, useSessionStatus, useSessio
   h(BotAvatar, { bot, size: 36, state }),
   pinned && !wide ? h(PinMark) : null,
   wide ? h('span', { className: 'bt-row-body' },
-    h('span', { className: 'bt-row-name' }, h('span', { className: 'bt-row-title' }, bot.name), bot.role ? h('span', { className: 'bt-row-role' }, bot.role) : null, pinned ? h(PinMark) : null),
+    h('span', { className: 'bt-row-name' }, h('span', { className: 'bt-row-title' }, bot.name, bot.engine ? h(AgentBadge, { engine: bot.engine }) : null), bot.role ? h('span', { className: 'bt-row-role' }, bot.role) : null, pinned ? h(PinMark) : null),
     runningLine ? h('span', { className: 'bt-row-preview' }, runningLine)
       : awayLine ? h('span', { className: 'bt-row-preview' }, awayLine)
         : waitsFor ? h('span', { className: 'bt-row-preview' }, waitsFor)
@@ -123,7 +124,7 @@ function RoomRow({ room, roster, actions, useSessions, useSessionStatus, useSess
   const unread = useSessionStatus(map => map.get(id)?.completionUnread === true) || (marked && !active)
   useMarkedUnread(id, active, marked, actions)
   const approval = useApproval(useWork, entry => entry.roomId === id)
-  const members = workKeys(useGroupWork(useWork, rooms => (rooms[id] ?? []).map(entry => ({ id: entry.botId, ...doingOf(entry) }))))
+  const members = workKeys(useGroupWork(useWork, rooms => (rooms[id] ?? []).filter(entry => entry.botId !== undefined).map(entry => ({ id: entry.botId, ...doingOf(entry) }))))
   const first = roster.byId[members[0]?.id]
   const workingLine = first ? workLine(first.name, members[0], members.length - 1) : null
   if (room.hidden && !active) return null
@@ -744,6 +745,15 @@ function mainMarkOf(id) {
 
 // The Main Bot's avatar in the team column, in CSS px of the page, with the page's size.
 // Only the default look: a photo or another character would not match the start window's whale.
+// Standalone app columns may still be sliding; native DSH panels have no such column.
+function restingBox(mark) {
+  const box = mark.getBoundingClientRect()
+  const column = mark.closest?.('.bt-leftcol')
+  if (!column) return box
+  const now = column.getBoundingClientRect()
+  return { left: box.left + column.offsetLeft - now.left, top: box.top + column.offsetTop - now.top, width: box.width, height: box.height }
+}
+
 function mainAvatarPlace(roster) {
   const main = roster?.byId?.[roster.mainBotId]
   if (main === undefined || main.avatar?.image || typeof document === 'undefined') return undefined
@@ -752,7 +762,7 @@ function mainAvatarPlace(roster) {
   const mark = mainMarkOf(main.id)
   // Not the opacity: the column fades in as it first draws, which is when this is measured.
   if (!mark || mark.checkVisibility?.({ visibilityProperty: true }) === false) return undefined
-  const box = mark.getBoundingClientRect()
+  const box = restingBox(mark)
   const view = document.documentElement
   return { x: box.left, y: box.top, width: box.width, height: box.height, viewportWidth: globalThis.innerWidth ?? view.clientWidth, viewportHeight: globalThis.innerHeight ?? view.clientHeight }
 }
@@ -767,7 +777,7 @@ function mainAvatarPlace(roster) {
 const GLIDE_MS = 460
 function glideOnto(mark, from) {
   if (!mark || reducedMotion()) return
-  const box = mark.getBoundingClientRect()
+  const box = restingBox(mark)
   if (!box.width) return
   const outer = document.createElement('div')
   const inner = document.createElement('div')

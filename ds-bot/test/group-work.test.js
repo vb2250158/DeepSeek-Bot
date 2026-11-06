@@ -990,6 +990,88 @@ test('one press stops the group\'s round and every member at work there, and not
   assert.deepEqual(kinds(first()).filter(([kind]) => kind === 'stopped'), [['stopped', 'Chief'], ['stopped', 'Writer']])
 })
 
+test('a member that cannot be stopped leaves the others stopped and reports the failure', async (t) => {
+  const host = await start(t)
+  host.emit('ga', 'turn/start', { turn: 1 })
+  host.emit('gb', 'turn/start', { turn: 1 })
+  host.agentOf('ga').cancel = () => { throw new Error('cancel failed') }
+  const stopped = await host.call('stop-room-work', { roomId: 'r1' })
+  assert.equal(stopped.ok, false)
+  assert.match(stopped.error.message, /cancel failed/)
+  assert.deepEqual(host.agentOf('gb').cancelled, [{ kind: 'user' }])
+  await settle(() => host.agentOf('r1').calls.length === 1)
+  assert.equal(host.takePost().source.stopped, true)
+})
+
+test('a round that cannot be stopped leaves the members stopped and reports the failure', async (t) => {
+  const host = await start(t)
+  const stop = new AbortController()
+  host.emit('gb', 'turn/start', { turn: 1 })
+  host.emit('r1', 'user/message', host.say('@Chief 看看进度'))
+  const relay = host.tool('group_relay', {}, 'r1', { callId: 'c1', signal: stop.signal })
+  try {
+    await settle(() => host.agentOf('ga').calls.length === 1)
+    host.begin('ga')
+    host.agentOf('r1').cancel = () => { throw new Error('round cancel failed') }
+    const stopped = await host.call('stop-room-work', { roomId: 'r1' })
+    assert.equal(stopped.ok, false)
+    assert.match(stopped.error.message, /round cancel failed/)
+    for (const id of ['ga', 'gb']) assert.deepEqual(host.agentOf(id).cancelled, [{ kind: 'user' }], id)
+  } finally {
+    stop.abort()
+    host.emit('ga', 'turn/end', { turn: 1, reason: { kind: 'aborted' } })
+    await relay
+  }
+})
+
+test('a rejected scoped child drain reports failure without cancelling an unrelated Agent', async (t) => {
+  const cancelled = []
+  const host = await start(t, undefined, {
+    subagents: { drainChildren: () => { throw new Error('belongs to another parent') } },
+    agents: { list: () => [], get: id => (id === 'sub-1' ? { cancel: reason => cancelled.push(reason) } : undefined) },
+  })
+  host.emit('gb', 'turn/start', { turn: 1 })
+  host.emit('gb', 'subagent/catalog', { childId: 'sub-1', label: 'Long run', mode: 'continuable' })
+  const stopped = await host.call('stop-room-work', { roomId: 'r1' })
+  assert.equal(stopped.ok, false)
+  assert.match(stopped.error.message, /belongs to another parent/)
+  assert.deepEqual(cancelled, [])
+})
+
+test('stopping a member drains only its direct subagents and leaves plain forks alone', async (t) => {
+  const drained = []
+  const cancelled = []
+  const children = ['sub-1', 'fork-1'].map(id => ({ id, cancel: () => cancelled.push(id) }))
+  const host = await start(t, undefined, {
+    subagents: {
+      listChildren: async id => id === 'gb' ? [{ id: 'sub-1', mode: 'continuable', createdAt: 1 }] : [],
+      drainChildren: async (parent, childIds) => { drained.push({ parent, childIds }); children.find(c => c.id === childIds[0]).cancel() },
+    },
+    agents: { list: () => children, get: id => children.find(child => child.id === id) },
+  })
+  host.emit('gb', 'turn/start', { turn: 1 })
+  assert.equal((await host.call('stop-room-work', { roomId: 'r1' })).value, true)
+  assert.equal(drained[0].parent, host.agentOf('gb'))
+  assert.deepEqual(drained[0].childIds, ['sub-1'])
+  assert.deepEqual(cancelled, ['sub-1'])
+})
+
+// An unhandled rejection here would end the Host.
+test('a stopped round warns when a member turn cannot be stopped', async (t) => {
+  const host = await start(t)
+  const warned = []
+  host.ctx.logger.warn = (...args) => { warned.push(args.join(' ')) }
+  const stop = new AbortController()
+  host.emit('r1', 'user/message', host.say('@Writer 写一下'))
+  const relay = host.tool('group_relay', {}, 'r1', { callId: 'c1', signal: stop.signal })
+  await settle(() => host.agentOf('gb').calls.length === 1)
+  host.begin('gb')
+  host.agentOf('gb').cancel = () => { throw new Error('cancel failed') }
+  stop.abort()
+  await relay
+  await settle(() => warned.some(line => /cancel failed/.test(line)))
+})
+
 test('members still at work show in the team view and in the prompts of the others', async (t) => {
   const host = await start(t)
   host.emit('gb', 'turn/start', { turn: 1 })
@@ -1545,12 +1627,11 @@ test('consecutive 0-tool ack ping-pong relays pause after 6 turns and go on only
 // stays marked as working in the group, and stopping the group interrupts the subagent
 // and suppresses its late settlement notice.
 test('a group member with a running DSH subagent stays working and stop-room-work interrupts the subagent (#701)', async (t) => {
-  const host = await start(t)
   const interrupted = []
-  host.ctx.subagents = {
+  const host = await start(t, undefined, { subagents: {
     listChildren: async id => id === 'gb' ? [{ id: 'sub-1', mode: 'continuable', createdAt: 1 }] : [],
     drainChildren: async (parent, childIds) => { interrupted.push({ parent, childIds }) },
-  }
+  } })
   const first = host.round('c1', host.say('@Writer 派子代理跑长任务'))
   await settle(() => host.agentOf('gb').calls.length === 1)
   host.begin('gb')

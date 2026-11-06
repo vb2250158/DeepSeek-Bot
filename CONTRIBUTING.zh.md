@@ -29,7 +29,7 @@
 | `fix/<Issue 号>-<短名>`、`feat/<Issue 号>-<短名>`、`docs/<短名>`、`chore/<短名>` | 你的工作分支。从最新的 `dev` 切出 | — |
 
 - 分支名不要以 `dev/` 开头。有 `dev` 分支时，Git 建不了 `dev/<名字>`。
-- 同步分支用 `git merge dev`（热修分支用 `git merge main`）。已推送的分支不要 rebase，也不要强推。
+- 同步分支用 `scripts/merge-dev.sh`：合入 `origin/dev`，生成文件 `ds-bot/client.js` 冲突时取 dev 的版本再重新生成（热修分支用 `git merge main`）。已推送的分支不要 rebase，也不要强推。
 - 默认分支是 `main`，所以 GitHub 新建 Pull Request 时默认的 base 是 `main`。请改成 `dev`。
 
 ### Issue
@@ -77,7 +77,7 @@
 
 ## 搭建环境
 
-本 fork 使用 Windows x64、Node.js `24.15.0`、npm `11.12.1` 和 pnpm `11.28.5`。测试固定公开 Core 源码 `de3fc0d70888e6ef7c2c6b64cb6d4f0c11db4ca2`（宿主 `0.2.2-alpha.3`），`DSH_HARNESS` 指向独立源码目录；不再通过 `npm run harness` 下载旧 npm Core。正式 Core564/`0.2.2-alpha.2` 与候选的区别、现有源码构建命令见[测试标准](docs/dev/testing.md)。
+本 fork 使用 Windows x64、Node.js `24.15.0`、npm `11.12.1` 和 pnpm `11.28.5`。测试固定公开 Core 源码 `3ff2154e44fcec3b98e1c529ae9f62b26b20096c`（宿主 `0.2.2-alpha.3`），`DSH_HARNESS` 指向独立源码目录；不再通过 `npm run harness` 下载旧 npm Core。正式 Core564/`0.2.2-alpha.2` 与候选的区别、现有源码构建命令见[测试标准](docs/dev/testing.md)。
 
 在 `ds-bot/` 运行 `npm ci` 安装插件工具。`@deepseek-ai/*` peer 由源码宿主提供；`.npmrc` 阻止 npm 将它们安装到插件目录。
 

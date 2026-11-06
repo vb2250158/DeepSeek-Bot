@@ -1,4 +1,12 @@
-This fork integrates upstream 0.2.7 (0.2.7-rabi.1) with shared management for public Bots, Rabi assistant presets and deferred client loading. Private Bots require approval before native Bot tools publish their content to the team. Deleted private Bots retain protected folders, memory and chats until you release them in Settings. Rabi-bound Bots keep memory and learned skills under Rabi ownership; project AGENTS.md proposals remain available. Office directory inputs reject internal links, and PNG decoding bounds allocation and rejects truncated image data.
+<p align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/logo-dark.svg"><img src="docs/images/logo.svg" alt="DS Bot" width="260"></picture></p>
+
+# DS Bot
+
+English | [中文](README.zh.md)
+
+![version](https://img.shields.io/badge/version-v0.3.0--rabi.1-blue) ![DSH](https://img.shields.io/badge/DSH-0.2.2--alpha.3-4D6BFE) ![license](https://img.shields.io/badge/license-Apache_2.0-green)
+
+This fork integrates upstream 0.3.0 (0.3.0-rabi.1) with shared management for public Bots, Rabi assistant presets and deferred client loading. Private Bots require approval before native Bot tools publish their content to the team. Deleted private Bots retain protected folders, memory and chats until you release them in Settings. Rabi-bound Bots keep memory and learned skills under Rabi ownership; project AGENTS.md proposals remain available. Office directory inputs reject internal links, and PNG decoding bounds allocation and rejects truncated image data.
 
 **[Download DS Bot for Windows 10/11 (64-bit) / 下载 Windows 10/11（64 位）版](https://github.com/Fei2411/DS-Bot/releases/latest)**, about 212 MB / 约 212 MB. A community project, not an official DeepSeek product. / 社区开源项目，不是 DeepSeek 官方产品。
 
@@ -32,7 +40,7 @@ Still stuck? [Report an install problem](https://github.com/Fei2411/DS-Bot/issue
 
 ## Tested host and environment
 
-This maintenance fork tests Windows x64, Node.js `24.15.0`, npm `11.12.1` and pnpm `11.28.5`, running Web from public Core source `vb2250158/deepseek-harness@de3fc0d70888e6ef7c2c6b64cb6d4f0c11db4ca2` (`0.2.2-alpha.3`). The CI runner is `windows-2025`. Earlier-host and cross-platform compatibility matrices are outside this target.
+This maintenance fork tests Windows x64, Node.js `24.15.0`, npm `11.12.1` and pnpm `11.28.5`, running Web from public Core source `vb2250158/deepseek-harness@3ff2154e44fcec3b98e1c529ae9f62b26b20096c` (`0.2.2-alpha.3`). The CI runner is `windows-2025`. Earlier-host and cross-platform compatibility matrices are outside this target.
 
 The recorded production baseline on 2026-11-04 remains Core `564bd14e9ec1d82d3e2985dbd8dea9f40129d71a` (`0.2.2-alpha.2`); the candidate above is not a formal-installation claim. See the [test policy](docs/dev/testing.md) for source preparation, behavior and saved-data regressions, Web smoke and CI scope.
 
@@ -144,8 +152,8 @@ DS Bot 0.2.1 and earlier cannot update themselves in DSH Desktop 0.2.1-rc.2 or l
 Needs Node.js `22.19` or later, and pnpm. On Linux it needs the same glibc 2.28 or newer as the desktop app — the DSH install loads its own native libraries, so CentOS 7 and other older-glibc systems take the Docker route below instead.
 
 ```sh
-npx @deepseek-ai/dsh@0.2.1-rc.5 plugin --profile web add ds-bot
-npx @deepseek-ai/dsh@0.2.1-rc.5 web
+npx @deepseek-ai/dsh@0.2.2-rc.1 plugin --profile web add ds-bot
+npx @deepseek-ai/dsh@0.2.2-rc.1 web
 ```
 
 **Docker (NAS, Linux server)**
@@ -192,11 +200,27 @@ For larger work, a group chat can run a goal: the admin aligns with you on what 
 
 Settings → **Capabilities** is a shared library of MCP servers, skills and packs. Add a capability to a Bot in its settings; it is available from that Bot's next message in its own chat and group chats. A local MCP command that a Bot adds needs your approval before it can run. Every Bot can manage shared capabilities; executable changes still require your approval.
 
+### Connectors
+
+Settings → **Connectors** connects services such as GitHub, Gmail and other mailboxes, and remote MCP servers. Sign in once with OAuth or a key; the credentials stay in DS Bot's Secrets and never reach a Bot. Every Bot can use a connected service unless you turn it off in the Bot's details. A Bot that needs a service it does not have asks you with a card, and by default every email it writes waits for you to send it.
+
+### Local agents
+
+Coding-agent CLIs you already use — Devin CLI, Claude Code, Codex CLI, OpenCode and other ACP agents — can run a Bot. In Settings → **Local agents** DS Bot lists the CLIs it finds; pick one as a Bot's model. The Bot uses the CLI's own sign-in and plan, and still works like any Bot: private and group chats, handoffs, approvals and memory.
+
+### Computer use
+
+Bots can use the apps on your computer, as far as you allow. Turn it on in Settings → **Computer use**, then give each Bot a level and the apps it may use. You see when a Bot is working, can take over at any time and hand back, and some apps are never given to a Bot.
+
 ### Usage
 
 In **Settings** → **Usage**, you can see token usage by time, by bot and by model.
 
 ![Usage page](docs/images/usage.png)
+
+### IM
+
+Bots talk to you in your chat apps. In Settings → IM you can link a bot to Telegram, WeChat, Feishu, DingTalk, WeCom, QQ, Discord or Slack — pairing, group chats, approval cards and replies all work there without any public address or open port on your computer.
 
 ### Office files
 

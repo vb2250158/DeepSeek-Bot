@@ -1,8 +1,7 @@
 {
   "name": "ds-bot",
-  "version": "0.2.7-rabi.2",
+  "version": "0.3.0-rabi.1",
   "description": "DS Bot: a team of long-lived Bots for DeepSeek Harness, with shared team management, pinned chats and group chats",
-
   "keywords": [
     "dsh-plugin",
     "deepseek-harness",
@@ -69,9 +68,14 @@
   },
   "devDependencies": {
     "@xmldom/xmldom": "0.9.12",
-    "esbuild": "0.28.2"
+    "esbuild": "0.28.2",
+    "qrcode-generator": "2.0.4"
   },
   "dependencies": {
-    "deep-view": "0.1.0"
+    "@modelcontextprotocol/client": "2.4.0",
+    "deep-view": "0.1.2",
+    "imapflow": "2.9.1",
+    "mailparser": "3.12.4",
+    "nodemailer": "10.2.1"
   }
 }

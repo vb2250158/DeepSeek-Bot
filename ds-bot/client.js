@@ -4,7 +4,7 @@ window.__ModuleLoader__.load({
   id: 'ds-bot',
   factory: (require) => {
     const module = { exports: {} }
-    const clientAppHash = '7706c4300849f7e3072e1e43b60d2e7c2283f9c33816ad41e66288779b8916f3'
+    const clientAppHash = '52bda122dc3925a0853c85c4904e85400b48607fff93520d47526de6f2422e37'
     // Must match src/client/index.js — fiber inject is read from this thin entry, not the deferred app.
     module.exports.inject = ['sessions', 'uiWorkspace', 'uiConversation', 'slots', 'theme', 'layout']
     module.exports.apply = async function apply(ctx) {

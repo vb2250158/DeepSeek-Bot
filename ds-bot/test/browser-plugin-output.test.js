@@ -139,6 +139,7 @@ test('a stored browser screenshot is repaired before the next step and survives 
   const ctx = new Context()
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
+  if (typeof ctx.tools.setExecutor === 'function') await ctx.plugin(await import('@deepseek-ai/dsh-tool-executor-native'))
   t.after(async () => ctx.fiber.dispose())
   const session = Session.create('old-browser-chat')
   const call = session.append('tool/call', { turn: 1, step: 1, callId: 'shot', name: 'browser_screenshot', arguments: '{}' })
