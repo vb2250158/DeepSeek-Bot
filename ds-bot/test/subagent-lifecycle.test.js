@@ -13,22 +13,12 @@ import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
 import FsLocal from '@deepseek-ai/dsh-fs-local'
 import SubagentRuntime from '@deepseek-ai/dsh-subagent'
+import WorkingDirectory from '@deepseek-ai/dsh-working-directory'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import { archivePreviousPart } from '../src/host/parts.js'
 import { drainSelectedChildren } from '../src/host/turns.js'
 
-const scopedLifecycle = typeof SubagentRuntime.prototype.waitForChildren === 'function'
-
-test('a previous part waits only for its Core-owned workers and keeps exact-parent completion', {
-  skip: scopedLifecycle ? false : 'This DSH release does not expose exact-parent child settlement.',
-}, async t => {
-  const { default: WorkingDirectory } = await import('@deepseek-ai/dsh-working-directory')
-  const executors = []
-  try {
-    executors.push(await import('@deepseek-ai/dsh-tool-executor-native'))
-  } catch (error) {
-    // Published DSH executes tools in ToolRuntime; newer Core mounts a separate executor.
-    if (error.code !== 'ERR_MODULE_NOT_FOUND' || !error.message.startsWith("Cannot find package '@deepseek-ai/dsh-tool-executor-native'")) throw error
-  }
+async function liveSubagents(t) {
   const home = await mkdtemp(join(tmpdir(), 'ds-bot-child-lifecycle-'))
   const previousHome = process.env.DSH_HOME
   t.diagnostic(`syntheticHome=${home}`)
@@ -49,7 +39,7 @@ test('a previous part waits only for its Core-owned workers and keeps exact-pare
       yield { type: 'finish', reason: { kind: 'stop' } }
     }
   }
-  for (const plugin of [LlmRuntime, SessionStore, SessionProjectionRegistry, SystemPrompt, ToolRuntime, ...executors, AgentRegistry, FsLocal, WorkingDirectory]) await ctx.plugin(plugin)
+  for (const plugin of [LlmRuntime, SessionStore, SessionProjectionRegistry, SystemPrompt, ToolRuntime, NativeToolExecutor, AgentRegistry, FsLocal, WorkingDirectory]) await ctx.plugin(plugin)
   await ctx.plugin(AgentLoop, { agents: [] })
   ctx.llm.registerAdapter(['child-lifecycle-fixture'], new ScriptedModel())
   await ctx.plugin(SubagentRuntime)
@@ -79,15 +69,19 @@ test('a previous part waits only for its Core-owned workers and keeps exact-pare
     const request = { parent: agent, prompt: [{ type: 'text', text: 'Independent synthetic work' }], maxDepth: 1 }
     return ctx.subagents.startActivation({
       provider: provider.name, label: `task for ${agent.id}`,
-      // Core's root-owner API was introduced with the flat activation fields.
-      ...(typeof ctx.subagents.rootOf === 'function' ? request : { request }),
+      ...request,
       signal: new AbortController().signal, delivery: 'parent',
     })
   }
-  const child = await start(parent)
-  const foreign = await start(other)
   const archived = []
   const rt = { ctx: { get: key => ctx.get(key), subagents: ctx.subagents, workspaceRegistry: { archiveSession: async (id, options) => archived.push({ id, options }) } }, resolveAgent: id => Promise.resolve(ctx.agents.get(id)) }
+  return { ctx, workers, parent, fresh, other, start, archived, rt }
+}
+
+test('a previous part waits only for its Core-owned workers and keeps exact-parent completion', async t => {
+  const { ctx, workers, parent, fresh, other, start, archived, rt } = await liveSubagents(t)
+  const child = await start(parent)
+  const foreign = await start(other)
   const wait = archivePreviousPart(rt, parent)
   await Promise.resolve()
   assert.deepEqual(archived, [])
@@ -104,12 +98,23 @@ test('a previous part waits only for its Core-owned workers and keeps exact-pare
   assert.equal(sourceEvents[0].data.source.senderSessionId, child.childId)
   assert.equal(fresh.session.snapshotEvents().filter(event => event.type === 'user/message' && event.data.source?.kind === 'subagent-settled').length, 0)
   assert.equal(workers.get(foreign.childId).state, 'running')
+  await ctx.fiber.dispose()
+  assert.equal(workers.get(foreign.childId).state, 'aborted')
+  assert.ok(workers.get(foreign.childId).disposed > 0)
+})
+
+test('selected child teardown rejects a foreign child, awaits only owned cleanup and permits later work', async t => {
+  const { ctx, workers, parent, other, start, rt } = await liveSubagents(t)
+  const foreign = await start(other)
   const selected = await start(parent)
-  await assert.rejects(drainSelectedChildren(rt, parent.id, [foreign.childId]), /not a direct child/)
+  const sibling = await start(parent)
+  await assert.rejects(drainSelectedChildren(rt, parent.id, [selected.childId, foreign.childId]), { code: 'UNAUTHORIZED' })
+  assert.equal(workers.get(selected.childId).state, 'running')
   assert.equal(workers.get(foreign.childId).state, 'running')
   await drainSelectedChildren(rt, parent.id, [selected.childId])
   await selected.result
   assert.equal(workers.get(selected.childId).state, 'aborted')
+  assert.equal(workers.get(sibling.childId).state, 'running')
   assert.equal(workers.get(foreign.childId).state, 'running')
   const later = await start(parent)
   workers.get(later.childId).finish('A later task remains independent of the earlier stop.')
@@ -121,7 +126,7 @@ test('a previous part waits only for its Core-owned workers and keeps exact-pare
   assert.ok(workers.get(foreign.childId).disposed > 0)
 })
 
-test('a DSH without scoped child settlement retains the original part and rejects child teardown', async () => {
+test('missing scoped child capabilities retain the original part and reject teardown', async () => {
   const archived = []
   const parent = { id: 'original-part' }
   const rt = {
@@ -129,6 +134,6 @@ test('a DSH without scoped child settlement retains the original part and reject
     hasSubagents: id => id === parent.id,
   }
   await assert.rejects(archivePreviousPart(rt, parent), /original Session remains available/)
-  await assert.rejects(drainSelectedChildren(rt, parent.id, ['child']), /does not provide scoped child teardown/)
+  await assert.rejects(drainSelectedChildren(rt, parent.id, ['child']), { code: 'SUBAGENT_TEARDOWN_UNAVAILABLE' })
   assert.deepEqual(archived, [])
 })

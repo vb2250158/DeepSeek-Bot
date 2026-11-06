@@ -323,6 +323,7 @@ var ZH = {
   // Local agents page
   "Local agents": "本地 Agent",
   "This DSH cannot register local agent routes.": "这个 DSH 不能注册本地 Agent 路由。",
+  "Local agents are disabled in this profile.": "此配置已停用本地 Agent。",
   "Detected agents": "已检测到的 Agent",
   Refresh: "刷新",
   "No agent CLIs found": "没有找到 Agent CLI",
@@ -25129,6 +25130,7 @@ function LocalAgentsPage({ run: run2, Section: Section2, Row: Row4 }) {
     void run2(call("local-agents")).then(setView);
   }, []);
   if (view === null) return null;
+  if (view.enabled === false) return (0, import_react62.createElement)("p", { className: "bt-set-hint" }, t("Local agents are disabled in this profile."));
   if (view.available === false) return (0, import_react62.createElement)("p", { className: "bt-set-hint" }, t("This DSH cannot register local agent routes."));
   return [
     (0, import_react62.createElement)(

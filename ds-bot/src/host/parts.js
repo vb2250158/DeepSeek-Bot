@@ -171,9 +171,13 @@ export function canonicalHeadings(note, names) {
 export async function archivePreviousPart(rt, agent) {
   const { ctx } = rt
   const runtime = typeof ctx.get === 'function' ? ctx.get('subagents') : ctx.subagents
-  if (typeof runtime?.waitForChildren === 'function') {
-    await runtime.waitForChildren(agent)
-    await agent.whenIdle()
+  if (typeof runtime?.waitForTreeWork === 'function') {
+    for (;;) {
+      await agent.whenIdle()
+      const idleSeq = agent.session.seq
+      if (!await runtime.waitForTreeWork(agent)
+        && agent.status === 'idle' && agent.session.seq === idleSeq) break
+    }
   } else if (rt.hasSubagents?.(agent.id)) {
     throw new Error('This DSH cannot retain worker completion while archiving a previous part; its original Session remains available.')
   }

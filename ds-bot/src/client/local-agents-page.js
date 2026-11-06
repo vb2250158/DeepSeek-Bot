@@ -32,6 +32,7 @@ export function LocalAgentsPage({ run, Section, Row }) {
   const refresh = () => run(call('local-agent-refresh')).then(setView)
   useEffect(() => { void run(call('local-agents')).then(setView) }, [])
   if (view === null) return null
+  if (view.enabled === false) return h('p', { className: 'bt-set-hint' }, t('Local agents are disabled in this profile.'))
   if (view.available === false) return h('p', { className: 'bt-set-hint' }, t('This DSH cannot register local agent routes.'))
   return [
     h(Section, { key: 'found', title: t('Detected agents') },

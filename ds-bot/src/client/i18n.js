@@ -291,6 +291,7 @@ const ZH = {
   // Local agents page
   'Local agents': '本地 Agent',
   'This DSH cannot register local agent routes.': '这个 DSH 不能注册本地 Agent 路由。',
+  'Local agents are disabled in this profile.': '此配置已停用本地 Agent。',
   'Detected agents': '已检测到的 Agent',
   Refresh: '刷新',
   'No agent CLIs found': '没有找到 Agent CLI',

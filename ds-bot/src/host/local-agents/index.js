@@ -34,6 +34,37 @@ const spawnEngine = (kind, route, spec) => (kind === 'acp' ? new AcpEngine(route
 
 export function install(rt) {
   const { ctx, state } = rt
+  const enabled = rt.config?.localAgentsEnabled
+  if (enabled !== undefined && typeof enabled !== 'boolean') throw new Error('localAgentsEnabled must be a boolean')
+  const isLocalAgentRef = ref => isLocalAgentRoute(splitRef(ref)?.provider ?? '')
+  const localAgentOf = (bot) => {
+    const ref = bot?.appliedModel ?? bot?.model
+    return ref !== undefined && isLocalAgentRef(ref) ? ref : undefined
+  }
+  const isLocalAgentSession = (sessionId) => {
+    const bot = rt.botOf(rt.selfOf(sessionId))
+    return bot !== undefined && localAgentOf(bot) !== undefined
+  }
+  Object.assign(rt, {
+    isLocalAgentRoute, isLocalAgentRef, localAgentOf, isLocalAgentSession,
+    localAgentBadge: (ref) => {
+      const provider = splitRef(ref)?.provider
+      return provider !== undefined && isLocalAgentRoute(provider) ? provider : undefined
+    },
+  })
+  // A profile can exclude this integration before any discovery, adapter,
+  // version/model probe or state initialization can access a machine's CLIs.
+  if (enabled === false) {
+    Object.assign(rt, {
+      localAgentRoutes: () => [],
+      localAgentTools: [],
+      localAgentsEndpoint: async (endpoint) => {
+        if (endpoint === 'local-agents' || endpoint === 'local-agent-refresh') return { available: false, enabled: false, detected: [], custom: [] }
+        throw Object.assign(new Error('Local agents are disabled in this profile.'), { code: 'LOCAL_AGENTS_DISABLED' })
+      },
+    })
+    return
+  }
   // state.localAgents is replaced by the state load after install; read it
   // each time instead of holding the pre-load object.
   const store = () => {
@@ -126,19 +157,6 @@ export function install(rt) {
   }, 'ds-bot: local agents')
 
   // ---------------------------------------------------------------------------
-  // Helpers the rest of the host asks.
-
-  const isLocalAgentRef = ref => isLocalAgentRoute(splitRef(ref)?.provider ?? '')
-  const localAgentOf = (bot) => {
-    const ref = bot?.appliedModel ?? bot?.model
-    return ref !== undefined && isLocalAgentRef(ref) ? ref : undefined
-  }
-  const isLocalAgentSession = (sessionId) => {
-    const bot = rt.botOf(rt.selfOf(sessionId))
-    return bot !== undefined && localAgentOf(bot) !== undefined
-  }
-
-  // ---------------------------------------------------------------------------
   // approve_agent_action: served only to abot sessions; the CLI's permission
   // prompts arrive through it as an ordinary approval card. It stays off
   // rt.teamTools (the catalog every Bot gets) and joins the scope only for a
@@ -225,11 +243,6 @@ export function install(rt) {
   }
 
   Object.assign(rt, {
-    isLocalAgentRoute, isLocalAgentRef, localAgentOf, isLocalAgentSession,
     localAgentRoutes: allRoutes, localAgentsEndpoint,
-    localAgentBadge: (ref) => {
-      const provider = splitRef(ref)?.provider
-      return provider !== undefined && isLocalAgentRoute(provider) ? provider : undefined
-    },
   })
 }

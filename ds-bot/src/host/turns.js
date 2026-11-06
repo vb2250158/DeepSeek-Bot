@@ -124,7 +124,7 @@ export const promisesWork = text => typeof text === 'string' && text.trim().leng
 // releasing their resources. A plain fork or a different parent's worker fails.
 export async function drainSelectedChildren(rt, sessionId, childIds) {
   const runtime = typeof rt.ctx.get === 'function' ? rt.ctx.get('subagents') : rt.ctx.subagents
-  if (typeof runtime?.drainChildren !== 'function') throw new Error('This DSH does not provide scoped child teardown; stop the children from the DSH session controls.')
+  if (typeof runtime?.drainChildren !== 'function') throw Object.assign(new Error('This DSH does not provide scoped child teardown; stop the children from the DSH session controls.'), { code: 'SUBAGENT_TEARDOWN_UNAVAILABLE' })
   const parent = await rt.resolveAgent(sessionId)
   await runtime.drainChildren(parent, childIds)
 }
@@ -231,8 +231,12 @@ export function install(rt) {
   async function stopSubagents(sessionId) {
     const runtime = typeof ctx.get === 'function' ? ctx.get('subagents') : ctx.subagents
     const recorded = [...(subagentsByParent.get(sessionId)?.keys() ?? [])]
-    const catalog = typeof runtime?.listChildren === 'function' ? await runtime.listChildren(sessionId) : []
-    const childIds = [...new Set([...recorded, ...catalog.map(child => child.id)])]
+    if (runtime === undefined && recorded.length === 0) return false
+    if (typeof runtime?.listDescendants !== 'function') throw Object.assign(new Error('This DSH cannot list scoped child ownership; stop the children from the DSH session controls.'), { code: 'SUBAGENT_LIST_UNAVAILABLE' })
+    const catalog = await runtime.listDescendants(sessionId)
+    if (catalog.some(child => child.kind === 'diagnostic')) throw Object.assign(new Error('A subagent catalog could not be read safely; no child was stopped. Check the DSH session controls.'), { code: 'SUBAGENT_CATALOG_UNTRUSTED' })
+    const direct = catalog.filter(child => child.kind === 'child' && child.parentId === sessionId && child.depth === 1)
+    const childIds = [...new Set([...recorded, ...direct.map(child => child.id)])]
     if (childIds.length === 0) return false
     for (const childId of childIds) rememberStopped(stoppedSubagents, childId)
     await drainSelectedChildren(rt, sessionId, childIds)

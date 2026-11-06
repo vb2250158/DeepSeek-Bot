@@ -40,11 +40,13 @@ Still stuck? [Report an install problem](https://github.com/Fei2411/DS-Bot/issue
 
 ## Tested host and environment
 
-This maintenance fork tests Windows x64, Node.js `24.15.0`, npm `11.12.1` and pnpm `11.28.5`, running Web from public Core source `vb2250158/deepseek-harness@d037bdbe8b5dba993bf778a5dc1415e87bed2664` (`0.2.2-rc.1`). The CI runner is `windows-2025`. Earlier-host and cross-platform compatibility matrices are outside this target.
+This maintenance fork tests Windows x64, Node.js `24.15.0`, npm `11.12.1` and pnpm `11.28.5`, running Web from public Core source `vb2250158/deepseek-harness@c257e48b257e9688ffe18bb711b6a32c6091a863` (`0.2.2-rc.1`). The CI runner is `windows-2025`. Earlier-host and cross-platform compatibility matrices are outside this target.
 
 Windows local-agent discovery and the Codex, Claude and ACP drivers resolve npm `.cmd` shims to their Node entry point and run without a shell or console window. Paths with spaces and array arguments are preserved; cancellation and timeouts target the CLI process itself. Arbitrary `.cmd`/`.bat` scripts are rejected with `UNSUPPORTED_AGENT_WRAPPER`: select the executable or a Node npm entry point instead. No local-agent account is signed in automatically.
 
 Inherited environment variables whose names contain `KEY`, `TOKEN`, `SECRET` or `PASSWORD`, and DSH-owned variables, are withheld from local agents. Explicit engine environment settings and the CLI's own file-based sign-in remain separate.
+
+Set `localAgentsEnabled: false` in the DS Bot plugin configuration to exclude the local-agent integration in that profile. The default is `true`. Disabled profiles do not discover CLIs, register their providers, probe versions or models, or offer local-agent approval tools. The settings page reports the disabled state; modifying local-agent settings is refused. Saved custom agents, CLI session mappings and Bot model references remain intact, and other Bot providers keep working. Re-enable the field to restore the integration; disabling it does not sign accounts out or move their files.
 
 The target above is not a formal-installation claim. Loading or reindexing the team preserves existing DSH Session archives, including an explicit archive with activity stopped. Opening an earlier part remains an explicit action that unarchives that part. See the [test policy](docs/dev/testing.md) for source preparation, behavior and saved-data regressions, Web smoke and CI scope.
 

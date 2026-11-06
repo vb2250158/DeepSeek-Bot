@@ -1027,7 +1027,7 @@ test('a round that cannot be stopped leaves the members stopped and reports the 
 test('a rejected scoped child drain reports failure without cancelling an unrelated Agent', async (t) => {
   const cancelled = []
   const host = await start(t, undefined, {
-    subagents: { drainChildren: () => { throw new Error('belongs to another parent') } },
+    subagents: { listDescendants: async () => [], drainChildren: () => { throw new Error('belongs to another parent') } },
     agents: { list: () => [], get: id => (id === 'sub-1' ? { cancel: reason => cancelled.push(reason) } : undefined) },
   })
   host.emit('gb', 'turn/start', { turn: 1 })
@@ -1044,7 +1044,10 @@ test('stopping a member drains only its direct subagents and leaves plain forks 
   const children = ['sub-1', 'fork-1'].map(id => ({ id, cancel: () => cancelled.push(id) }))
   const host = await start(t, undefined, {
     subagents: {
-      listChildren: async id => id === 'gb' ? [{ id: 'sub-1', mode: 'continuable', createdAt: 1 }] : [],
+      listDescendants: async id => id === 'gb' ? [
+        { kind: 'child', id: 'sub-1', parentId: 'gb', depth: 1, mode: 'continuable', createdAt: 1 },
+        { kind: 'child', id: 'grandchild', parentId: 'sub-1', depth: 2, mode: 'continuable', createdAt: 2 },
+      ] : [],
       drainChildren: async (parent, childIds) => { drained.push({ parent, childIds }); children.find(c => c.id === childIds[0]).cancel() },
     },
     agents: { list: () => children, get: id => children.find(child => child.id === id) },
@@ -1054,6 +1057,20 @@ test('stopping a member drains only its direct subagents and leaves plain forks 
   assert.equal(drained[0].parent, host.agentOf('gb'))
   assert.deepEqual(drained[0].childIds, ['sub-1'])
   assert.deepEqual(cancelled, ['sub-1'])
+})
+
+test('an unreadable child catalog rejects scoped stop before any child is drained', async t => {
+  const drained = []
+  const host = await start(t, undefined, { subagents: {
+    listDescendants: async id => id === 'gb' ? [{ kind: 'diagnostic', id: 'unreadable', parentId: 'gb', depth: 1, reason: 'unavailable' }] : [],
+    drainChildren: async (...args) => drained.push(args),
+  } })
+  host.emit('gb', 'turn/start', { turn: 1 })
+  const stopped = await host.call('stop-room-work', { roomId: 'r1' })
+  assert.equal(stopped.ok, false)
+  assert.equal(stopped.error.code, 'bot/refused')
+  assert.match(stopped.error.message, /catalog could not be read safely/)
+  assert.deepEqual(drained, [])
 })
 
 // An unhandled rejection here would end the Host.
@@ -1629,7 +1646,7 @@ test('consecutive 0-tool ack ping-pong relays pause after 6 turns and go on only
 test('a group member with a running DSH subagent stays working and stop-room-work interrupts the subagent (#701)', async (t) => {
   const interrupted = []
   const host = await start(t, undefined, { subagents: {
-    listChildren: async id => id === 'gb' ? [{ id: 'sub-1', mode: 'continuable', createdAt: 1 }] : [],
+    listDescendants: async id => id === 'gb' ? [{ kind: 'child', id: 'sub-1', parentId: 'gb', depth: 1, mode: 'continuable', createdAt: 1 }] : [],
     drainChildren: async (parent, childIds) => { interrupted.push({ parent, childIds }) },
   } })
   const first = host.round('c1', host.say('@Writer 派子代理跑长任务'))

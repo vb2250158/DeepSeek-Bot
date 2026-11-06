@@ -8,7 +8,7 @@ This fork tests its current DS Bot behavior on one source Web host. It does not 
 | Node.js | `24.15.0` |
 | npm, plugin tools | `11.12.1` |
 | pnpm, Core source dependencies | `11.28.5` |
-| Core source | [`vb2250158/deepseek-harness@d037bdbe8b5dba993bf778a5dc1415e87bed2664`](https://github.com/vb2250158/deepseek-harness/commit/d037bdbe8b5dba993bf778a5dc1415e87bed2664) |
+| Core source | [`vb2250158/deepseek-harness@c257e48b257e9688ffe18bb711b6a32c6091a863`](https://github.com/vb2250158/deepseek-harness/commit/c257e48b257e9688ffe18bb711b6a32c6091a863) |
 | Core host version | `0.2.2-rc.1` |
 | Runtime entry | Source `dsh` Web profile through `@deepseek-ai/dsh/profile-boot` |
 

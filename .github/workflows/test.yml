@@ -23,7 +23,7 @@ jobs:
         shell: pwsh
     env:
       DSH_HARNESS: ${{ github.workspace }}/core
-      DSH_CORE_SHA: d037bdbe8b5dba993bf778a5dc1415e87bed2664
+      DSH_CORE_SHA: c257e48b257e9688ffe18bb711b6a32c6091a863
       DSH_TELEMETRY_DISABLED: '1'
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
@@ -43,7 +43,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: vb2250158/deepseek-harness
-          ref: d037bdbe8b5dba993bf778a5dc1415e87bed2664
+          ref: c257e48b257e9688ffe18bb711b6a32c6091a863
           path: core
       - name: Verify the target environment
         run: |

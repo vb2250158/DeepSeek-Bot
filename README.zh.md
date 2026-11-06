@@ -40,11 +40,13 @@ Still stuck? [Report an install problem](https://github.com/Fei2411/DS-Bot/issue
 
 ## 受测宿主与环境
 
-本维护 fork 的单一受测目标为 Windows x64、Node.js `24.15.0`、npm `11.12.1`、pnpm `11.28.5`，使用公开 Core 源码 `vb2250158/deepseek-harness@d037bdbe8b5dba993bf778a5dc1415e87bed2664`（`0.2.2-rc.1`）运行 Web。CI runner 为 `windows-2025`。不运行旧宿主或跨平台兼容矩阵。
+本维护 fork 的单一受测目标为 Windows x64、Node.js `24.15.0`、npm `11.12.1`、pnpm `11.28.5`，使用公开 Core 源码 `vb2250158/deepseek-harness@c257e48b257e9688ffe18bb711b6a32c6091a863`（`0.2.2-rc.1`）运行 Web。CI runner 为 `windows-2025`。不运行旧宿主或跨平台兼容矩阵。
 
 Windows 本地 Agent 发现及 Codex、Claude、ACP 驱动会把 npm `.cmd` 启动器解析为 Node 入口，不经过 shell，也不弹出控制台窗口。含空格的路径和数组参数保持原样；取消和超时直接作用于 CLI 进程。任意 `.cmd`/`.bat` 脚本会以 `UNSUPPORTED_AGENT_WRAPPER` 明确拒绝，请选择可执行文件或 Node npm 入口。不会自动登录本地 Agent 账号。
 
 本地 Agent 不继承名称含 `KEY`、`TOKEN`、`SECRET` 或 `PASSWORD` 的环境变量，也不继承 DSH 自有变量。引擎显式指定的环境设置及 CLI 自己保存在文件中的登录状态另行保留。
+
+在 DS Bot 插件配置中设置 `localAgentsEnabled: false`，可在该 profile 停用本地 Agent 集成，默认值为 `true`。停用后不发现 CLI、不注册对应提供者、不探测版本或模型，也不提供本地 Agent 审批工具；设置页会显示停用状态，并拒绝修改本地 Agent 设置。已存自定义 Agent、CLI 会话映射和 Bot 模型引用保持不变，其他 Bot 提供者继续工作。重新启用该字段即可恢复集成；停用不会注销账号或移动其文件。
 
 上述目标不代表已正式安装。加载或重建团队索引会保留 DSH Session 的既有归档，包括明确归档并停止活动的状态；用户显式打开较早部分时，仍会解除该部分的归档。源码准备、当前行为与已存数据回归、Web smoke 和 CI 范围见[测试策略](docs/dev/testing.md)。
 
