@@ -1,6 +1,6 @@
 # ds-bot
 
-Fork 0.3.0-rabi.2 integrates upstream 0.3.0 and keeps Rabi assistant presets, persona-owned memory and skills, shared Bot management, pinned chats and the native DSH team workspace. Group goals and memory change history are available in that workspace, including later conversation parts; the Enter key preference applies to its composers. Scheduled tasks follow new conversation parts without losing task identity or delivery history on current DSH hosts. A failed move keeps the original input and recovery marker.
+Fork 0.3.0-rabi.3 integrates upstream 0.3.0 and keeps Rabi assistant presets, persona-owned memory and skills, shared Bot management, pinned chats and the native DSH team workspace. Group goals and memory change history are available in that workspace, including later conversation parts; the Enter key preference applies to its composers. Scheduled tasks follow new conversation parts without losing task identity or delivery history on current DSH hosts. A failed move keeps the original input and recovery marker.
 
 Windows local-agent commands support executable paths and npm Node `.cmd` shims without a shell. The Codex, Claude and ACP drivers preserve argument arrays, hide subprocess windows, and keep cancellation attached to the CLI's real PID. Other batch launchers fail explicitly with `UNSUPPORTED_AGENT_WRAPPER`; choose the executable or Node entry point. Version probes use the sanitized environment and report unsupported launchers without crashing discovery.
 
@@ -65,6 +65,8 @@ Bot chats do not show manual continuation or retry buttons. Interrupted turns an
 Terminal errors and retained Rabi failure notices are visible only when they occurred during the current page navigation. Refreshing dismisses their historical presentation without changing the Session log. New failures keep the installed renderer; deliverables and other turn-tail contributions remain available. This policy is scoped to Bot conversations and is removed when leaving that surface.
 
 Upstream 0.1.7 integration adds handoff trees and strengthens message/file reading and concurrent group changes. Team management remains shared among Bots; the native panel and Rabi bindings remain available.
+
+Local agents settings read the request data directly. A failed settings page stays contained, and switching pages lets Usage load again.
 
 ## Harness panel
 

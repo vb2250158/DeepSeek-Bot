@@ -4,9 +4,9 @@
 
 [English](README.md) | 中文
 
-![版本](https://img.shields.io/badge/版本-v0.3.0--rabi.2-blue) ![DSH](https://img.shields.io/badge/DSH-0.2.2--rc.1-4D6BFE) ![许可](https://img.shields.io/badge/许可-Apache_2.0-green)
+![版本](https://img.shields.io/badge/版本-v0.3.0--rabi.3-blue) ![DSH](https://img.shields.io/badge/DSH-0.2.2--rc.1-4D6BFE) ![许可](https://img.shields.io/badge/许可-Apache_2.0-green)
 
-本 fork 已合并上游 0.3.0（0.3.0-rabi.2），保留公开 Bot 平等管理、Rabi 助手预设和延迟加载。私密 Bot 通过原生 Bot 工具向团队发布内容前需要批准；删除后，其文件夹、记忆和聊天仍受保护，可在设置中解除。Rabi 绑定 Bot 的记忆和学习技能继续由 Rabi 管理，项目 AGENTS.md 提案仍可使用。Office 目录输入拒绝内部链接，PNG 读取限制内存并拒绝截断图像。
+本 fork 已合并上游 0.3.0（0.3.0-rabi.3），保留公开 Bot 平等管理、Rabi 助手预设和延迟加载。私密 Bot 通过原生 Bot 工具向团队发布内容前需要批准；删除后，其文件夹、记忆和聊天仍受保护，可在设置中解除。Rabi 绑定 Bot 的记忆和学习技能继续由 Rabi 管理，项目 AGENTS.md 提案仍可使用。Office 目录输入拒绝内部链接，PNG 读取限制内存并拒绝截断图像。
 
 **[Download DS Bot for Windows 10/11 (64-bit) / 下载 Windows 10/11（64 位）版](https://github.com/Fei2411/DS-Bot/releases/latest)**, about 212 MB / 约 212 MB. A community project, not an official DeepSeek product. / 社区开源项目，不是 DeepSeek 官方产品。
 
@@ -37,6 +37,8 @@ Still stuck? [Report an install problem](https://github.com/Fei2411/DS-Bot/issue
 
 还是装不上？[报告安装问题](https://github.com/Fei2411/DS-Bot/issues/new?template=install.yml)。
 </details>
+
+设置中的本地 Agent 页直接读取请求数据；单页渲染错误仅显示在当前页，切换页面后用量页可重新加载。
 
 ## 受测宿主与环境
 

@@ -4,9 +4,9 @@
 
 English | [中文](README.zh.md)
 
-![version](https://img.shields.io/badge/version-v0.3.0--rabi.2-blue) ![DSH](https://img.shields.io/badge/DSH-0.2.2--rc.1-4D6BFE) ![license](https://img.shields.io/badge/license-Apache_2.0-green)
+![version](https://img.shields.io/badge/version-v0.3.0--rabi.3-blue) ![DSH](https://img.shields.io/badge/DSH-0.2.2--rc.1-4D6BFE) ![license](https://img.shields.io/badge/license-Apache_2.0-green)
 
-This fork integrates upstream 0.3.0 (0.3.0-rabi.2) with shared management for public Bots, Rabi assistant presets and deferred client loading. Private Bots require approval before native Bot tools publish their content to the team. Deleted private Bots retain protected folders, memory and chats until you release them in Settings. Rabi-bound Bots keep memory and learned skills under Rabi ownership; project AGENTS.md proposals remain available. Office directory inputs reject internal links, and PNG decoding bounds allocation and rejects truncated image data.
+This fork integrates upstream 0.3.0 (0.3.0-rabi.3) with shared management for public Bots, Rabi assistant presets and deferred client loading. Private Bots require approval before native Bot tools publish their content to the team. Deleted private Bots retain protected folders, memory and chats until you release them in Settings. Rabi-bound Bots keep memory and learned skills under Rabi ownership; project AGENTS.md proposals remain available. Office directory inputs reject internal links, and PNG decoding bounds allocation and rejects truncated image data.
 
 **[Download DS Bot for Windows 10/11 (64-bit) / 下载 Windows 10/11（64 位）版](https://github.com/Fei2411/DS-Bot/releases/latest)**, about 212 MB / 约 212 MB. A community project, not an official DeepSeek product. / 社区开源项目，不是 DeepSeek 官方产品。
 
@@ -37,6 +37,8 @@ Still stuck? [Report an install problem](https://github.com/Fei2411/DS-Bot/issue
 
 还是装不上？[报告安装问题](https://github.com/Fei2411/DS-Bot/issues/new?template=install.yml)。
 </details>
+
+Local agents settings read the request data directly. A failed settings page stays contained, and switching pages lets Usage load again.
 
 ## Tested host and environment
 

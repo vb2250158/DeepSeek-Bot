@@ -16,6 +16,7 @@ const { outputFiles } = await build({
 })
 const frames = []
 const react = {
+  Component: class {},
   createElement: (type, props, ...children) => ({ type, props: { ...props, children } }), Fragment: Symbol('Fragment'),
   useEffect: (effect) => { effect() }, useLayoutEffect() {}, useState: initial => [initial, () => {}],
   useMemo: make => make(), useRef: current => ({ current }), useId: () => 'id',
