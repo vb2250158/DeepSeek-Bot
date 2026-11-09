@@ -45,7 +45,7 @@ test('the former Main Bot has the same pin menu as any other Bot', async () => {
   } })
   const buttons = nodes(tree, node => node.props.role === 'menuitem')
   assert.ok(!buttons.some(node => node.children.some(text => typeof text === 'string' && text.includes('Main Bot'))))
-  await buttons.find(node => node.children.includes('Pin')).props.onClick()
+  await buttons.find(node => JSON.stringify(node.children).includes('Pin')).props.onClick()
   assert.deepEqual(changed, [['former-main', true]])
 })
 

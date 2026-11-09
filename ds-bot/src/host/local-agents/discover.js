@@ -22,6 +22,10 @@ export function cleanEnv(extra = {}) {
     if (/^GIT_CONFIG_(?:COUNT|PARAMETERS|(?:KEY|VALUE)_\d+)$/.test(upper) || DROP_EXACT.has(upper) || /KEY|TOKEN|SECRET|PASSWORD/.test(upper) || DROP_PREFIX.some(prefix => upper.startsWith(prefix))) continue
     env[key] = value
   }
+  // A CLI found outside our sparse PATH (a script with `#!/usr/bin/env node`)
+  // needs the same folders to find its interpreter. Windows spells it `Path`.
+  const pathKey = Object.keys(env).find(key => key.toUpperCase() === 'PATH') ?? 'PATH'
+  env[pathKey] = searchDirs().join(delimiter)
   return { ...env, ...extra }
 }
 
@@ -99,5 +103,21 @@ export function probeVersion(executable, args, env) {
         resolve({ ok: error === null, version: text })
       })
     } catch (error) { resolve({ ok: false, error: error.code }) }
+  })
+}
+
+// Whether a CLI is signed in: true, false, or null when it cannot tell. A missing
+// credential file proves nothing (macOS keeps some in the Keychain), so only a
+// command can say false. The output and the file stay here; only the answer leaves.
+export function probeSignIn(executable, check, { home = homedir() } = {}) {
+  if (check === undefined) return Promise.resolve(null)
+  if (check.file !== undefined) return Promise.resolve(existsSync(join(home, ...check.file)) ? true : null)
+  return new Promise((resolve) => {
+    try {
+      execAgent(executable, check.args, { encoding: 'utf8', timeout: 3_000, env: cleanEnv(), windowsHide: true }, (_error, stdout, stderr) => {
+        const text = `${stdout ?? ''}${stderr ?? ''}`
+        resolve(/not (?:logged|signed) in/iu.test(text) ? false : /(?:logged|signed) in/iu.test(text) ? true : null)
+      })
+    } catch { resolve(null) }
   })
 }

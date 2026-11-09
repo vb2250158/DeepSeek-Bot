@@ -27,7 +27,7 @@ The Bot team:
 
 ## Commands
 
-Use the current Windows source Web target in [docs/dev/testing.md](docs/dev/testing.md): Node `24.15.0`, npm `11.12.1`, pnpm `11.28.5`, Core `3ff2154e44fcec3b98e1c529ae9f62b26b20096c` / `0.2.2-alpha.3`. Set `DSH_HARNESS` to that independent Core source checkout. Prepare only the existing native Host, Host/Client library and Web build steps listed there; do not install older npm Core versions for compatibility or build SDK executables and desktop/mobile packages.
+Use the current Windows source Web target in [docs/dev/testing.md](docs/dev/testing.md): Node `24.15.0`, npm `11.12.1`, pnpm `11.28.5`, Core `955ba060b3bfa9908cb3ea4da63ff580f51beb72` / `0.2.2-rc.1`. Set `DSH_HARNESS` to that independent Core source checkout. Prepare only the existing native Host, Host/Client library and Web build steps listed there; do not install older npm Core versions for compatibility or build SDK executables and desktop/mobile packages.
 
 In `ds-bot/`:
 
@@ -39,7 +39,7 @@ npm run lint
 node dev/ci-web-smoke.mjs
 ```
 
-Select local checks by the changed surface and reuse passing evidence with unchanged inputs. Keep current behavior and production-history regressions. CI runs this one Windows target plus the tracked-tree leak scan; documentation and configuration changes do not justify replaying unrelated historical suites. The recorded formal Core is `3ff2154e44fcec3b98e1c529ae9f62b26b20096c` / `0.2.2-alpha.3` with DS Bot `0.2.7-rabi.2`; the new plugin candidate is separate from its formal installation.
+Select local checks by the changed surface and reuse passing evidence with unchanged inputs. Keep current behavior and production-history regressions. CI runs this one Windows target plus the tracked-tree leak scan; documentation and configuration changes do not justify replaying unrelated historical suites. Formal installation is tracked separately by the environment-maintenance owner.
 
 ## Branches, pull requests and issues
 

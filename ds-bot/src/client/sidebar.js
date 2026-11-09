@@ -1,14 +1,15 @@
+import { inkFill } from './inks.js'
 import { AgentBadge } from './agent-badge.js'
 import { createElement as h, Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import { FishLogo } from './dsh-primitives.js'
 import { currentPart, previewOf, relativeShort, rowTime } from './text.js'
-import { PlusIcon, SearchIcon, PinMarkIcon, CloudDownloadIcon, GearIcon, GaugeIcon, ClockIcon, ConnectorIcon, SwitchIcon, SignInIcon, SignOutIcon, SlidersIcon } from './icons.js'
+import { ChevronRightIcon, DotsIcon, FolderIcon, PlusIcon, SearchIcon, PinMarkIcon, CloudDownloadIcon, GearIcon, GaugeIcon, ClockIcon, ConnectorIcon, SwitchIcon, SignInIcon, SignOutIcon, SlidersIcon } from './icons.js'
 import { lookOf, MAIN_LOOK } from './characters.js'
 import { botState, BotMark, BotAvatar, RoomAvatar } from './mark.js'
 import { reducedMotion } from './activity-row.js'
 import { Shimmer, workPhrase } from './cells.js'
-import { springEasing, SPRING_POP, SPRING_SHAPE, useViewport, viewBottom } from './motion.js'
+import { springEasing, SPRING_TAP, SPRING_POP, SPRING_SHAPE, useViewport, viewBottom } from './motion.js'
 import { hostText, t } from './i18n.js'
 import { clientErrors } from './diagnostics.js'
 import { showsDshRow } from './dsh-offer.js'
@@ -246,6 +247,174 @@ function AgentRow({ agent, actions, useSessions, useSessionStatus, useUi, wide, 
         })))))
 }
 
+function renderSidebarEntry(entry, rowProps, markedUnread, onDragStart) {
+  return entry.kind === 'bot'
+    ? h(BotRow, { key: entry.item.id, ...rowProps, bot: entry.item, marked: markedUnread[entry.item.id] === true, onDragStart })
+    : entry.kind === 'room'
+      ? h(RoomRow, { key: entry.item.id, ...rowProps, room: entry.item, marked: markedUnread[entry.item.id] === true, onDragStart })
+      : h(AgentRow, { key: entry.item.id, ...rowProps, agent: entry.item, marked: markedUnread[entry.item.id] === true, onDragStart })
+}
+
+function SectionBlock({ section, entries, rowProps, markedUnread, renaming, dropTarget, onDragStart, onDragOverSec, onDropSec }) {
+  const { roster, actions, useSessions, useSessionStatus, useWork, wide } = rowProps
+  const input = useRef(null)
+  useLayoutEffect(() => {
+    if (!renaming) return
+    input.current?.focus()
+    input.current?.select()
+  }, [renaming])
+  const visibleEntries = entries.filter(entry => !entry.item.hidden)
+  const botsInSec = useMemo(() => {
+    const seen = new Set()
+    const list = []
+    for (const entry of visibleEntries) {
+      if (entry.kind === 'bot') {
+        if (!seen.has(entry.item.id)) { seen.add(entry.item.id); list.push(entry.item) }
+      } else if (entry.kind === 'room') {
+        for (const memberId of entry.item.members ?? []) {
+          const bot = roster.byId[memberId]
+          if (bot && !seen.has(bot.id)) { seen.add(bot.id); list.push(bot) }
+        }
+      }
+    }
+    return list
+  }, [visibleEntries, roster.byId])
+  const sessionIds = useMemo(() => entries.flatMap(entry => (
+    entry.kind === 'bot' ? [currentPart(entry.item)]
+      : entry.kind === 'room' ? [entry.item.sessionId ?? entry.item.id]
+        : entry.item.sessions ?? []
+  )), [entries])
+  const activeSession = useSessions(list => sessionIds.find(id => (list.byId[id]?.retainedBy?.mainView ?? 0) > 0) ?? '')
+  const activeEntry = useMemo(() => {
+    if (activeSession === '') return undefined
+    return entries.find(entry => (
+      entry.kind === 'bot' ? currentPart(entry.item) === activeSession
+        : entry.kind === 'room' ? (entry.item.sessionId ?? entry.item.id) === activeSession
+          : (entry.item.sessions ?? []).includes(activeSession)
+    ))
+  }, [entries, activeSession])
+  const statusBits = useSessionStatus(map => JSON.stringify(sessionIds.map(id => [
+    id,
+    map.get(id)?.running === true ? 1 : 0,
+    map.get(id)?.completionUnread === true || map.get(id)?.pendingInteraction !== undefined ? 1 : 0,
+  ])))
+  const workBits = useWork ? useWork(work => {
+    const botIds = new Set(entries.filter(e => e.kind === 'bot').map(e => e.item.id))
+    const roomIds = new Set(entries.filter(e => e.kind === 'room').map(e => e.item.id))
+    const approval = (work.approvals ?? []).some(a => botIds.has(a.botId) || roomIds.has(a.roomId))
+    const roomWorking = Object.entries(work.rooms ?? {}).some(([rId, list]) => (
+      (roomIds.has(rId) && list.some(e => e.botId !== undefined)) || list.some(e => botIds.has(e.botId))
+    ))
+    return `${approval ? 1 : 0}|${roomWorking ? 1 : 0}`
+  }) : '0|0'
+  const parsedStatuses = JSON.parse(statusBits)
+  const [hasApproval, hasRoomWork] = workBits.split('|').map(v => v === '1')
+  const hasQuestion = entries.some(entry => entry.kind === 'bot' && roster.questions?.[currentPart(entry.item)] !== undefined)
+  const hasAlert = hasQuestion || hasApproval
+  const hasWorking = hasRoomWork || parsedStatuses.some(([, run]) => run === 1)
+  const hasUnread = parsedStatuses.some(([id, , unread]) => unread === 1 && id !== activeSession)
+    || entries.some(entry => markedUnread[entry.item.id] === true && entry !== activeEntry)
+  const statusKind = hasAlert ? 'alert' : hasWorking ? 'working' : hasUnread ? 'unread' : null
+  const toggle = () => {
+    void Promise.resolve(actions.saveSection({ id: section.id, collapsed: !section.collapsed })).catch(error => actions.reportError(error, 'section'))
+  }
+  const openSecMenu = (kind, x, y) => actions.openMenu({ kind, id: section.id, x, y })
+  if (!wide) {
+    if (section.collapsed) {
+      const folderRoom = { id: section.id, name: section.name, members: botsInSec.map(bot => bot.id) }
+      return h('div', { className: 'bt-rail-sec', 'data-sec-id': section.id },
+        h('div', { className: 'bt-rail-sec-div', title: section.name, onClick: toggle },
+          h('span', { className: 'bt-rail-sec-pill', style: section.color ? { background: inkFill(section.color) } : undefined })),
+        h('button', {
+          type: 'button', className: 'bt-rail-folder', 'aria-label': section.name, title: `${section.name} (${visibleEntries.length})`,
+          'aria-current': activeEntry ? 'page' : undefined,
+          onClick: toggle,
+          onContextMenu: (event) => { event.preventDefault(); openSecMenu('section', event.clientX, event.clientY) },
+        },
+        botsInSec.length > 0 ? h(RoomAvatar, { room: folderRoom, roster, size: 38 }) : h(FolderIcon),
+        statusKind ? h('span', { className: `bt-dot${statusKind === 'alert' ? ' bt-dot-wait' : ''}`, style: statusKind === 'working' ? { background: 'var(--bt-green)' } : undefined, 'aria-hidden': true }) : null))
+    }
+    return h(Fragment, null,
+      h('div', { className: 'bt-rail-sec-div', 'data-sec-id': section.id, title: section.name, onClick: toggle },
+        h('span', { className: 'bt-rail-sec-pill', style: section.color ? { background: inkFill(section.color) } : undefined })),
+      entries.map(entry => renderSidebarEntry(entry, rowProps, markedUnread)))
+  }
+  const commitRename = (keep) => {
+    const value = input.current?.value ?? ''
+    actions.endSectionRename()
+    if (!keep || value.trim() === '' || value.trim() === section.name) return
+    void Promise.resolve(actions.saveSection({ id: section.id, name: value.trim() })).catch(error => actions.reportError(error, 'section-rename'))
+  }
+  const bodyEntries = section.collapsed && activeEntry ? entries.filter(entry => entry !== activeEntry) : entries
+  return h('div', {
+    className: 'bt-sec',
+    'data-sec-id': section.id,
+    'data-collapsed': section.collapsed ? 'true' : 'false',
+    'data-drop': dropTarget === section.id ? 'true' : undefined,
+    onDragOver: onDragOverSec ? event => onDragOverSec(event, section.id) : undefined,
+    onDrop: onDropSec ? event => onDropSec(event, section.id) : undefined,
+  },
+  renaming
+    ? h('div', { className: 'bt-sec-edit' },
+        h('input', {
+          ref: input, defaultValue: section.name, maxLength: 32, 'aria-label': t('Rename section'),
+          onKeyDown: (event) => {
+            if (event.nativeEvent.isComposing) return
+            if (event.key === 'Enter') commitRename(true)
+            else if (event.key === 'Escape') commitRename(false)
+          },
+          onBlur: () => commitRename(true),
+        }))
+    : h('div', { className: 'bt-sec-head-wrap' },
+        h('button', {
+          type: 'button', className: 'bt-sec-head', 'aria-expanded': !section.collapsed,
+          onClick: toggle,
+          onDoubleClick: (event) => { event.stopPropagation(); actions.beginSectionRename(section.id) },
+          onContextMenu: (event) => { event.preventDefault(); event.stopPropagation(); openSecMenu('section', event.clientX, event.clientY) },
+        },
+        h('span', { className: 'bt-sec-chev', 'aria-hidden': true }, h(ChevronRightIcon)),
+        section.color ? h('span', { className: 'bt-sec-dot', style: { background: inkFill(section.color) }, 'aria-hidden': true }) : null,
+        h('span', { className: 'bt-sec-title' }, section.name),
+        h('span', { className: `bt-sec-count${!section.collapsed ? ' bt-sec-count-hide' : ''}` }, visibleEntries.length),
+        h('span', { className: 'bt-sec-tail' },
+          section.collapsed && botsInSec.length > 0
+            ? h('span', { className: 'bt-sec-pile', 'aria-hidden': true },
+                botsInSec.slice(0, 3).map(bot => h('span', { key: bot.id, className: 'bt-sec-pile-item' }, h(BotMark, { bot, size: 18 }))),
+                botsInSec.length > 3 ? h('span', { className: 'bt-sec-pile-more' }, `+${botsInSec.length - 3}`) : null)
+            : null,
+          section.collapsed && statusKind
+            ? h('span', { className: 'bt-sec-status', 'data-kind': statusKind, 'aria-hidden': true }, statusKind === 'alert' ? '?' : null)
+            : null)),
+        h('span', { className: 'bt-sec-acts' },
+          h('button', {
+            type: 'button', className: 'bt-sec-act', 'aria-label': t('Add to {name}', { name: section.name }), title: t('Add to {name}', { name: section.name }),
+            onClick: (event) => {
+              event.stopPropagation()
+              const rect = event.currentTarget.getBoundingClientRect()
+              openSecMenu('section-add', rect.left, rect.bottom + 4)
+            },
+          }, h(PlusIcon)),
+          h('button', {
+            type: 'button', className: 'bt-sec-act', 'aria-label': t('{name} actions', { name: section.name }), title: t('{name} actions', { name: section.name }),
+            onClick: (event) => {
+              event.stopPropagation()
+              const rect = event.currentTarget.getBoundingClientRect()
+              openSecMenu('section', rect.left, rect.bottom + 4)
+            },
+          }, h(DotsIcon)))),
+  h('div', {
+    className: 'bt-sec-body',
+    inert: section.collapsed ? true : undefined,
+    'aria-hidden': section.collapsed ? true : undefined,
+  },
+    h('div', { className: 'bt-sec-body-in' },
+      bodyEntries.map(entry => renderSidebarEntry(entry, rowProps, markedUnread, onDragStart)))),
+  section.collapsed && activeEntry
+    ? h('div', { className: 'bt-sec-peek' }, renderSidebarEntry(activeEntry, rowProps, markedUnread, onDragStart))
+    : null)
+}
+
+
 // List rows glide to new places on a spring.
 const GLIDE = springEasing(1000, 63)
 
@@ -289,6 +458,7 @@ export function TeamSidebar(props) {
   useLayoutEffect(() => { closing.current = false })
   const roster = useRoster(value => value)
   const markedUnread = useUi(value => value.unread)
+  const renameSection = useUi(value => value.renameSection)
   const bootFailed = useUi(value => value.bootFailed)
   props.useRegistry(value => value)
   const updated = useSessions(list => {
@@ -391,11 +561,8 @@ export function TeamSidebar(props) {
     wide && roster.readOnly ? h('div', { className: 'bt-hint bt-read-only', role: 'status' }, hostText(roster.readOnly)) : null,
     h('div', { ref: listRef, className: 'bt-list', role: 'region', 'aria-label': t('Bot list') },
       roster.ready ? null : h('div', { className: 'bt-hint', role: bootFailed ? 'alert' : 'status' }, bootFailed ? bootHint() : t('Setting up your Bots…')),
-      order.filter(entry => !entry.item.pinned).map(entry => (entry.kind === 'bot'
-        ? h(BotRow, { key: entry.item.id, ...rowProps, bot: entry.item, marked: markedUnread[entry.item.id] === true })
-        : entry.kind === 'room'
-          ? h(RoomRow, { key: entry.item.id, ...rowProps, room: entry.item, marked: markedUnread[entry.item.id] === true })
-          : h(AgentRow, { key: entry.item.id, ...rowProps, agent: entry.item, marked: markedUnread[entry.item.id] === true })))))
+      order.filter(entry => !entry.item.pinned && !(roster.sections ?? []).some(section => section.id === entry.item.sectionId)).map(entry => renderSidebarEntry(entry, rowProps, markedUnread)),
+      (roster.sections ?? []).map(section => h(SectionBlock, { key: section.id, section, entries: order.filter(entry => !entry.item.pinned && entry.item.sectionId === section.id), rowProps, markedUnread, renaming: renameSection === section.id }))))
 }
 
 // The update button at the sidebar's top right: a cloud while a newer DS Bot —
@@ -882,6 +1049,60 @@ export function BrandName() {
 // FooterAccount only shows when the seat went to no one. The shell's footer classes
 // are CSS-module names, so they match on their stems.
 export const SIDEBAR_CSS = `
+.bt-sec-ungrouped{display:flex;flex-direction:column;gap:3px;border-radius:10px;transition:min-height .14s ease,background-color .14s ease,box-shadow .14s ease}
+.bt-sec-ungrouped[data-dragging=true]:empty{min-height:28px;margin-bottom:2px;box-shadow:inset 0 0 0 1px var(--bt-line-2)}
+.bt-sec-ungrouped[data-drop=true]{background:color-mix(in srgb,var(--bt-accent) 9%,transparent);box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--bt-accent) 65%,transparent)}
+.bt-sec{display:flex;flex-direction:column;margin-top:6px;border-radius:12px;transition:background-color .14s ease,box-shadow .14s ease}
+.bt-sec[data-drop=true]{background:color-mix(in srgb,var(--bt-accent) 9%,transparent);box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--bt-accent) 65%,transparent)}
+.bt-sec-head-wrap{position:relative;display:flex;align-items:center}
+.bt-sec-head{display:flex;align-items:center;gap:6px;height:30px;padding:0 8px 0 6px;border:0;border-radius:8px;background:transparent;color:var(--bt-ink-2);font-family:var(--bt-font);font-size:12px;line-height:16px;font-weight:600;cursor:pointer;width:100%;text-align:left;transition:background-color .12s ease,color .12s ease}
+.bt-sec-head-wrap:hover .bt-sec-head{background:var(--bt-hover);color:var(--bt-ink)}
+.bt-sec-head:focus-visible{outline:2px solid var(--bt-accent);outline-offset:-2px}
+.bt-sec-chev{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;flex:none;color:var(--bt-ink-3);transition:transform ${SPRING_SHAPE.duration}ms ${SPRING_SHAPE.easing},color .12s ease}
+.bt-sec-head-wrap:hover .bt-sec-chev{color:var(--bt-ink-2)}
+.bt-sec[data-collapsed=false] .bt-sec-chev{transform:rotate(90deg)}
+.bt-sec-chev svg{width:12px;height:12px}
+.bt-sec-dot{width:6px;height:6px;border-radius:50%;corner-shape:round;flex:none}
+.bt-sec-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:0 1 auto}
+.bt-sec-count{font-size:11px;line-height:16px;font-weight:500;color:var(--bt-ink-3);font-variant-numeric:tabular-nums;flex:none}
+.bt-sec-head-wrap:hover .bt-sec-count-hide{display:none}
+.bt-sec-tail{margin-left:auto;display:inline-flex;align-items:center;gap:6px;flex:none}
+.bt-sec-head-wrap:hover .bt-sec-tail{padding-right:44px}
+.bt-sec-pile{display:inline-flex;align-items:center;animation:bt-sec-pile-in ${SPRING_POP.duration}ms ${SPRING_POP.easing}}
+.bt-sec-pile-item{display:inline-flex;border-radius:50%;corner-shape:round;background:var(--bt-sidebar);box-shadow:0 0 0 1.5px var(--bt-sidebar)}
+.bt-sec-pile-item+.bt-sec-pile-item{margin-left:-5px}
+.bt-sec-pile-more{font-size:11px;line-height:16px;font-weight:600;color:var(--bt-ink-3);margin-left:3px;font-variant-numeric:tabular-nums}
+.bt-sec-status{width:8px;height:8px;border-radius:50%;corner-shape:round;flex:none}
+.bt-sec-status[data-kind=working]{background:var(--bt-green);box-shadow:0 0 0 2px color-mix(in srgb,var(--bt-green) 22%,transparent)}
+.bt-sec-status[data-kind=alert]{width:12px;height:12px;background:var(--bt-accent);color:var(--bt-accent-ink);font-size:8.5px;line-height:12px;font-weight:600;display:inline-flex;align-items:center;justify-content:center}
+.bt-sec-status[data-kind=unread]{background:var(--bt-accent)}
+.bt-sec-acts{position:absolute;right:4px;top:50%;transform:translateY(-50%);display:none;align-items:center;gap:2px}
+.bt-sec-head-wrap:hover .bt-sec-acts,.bt-sec-acts:focus-within{display:inline-flex}
+.bt-sec-act{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;padding:0;border:0;border-radius:6px;background:transparent;color:var(--bt-ink-3);cursor:pointer;transition:background-color .12s ease,color .12s ease,transform ${SPRING_TAP.duration}ms ${SPRING_TAP.easing}}
+.bt-sec-act:hover{background:var(--bt-active);color:var(--bt-ink)}
+.bt-sec-act:active{transform:scale(.9)}
+.bt-sec-act:focus-visible{outline:2px solid var(--bt-accent);outline-offset:-2px}
+.bt-sec-act svg{width:13px;height:13px}
+.bt-sec-edit{display:flex;align-items:center;height:30px;padding:0 4px}
+.bt-sec-edit input{width:100%;height:24px;padding:0 8px;border:0;border-radius:6px;background:var(--bt-card);color:var(--bt-ink);font:inherit;font-size:12px;line-height:16px;font-weight:600;outline:none;box-shadow:inset 0 0 0 1.5px var(--bt-accent)}
+.bt-sec-body{display:grid;grid-template-rows:1fr;transition:grid-template-rows ${SPRING_SHAPE.duration}ms ${SPRING_SHAPE.easing}}
+.bt-sec[data-collapsed=true] .bt-sec-body{grid-template-rows:0fr}
+.bt-sec-body-in{overflow:hidden;min-height:0;display:flex;flex-direction:column;gap:3px;position:relative}
+.bt-sec[data-collapsed=false] .bt-sec-body-in{padding-top:2px}
+.bt-sec[data-collapsed=false]:hover .bt-sec-body-in::before{content:'';position:absolute;left:10px;top:6px;bottom:6px;width:1.5px;border-radius:999px;background:var(--bt-line-2);opacity:.55;pointer-events:none}
+.bt-sec-peek{margin-top:2px}
+.bt-rail-sec{display:flex;flex-direction:column;align-items:center;gap:4px;width:100%}
+.bt-rail-sec-div{display:flex;align-items:center;justify-content:center;width:100%;padding:5px 0 2px;cursor:pointer}
+.bt-rail-sec-pill{width:22px;height:3px;border-radius:999px;background:var(--bt-line-2);transition:width .14s ease,background-color .14s ease}
+.bt-rail-sec-div:hover .bt-rail-sec-pill{width:30px;background:var(--bt-ink-3)}
+.bt-rail-folder{position:relative;display:flex;align-items:center;justify-content:center;width:56px;height:56px;padding:0;border:0;border-radius:16px;background:color-mix(in srgb,var(--bt-ink) 5%,transparent);color:var(--bt-ink-2);box-shadow:inset 0 0 0 .5px var(--bt-line-2);cursor:pointer;transition:background-color .12s ease,transform ${SPRING_TAP.duration}ms ${SPRING_TAP.easing}}
+.bt-rail-folder:hover{background:var(--bt-hover);color:var(--bt-ink)}
+.bt-rail-folder:active{transform:scale(.95)}
+.bt-rail-folder:focus-visible{outline:2px solid var(--bt-accent);outline-offset:-2px}
+.bt-rail-folder[aria-current=page]{background:var(--bt-active);box-shadow:inset 0 0 0 1.5px var(--bt-accent)}
+.bt-sec-add-menu{max-width:260px}
+.bt-sec-add-list{display:flex;flex-direction:column;gap:2px;max-height:240px;overflow-y:auto}
+
 .bt-confirm{width:260px;max-width:72vw;padding:10px 12px 12px;display:flex;flex-direction:column;gap:10px}
 .bt-confirm-text{margin:0;font-size:13px;line-height:19px;color:var(--bt-ink-2)}
 .bt-confirm-error{margin:0;font-size:12px;line-height:17px;color:var(--bt-danger);overflow-wrap:anywhere}

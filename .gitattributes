@@ -7,3 +7,6 @@ app/test/fixtures/** -text -whitespace
 # Generated JavaScript includes the thin client template verbatim.
 ds-bot/scripts/thin-client.js text eol=lf
 ds-bot/client-app.js text eol=lf
+
+# Windows shim fixtures preserve npm and pnpm CRLF bytes.
+ds-bot/test/fixtures/windows-shims/** -text -whitespace

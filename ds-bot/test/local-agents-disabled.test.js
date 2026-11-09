@@ -14,7 +14,7 @@ test('a disabled local-agent integration does not discover, register, probe, spa
   t.after(() => { t.mock.restoreAll(); syncBuiltinESMExports() })
   const state = { localAgents: { custom: [{ id: 'fixture', name: 'Fixture', command: 'fake-agent', args: [] }], sessions: { bot: { cliSessionId: 'saved-cli-session' } } } }
   const before = structuredClone(state)
-  const bot = { model: 'codex-cli/default' }
+  const bot = { model: 'local-codex-cli/default' }
   const rt = {
     config: { localAgentsEnabled: false }, state,
     ctx: { llm: { registerAdapter: unexpected }, effect: unexpected },
@@ -25,7 +25,7 @@ test('a disabled local-agent integration does not discover, register, probe, spa
   assert.deepEqual(rt.localAgentTools, [])
   assert.equal(rt.localAgentOf(bot), bot.model)
   assert.equal(rt.isLocalAgentSession('bot'), true)
-  assert.equal(rt.localAgentBadge(bot.model), 'codex-cli')
+  assert.equal(rt.localAgentBadge(bot.model), 'local-codex-cli')
   const disabled = { available: false, enabled: false, detected: [], custom: [] }
   assert.deepEqual(await rt.localAgentsEndpoint('local-agents'), disabled)
   assert.deepEqual(await rt.localAgentsEndpoint('local-agent-refresh'), disabled)

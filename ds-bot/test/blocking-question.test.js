@@ -257,11 +257,11 @@ test('Bot Sessions filter the hidden tools and their guidance out of the prompt 
   t.after(stop)
   for (const id of ['chief', 'room-writer', 'plain']) await agentFor(id)
   const filters = scopedListeners.filter(record => record.event === 'system-prompt/assemble')
-  assert.deepEqual(filters.map(record => record.sessionId), ['room', 'chief', 'chief', 'room-writer', 'room-writer', 'plain'])
+  assert.deepEqual(filters.map(record => record.sessionId), ['chief', 'chief', 'room-writer', 'room-writer'])
   // Resolving the same Agent again adds no listener.
   await rt.resolveAgent('chief')
-  assert.equal(scopedListeners.filter(record => record.event === 'system-prompt/assemble').length, 6)
-  const filtered = await filters[1].listener({}, {}, async () => ({
+  assert.equal(scopedListeners.filter(record => record.event === 'system-prompt/assemble').length, 4)
+  const filtered = await filters[0].listener({}, {}, async () => ({
     sections: [{ name: 'bot-identity' }, { name: 'tool:goal' }, { name: 'tool:workflow' }, { name: 'tool:subagent' }, { name: 'tool:bash' }],
     contexts: [{ name: 'x' }],
     tools: [{ name: 'read' }, { name: 'subagent' }, { name: 'workflow' }, { name: 'send_message' }, { name: 'message_bot' }, { name: 'ask_user_question' }],
@@ -270,7 +270,7 @@ test('Bot Sessions filter the hidden tools and their guidance out of the prompt 
   assert.deepEqual(filtered.sections.map(section => section.name), ['bot-identity', 'tool:workflow', 'tool:subagent', 'tool:bash'])
   assert.deepEqual(filtered.tools.map(tool => tool.name), ['read', 'subagent', 'workflow', 'send_message', 'message_bot'])
   const presentation = { sections: [{ name: 'bot-identity' }, { name: 'tool:goal' }, { name: 'tool:workflow' }, { name: 'tool:subagent' }, { name: 'tool:bash' }], contexts: [], variables: {} }
-  const current = await filters[1].listener(presentation, {}, async () => presentation)
+  const current = await filters[0].listener(presentation, {}, async () => presentation)
   assert.equal(Object.hasOwn(current, 'tools'), false)
   assert.deepEqual(current.sections.map(section => section.name), ['bot-identity', 'tool:workflow', 'tool:subagent', 'tool:bash'])
   assert.deepEqual(filtered.contexts, [{ name: 'x' }])

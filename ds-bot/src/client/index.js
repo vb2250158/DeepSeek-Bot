@@ -1,3 +1,4 @@
+import { installSettingsShell, SETTINGS_SHELL_CSS } from './settings-shell.js'
 import { call } from './api.js'
 import { isHex, inkText, paintCss } from './inks.js'
 import { DEFAULT_MASK, SHAPES, markupCache, maskOf } from './characters.js'
@@ -7,7 +8,7 @@ import { themeCss, shellTokens, registry, registerShape, registerTheme, allTheme
 import { MENTION_ORIGIN, currentPart } from './text.js'
 import { SHELL_CSS, CONVERSATION_CSS, installStyles, installCompiledStyles } from './styles.js'
 import { lookOf } from './mark.js'
-import { SIDEBAR_CSS, holdShellShortcuts, openHarnessSettings, openHarnessOnboarding, MODELS_STEP, MODELS_STEP_ORDER, OpenModelsStep } from './sidebar.js'
+import { SIDEBAR_CSS, holdShellShortcuts, openHarnessSettings, openHarnessOnboarding, MODELS_STEP } from './sidebar.js'
 import { BOT_PANEL, BotPanelIcon, BotWorkbench, BotTeam, BotConversation, WORKBENCH_CSS } from './workbench.js'
 import { HeaderPill } from './header.js'
 import { ComposerPlus, ComposerVoice, menuIcons } from './composer.js'
@@ -785,7 +786,18 @@ export function apply(ctx) {
       else if (kind === 'letgo') void actions.computerAllowForeground(botId)
     })
   }
-  const face = () => ({ actions, hooks: { roster, ui, activity, work, memoryNews, registry, turnClock, live, computer, cards, heldCards, browserPages, browserTabs, browserHolds, surface, update } })
+  const settingsShellHeld = createSource(false)
+  let settingsShell
+  const face = () => ({ actions, hooks: { roster, ui, activity, work, memoryNews, registry, turnClock, live, computer, cards, heldCards, browserPages, browserTabs, browserHolds, surface, update, settingsShellHeld } })
+  ctx.effect(() => {
+    const offStyles = installCompiledStyles(SETTINGS_SHELL_CSS, 'settings-shell')
+    settingsShell = installSettingsShell(ctx, { face, actions, ui, held: settingsShellHeld })
+    return () => { settingsShell.dispose(); settingsShell = undefined; offStyles() }
+  }, 'ds-bot: settings shell')
+  actions.surfaceMode = () => surface.getSnapshot().mode
+  actions.openHarnessSettings = () => actions.openSettings('general')
+  actions.openHarnessModels = () => actions.openSettings('models', 'advanced')
+  actions.openHarnessOnboarding = id => settingsShell?.openOnboarding(id)
   // The queue dock's per-session verbs, supplied the way the shell's own dock
   // injects them (the session facade and the conversation service).
   const queueFace = (sessionId) => ({
@@ -982,7 +994,6 @@ export function apply(ctx) {
     () => { const style = installStyles(WORKBENCH_CSS, 'workbench'); return () => style.remove() },
     // The whale wins the seat over a shell account plugin's own launcher (the
     // Desktop's "··· More"), which comes back in Agent mode.
-    () => shadow('settings.onboarding', { id: MODELS_STEP, order: MODELS_STEP_ORDER }, OpenModelsStep),
     () => shadow('shell.overlay', { id: 'bot-computer', order: 40, inject: face }, ComputerIndicator),
     () => shadow('shell.overlay', { id: 'bot', order: 50, inject: face }, Overlays),
     () => shadow('shell.overlay', { id: 'bot-signin', order: 55, inject: face }, DeepSeekSignIn),
