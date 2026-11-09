@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { runInNewContext } from 'node:vm'
 import { build } from 'esbuild'
@@ -42,9 +43,11 @@ const walk = (node, match, out = []) => {
 }
 const textOf = node => (typeof node === 'string' ? node : Array.isArray(node) ? node.map(textOf).join('') : node?.props ? textOf(node.props.children) : '')
 const roster = { byId: {}, roomsById: {}, bots: [], rooms: [], models: [], prefs: {} }
-const harnessRequire = createRequire(`${plugin}/dev/harness/package.json`)
+const harness = process.env.DSH_HARNESS
+assert.ok(harness, 'The test launcher must provide the current Core source checkout')
+const harnessRequire = createRequire(join(harness, 'packages/bundle/web-app/package.json'))
 // The patch files are YAML; DSH's own parser reads them as a profile would.
-const { parse } = harnessRequire('yaml')
+const { parse } = createRequire(join(harness, 'packages/boot/config-editor/package.json'))('yaml')
 const packageFile = (name, file) => harnessRequire.resolve(`${name}/package.json`).replace(/package\.json$/, file)
 
 // DSH's own settings shell, run as its browser module would: the child slots its
