@@ -2,7 +2,7 @@ import { AgentBadge } from './agent-badge.js'
 import { createElement as h, Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import { FishLogo } from './dsh-primitives.js'
-import { currentPart, previewOf, relativeShort } from './text.js'
+import { currentPart, previewOf, relativeShort, rowTime } from './text.js'
 import { PlusIcon, SearchIcon, PinMarkIcon, CloudDownloadIcon, GearIcon, GaugeIcon, ClockIcon, ConnectorIcon, SwitchIcon, SignInIcon, SignOutIcon, SlidersIcon } from './icons.js'
 import { lookOf, MAIN_LOOK } from './characters.js'
 import { botState, BotMark, BotAvatar, RoomAvatar } from './mark.js'
@@ -77,6 +77,7 @@ function BotRow({ bot, roster, actions, useSessions, useSessionStatus, useSessio
   const id = bot.id
   const part = currentPart(bot)
   const preview = useSessions(list => previewOf(list, part, roster.exchangeTurns[part]))
+  const lastAt = useSessions(list => list.byId[part]?.updatedAt ?? 0)
   const running = useSessionStatus(map => map.get(part)?.running === true)
   const active = useSessionRetainInfo(part, info => (info?.retainedBy?.mainView ?? 0) > 0)
   const unread = useSessionStatus(map => map.get(part)?.completionUnread === true || map.get(part)?.pendingInteraction !== undefined) || (marked && !active)
@@ -107,7 +108,8 @@ function BotRow({ bot, roster, actions, useSessions, useSessionStatus, useSessio
   h(BotAvatar, { bot, size: 36, state }),
   pinned && !wide ? h(PinMark) : null,
   wide ? h('span', { className: 'bt-row-body' },
-    h('span', { className: 'bt-row-name' }, h('span', { className: 'bt-row-title' }, bot.name, bot.engine ? h(AgentBadge, { engine: bot.engine }) : null), bot.role ? h('span', { className: 'bt-row-role' }, bot.role) : null, pinned ? h(PinMark) : null),
+    h('span', { className: 'bt-row-name' }, h('span', { className: 'bt-row-title' }, bot.name, bot.engine ? h(AgentBadge, { engine: bot.engine }) : null), bot.role ? h('span', { className: 'bt-row-role' }, bot.role) : null, pinned ? h(PinMark) : null,
+      lastAt > 0 ? h('time', { className: 'bt-row-time', dateTime: new Date(lastAt).toISOString(), title: new Date(lastAt).toLocaleString() }, rowTime(lastAt)) : null),
     runningLine ? h('span', { className: 'bt-row-preview' }, runningLine)
       : awayLine ? h('span', { className: 'bt-row-preview' }, awayLine)
         : waitsFor ? h('span', { className: 'bt-row-preview' }, waitsFor)

@@ -53,6 +53,18 @@ export function messageClock(time, now = Date.now()) {
   return daysBefore(new Date(time), now) === 0 ? clock(time) : clockLabel(time, now)
 }
 
+// A conversation row's last-reply stamp, following the QQ-style list: today's
+// clock, "Yesterday", then month/day. The full timestamp stays in the title.
+export function rowTime(ms, now = Date.now()) {
+  const date = new Date(ms)
+  const today = new Date(now)
+  if (date.toDateString() === today.toDateString()) return clock(ms)
+  const yesterday = new Date(now)
+  yesterday.setDate(yesterday.getDate() - 1)
+  if (date.toDateString() === yesterday.toDateString()) return t('Yesterday')
+  return date.toLocaleDateString(dateLocale(), { month: 'numeric', day: 'numeric' })
+}
+
 // A short relative stamp for list rows: "just now", "5 min", "3 h", "2 d", then a date.
 export function relativeShort(ms) {
   const diff = Math.max(0, Date.now() - ms)

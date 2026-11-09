@@ -812,6 +812,7 @@ const ZH = {
 
   // Time and usage
   'Today {time}': '今天 {time}',
+  'Yesterday': '昨天',
   'Yesterday {time}': '昨天 {time}',
   'Ran for {duration}': '本次用时 {duration}',
   '{tokens} tok · Cache hit {hit}%': '{tokens} tok · 缓存命中 {hit}%',

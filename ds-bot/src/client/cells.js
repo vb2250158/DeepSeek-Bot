@@ -278,9 +278,10 @@ export function AssistantCell({ node, groupPart, sessionId, openFile, fileMentio
   const activity = groupPart === 'response' ? [] : stepActivity(data)
   if (texts.length === 0 && !reasoning && relays.length === 0 && activity.length === 0) return h(CellEmpty)
   const selfId = roster.byId[sessionId]?.id ?? sessionId
-  // The flat layout heads a reply with who speaks, once per Turn: in the step that opens
-  // it, in that step's reasoning part when the reasoning shows there.
-  const speaker = layoutOf(roster.prefs) === 'flat' ? roster.byId[sessionId] : undefined
+  // Every Bot reply is headed by who speaks, once per Turn, in the step that opens
+  // it. The bubble layout shows the avatar and name without a per-message clock;
+  // the flat layout keeps its own time in the head as before.
+  const speaker = roster.byId[sessionId]
   const head = speaker !== undefined && opensReply(steps, data, shown)
     && (reasoning !== '' || (texts.length > 0 && !(groupPart === 'response' && shown && turnReasoning(steps, data) !== '')))
   return h(Fragment, null,
@@ -295,7 +296,7 @@ export function AssistantCell({ node, groupPart, sessionId, openFile, fileMentio
         whole: true,
       })
     }),
-    head ? h(SpeakerHead, { bot: speaker, time: data.time }) : null,
+    head ? h(SpeakerHead, { bot: speaker, time: layoutOf(roster.prefs) === 'flat' ? data.time : undefined }) : null,
     activity.length ? h('div', { className: 'bt-agent-activity' }, activity.map((line, index) => h('div', { key: index, className: 'bt-agent-act', title: line }, h('span', { className: 'bt-agent-act-mark', 'aria-hidden': true }), h('span', { className: 'bt-agent-act-text' }, activityParts(line))))) : null,
     reasoning ? h(ThinkingRow, {
       text: reasoning, live: thinking !== undefined, viewKey: `${sessionId}:${data.turn}`,
@@ -303,7 +304,7 @@ export function AssistantCell({ node, groupPart, sessionId, openFile, fileMentio
       // time makes one Elapsed show settled + running.
       ...(thinking !== undefined ? { at: typeof thinking.time === 'number' ? thinking.time - (ms ?? 0) : undefined } : { ms }),
     }) : null,
-    texts.length ? h(Bubbles, { texts, roster, selfId, actions, streaming: running, sessionId, msgKey: `${sessionId}:${data.turn}:${node.key ?? data.seq ?? ''}`, useUi, mentions, fold: FOLD_HUGE, time: speaker === undefined ? data.time : undefined }) : null)
+    texts.length ? h(Bubbles, { texts, roster, selfId, actions, streaming: running, sessionId, msgKey: `${sessionId}:${data.turn}:${node.key ?? data.seq ?? ''}`, useUi, mentions, fold: FOLD_HUGE, time: layoutOf(roster.prefs) === 'flat' ? undefined : data.time }) : null)
 }
 
 // `code` in an activity line is the command or path the agent works on.
@@ -325,7 +326,9 @@ function EventLine({ prefix, bots, joiner = t('and'), onOpen, whole = false }) {
   return h('div', { className: 'bt-event' }, parts)
 }
 
-// The flat layout's head over a Bot's reply in its own chat: avatar, name, time.
+// The head over a Bot's reply in its own chat: avatar and name, plus the time
+// when the flat layout keeps it there. Bubble layouts leave time to the row and
+// the shared separators, so a clock is not repeated beside every speaker.
 function SpeakerHead({ bot, time }) {
   return h('div', { className: 'bt-group-name' },
     h('span', { className: 'bt-lead' }, h(BotMark, { bot, size: 22 })), bot.name,

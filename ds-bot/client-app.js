@@ -863,6 +863,7 @@ var ZH = {
   "Only the start of this message is kept here": "这里只保留了这条消息的开头",
   // Time and usage
   "Today {time}": "今天 {time}",
+  "Yesterday": "昨天",
   "Yesterday {time}": "昨天 {time}",
   "Ran for {duration}": "本次用时 {duration}",
   "{tokens} tok · Cache hit {hit}%": "{tokens} tok · 缓存命中 {hit}%",
@@ -2589,6 +2590,15 @@ function clockLabel(time, now = Date.now()) {
 function messageClock(time, now = Date.now()) {
   return daysBefore(new Date(time), now) === 0 ? clock(time) : clockLabel(time, now);
 }
+function rowTime(ms, now = Date.now()) {
+  const date = new Date(ms);
+  const today = new Date(now);
+  if (date.toDateString() === today.toDateString()) return clock(ms);
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (date.toDateString() === yesterday.toDateString()) return t("Yesterday");
+  return date.toLocaleDateString(dateLocale(), { month: "numeric", day: "numeric" });
+}
 function relativeShort(ms) {
   const diff = Math.max(0, Date.now() - ms);
   if (diff < 6e4) return t("just now");
@@ -3170,6 +3180,7 @@ body[data-bt-motion=quiet] .bt-mark[data-poke]{cursor:default}
 .bt-row-body{display:flex;flex-direction:column;min-width:0;flex:1 1 auto}
 .bt-row-name{display:flex;align-items:center;gap:6px;min-width:0;font-size:14px;line-height:20px;font-weight:400}
 .bt-row-title{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bt-row-time{margin-left:auto;flex:none;font-size:11px;line-height:14px;color:var(--bt-ink-3);font-variant-numeric:tabular-nums;white-space:nowrap}
 .bt-tag{flex:none;max-width:96px;font-size:12px;line-height:16px;font-weight:400;padding:1px 6px;border-radius:4px;background:var(--bt-tag-bg);color:var(--bt-tag-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bt-row-preview{font-size:13px;line-height:18px;color:var(--bt-ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bt-unread{width:8px;height:8px;border-radius:50%;background:var(--bt-accent);flex:none;margin-right:2px;animation:bt-fade .13s cubic-bezier(.22,1,.36,1)}
@@ -13569,7 +13580,7 @@ function AssistantCell({ node, groupPart, sessionId, openFile, fileMentions, use
   const activity = groupPart === "response" ? [] : stepActivity(data);
   if (texts2.length === 0 && !reasoning && relays.length === 0 && activity.length === 0) return (0, import_react33.createElement)(CellEmpty);
   const selfId = roster.byId[sessionId]?.id ?? sessionId;
-  const speaker = layoutOf(roster.prefs) === "flat" ? roster.byId[sessionId] : void 0;
+  const speaker = roster.byId[sessionId];
   const head = speaker !== void 0 && opensReply(steps, data, shown) && (reasoning !== "" || texts2.length > 0 && !(groupPart === "response" && shown && turnReasoning(steps, data) !== ""));
   return (0, import_react33.createElement)(
     import_react33.Fragment,
@@ -13587,7 +13598,7 @@ function AssistantCell({ node, groupPart, sessionId, openFile, fileMentions, use
         whole: true
       });
     }),
-    head ? (0, import_react33.createElement)(SpeakerHead, { bot: speaker, time: data.time }) : null,
+    head ? (0, import_react33.createElement)(SpeakerHead, { bot: speaker, time: layoutOf(roster.prefs) === "flat" ? data.time : void 0 }) : null,
     activity.length ? (0, import_react33.createElement)("div", { className: "bt-agent-activity" }, activity.map((line, index) => (0, import_react33.createElement)("div", { key: index, className: "bt-agent-act", title: line }, (0, import_react33.createElement)("span", { className: "bt-agent-act-mark", "aria-hidden": true }), (0, import_react33.createElement)("span", { className: "bt-agent-act-text" }, activityParts(line))))) : null,
     reasoning ? (0, import_react33.createElement)(ThinkingRow, {
       text: reasoning,
@@ -13597,7 +13608,7 @@ function AssistantCell({ node, groupPart, sessionId, openFile, fileMentions, use
       // time makes one Elapsed show settled + running.
       ...thinking !== void 0 ? { at: typeof thinking.time === "number" ? thinking.time - (ms ?? 0) : void 0 } : { ms }
     }) : null,
-    texts2.length ? (0, import_react33.createElement)(Bubbles, { texts: texts2, roster, selfId, actions, streaming: running, sessionId, msgKey: `${sessionId}:${data.turn}:${node.key ?? data.seq ?? ""}`, useUi, mentions, fold: FOLD_HUGE, time: speaker === void 0 ? data.time : void 0 }) : null
+    texts2.length ? (0, import_react33.createElement)(Bubbles, { texts: texts2, roster, selfId, actions, streaming: running, sessionId, msgKey: `${sessionId}:${data.turn}:${node.key ?? data.seq ?? ""}`, useUi, mentions, fold: FOLD_HUGE, time: layoutOf(roster.prefs) === "flat" ? void 0 : data.time }) : null
   );
 }
 var activityParts = (line) => line.split("`").map((part, index) => index % 2 === 1 ? (0, import_react33.createElement)("code", { key: index }, part) : part);
@@ -14736,6 +14747,7 @@ function BotRow({ bot, roster, actions, useSessions, useSessionStatus, useSessio
   const id = bot.id;
   const part = currentPart(bot);
   const preview = useSessions((list) => previewOf(list, part, roster.exchangeTurns[part]));
+  const lastAt = useSessions((list) => list.byId[part]?.updatedAt ?? 0);
   const running = useSessionStatus((map) => map.get(part)?.running === true);
   const active = useSessionRetainInfo(part, (info) => (info?.retainedBy?.mainView ?? 0) > 0);
   const unread = useSessionStatus((map) => map.get(part)?.completionUnread === true || map.get(part)?.pendingInteraction !== void 0) || marked && !active;
@@ -14776,7 +14788,14 @@ function BotRow({ bot, roster, actions, useSessions, useSessionStatus, useSessio
     wide ? (0, import_react35.createElement)(
       "span",
       { className: "bt-row-body" },
-      (0, import_react35.createElement)("span", { className: "bt-row-name" }, (0, import_react35.createElement)("span", { className: "bt-row-title" }, bot.name, bot.engine ? (0, import_react35.createElement)(AgentBadge, { engine: bot.engine }) : null), bot.role ? (0, import_react35.createElement)("span", { className: "bt-row-role" }, bot.role) : null, pinned ? (0, import_react35.createElement)(PinMark) : null),
+      (0, import_react35.createElement)(
+        "span",
+        { className: "bt-row-name" },
+        (0, import_react35.createElement)("span", { className: "bt-row-title" }, bot.name, bot.engine ? (0, import_react35.createElement)(AgentBadge, { engine: bot.engine }) : null),
+        bot.role ? (0, import_react35.createElement)("span", { className: "bt-row-role" }, bot.role) : null,
+        pinned ? (0, import_react35.createElement)(PinMark) : null,
+        lastAt > 0 ? (0, import_react35.createElement)("time", { className: "bt-row-time", dateTime: new Date(lastAt).toISOString(), title: new Date(lastAt).toLocaleString() }, rowTime(lastAt)) : null
+      ),
       runningLine ? (0, import_react35.createElement)("span", { className: "bt-row-preview" }, runningLine) : awayLine ? (0, import_react35.createElement)("span", { className: "bt-row-preview" }, awayLine) : waitsFor ? (0, import_react35.createElement)("span", { className: "bt-row-preview" }, waitsFor) : preview ? (0, import_react35.createElement)("span", { className: "bt-row-preview" }, preview) : null
     ) : null,
     wide && unread && !active ? (0, import_react35.createElement)("span", { className: "bt-unread", "aria-hidden": true }) : !wide && !active && unread ? (0, import_react35.createElement)("span", { className: "bt-dot", "aria-hidden": true }) : null
