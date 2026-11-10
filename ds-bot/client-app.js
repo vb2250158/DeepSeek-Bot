@@ -17853,6 +17853,10 @@ body[data-bt-motion=quiet] .bt-mark[data-poke]{cursor:default}
 body{--bt-msg-w:.8;--bt-flat-w:1}
 .bt-astack{display:flex;flex-direction:column;align-items:flex-start;gap:2px;margin:0}
 .bt-bubble{max-width:min(calc(var(--bt-msg-w) * 100%),calc(100% - 82px));background:var(--bt-bubble);color:var(--bt-ink);border-radius:18px;padding:7px 12px;font-size:var(--dsh-content-font-size,14px);line-height:calc(var(--dsh-content-font-size,14px) + 10px);box-sizing:border-box;overflow-wrap:anywhere;text-wrap:pretty;text-autospace:normal}
+/* Two bubbles of one speaker meet flat: the facing corners square off so the pair
+   reads as one block instead of two separate cards. */
+.bt-msg:not(:first-child)>.bt-msg-line>.bt-bubble{border-start-start-radius:4px}
+.bt-msg:not(:last-child)>.bt-msg-line>.bt-bubble{border-end-start-radius:4px}
 .bt-bubble [class*="_markdown"]>*+*{margin-top:10px}
 .bt-bubble [class*="_markdown"]{color:inherit!important;font-size:inherit!important;line-height:inherit!important}
 .bt-bubble p{margin:0}
@@ -17870,7 +17874,10 @@ body{--bt-msg-w:.8;--bt-flat-w:1}
 .bt-group-msg[data-chain-prev]{margin-top:0}
 .bt-group-msg[data-chain-prev]>.bt-group-name{display:none}
 body:not([data-bt-layout=flat]) .bt-group-msg[data-chain-next] .bt-lead{visibility:hidden}
-[data-chat-flow]>[data-chat-group-key][data-bt-chain-next]{padding-bottom:2px!important;margin-bottom:0!important}
+body:not([data-bt-layout=flat]) .bt-group-msg[data-chain-prev]>.bt-astack>.bt-msg:first-child>.bt-msg-line>.bt-bubble{border-start-start-radius:4px}
+body:not([data-bt-layout=flat]) .bt-group-msg[data-chain-next]>.bt-astack>.bt-msg:last-child>.bt-msg-line>.bt-bubble{border-end-start-radius:4px}
+[data-chat-flow]{row-gap:0!important}
+[data-chat-flow]>[data-chat-group-key][data-bt-chain-next]{padding-bottom:0!important;margin-bottom:0!important}
 [data-chat-flow]>[data-chat-group-key][data-bt-chain-prev]{padding-top:0!important;margin-top:0!important}
 .bt-lead{flex:none;display:flex;margin-bottom:1px}
 button.bt-lead{border:0;background:none;padding:0;cursor:pointer}
