@@ -276,6 +276,12 @@ export function AssistantCell({ node, groupPart, sessionId, openFile, fileMentio
   // earlier step's cell.
   const thinking = groupPart === 'response' || !shown ? undefined : thinkingStep(members)
   const ms = useThinkingMs({ sessionId, turn: data.turn, settledSteps: members.filter(step => step.status !== 'running').length, skip: hidden || reasoning === '' })
+  // Steps are redrawn as a Turn streams; re-mark their seams after each commit so the
+  // spacing and squared corners follow the final order.
+  useLayoutEffect(() => {
+    const flow = document.querySelector('.bt-chat-column [data-chat-flow]')
+    if (flow) scheduleGroupChains(flow)
+  }, [sessionId, data.turn, node.key])
   // A streaming reply stands in for the activity row.
   useLiveNote(actions, sessionId, `text:${node.key ?? data.seq}`, !hidden && running && texts.length > 0 ? { text: true } : null)
   if (hidden) return h(CellEmpty)
@@ -344,14 +350,25 @@ function SpeakerHead({ bot }) {
     h('span', { className: 'bt-lead' }, h(BotMark, { bot, size: 36 })), bot.name)
 }
 
-const CHAIN_BREAK_SEL = '.bt-group-msg, .bt-umsg, .bt-urow, [data-chat-flow-kind=user], [data-chat-flow-kind=command-input], .bt-q-inline, .bt-event, .bt-time-sep, .bt-new-sep, .bt-part-line, .bt-btw-card, .bt-learn-card'
+const CHAIN_BREAK_SEL = '.bt-group-msg, [data-chat-flow-kind=assistant-step], .bt-umsg, .bt-urow, [data-chat-flow-kind=user], [data-chat-flow-kind=command-input], .bt-q-inline, .bt-event, .bt-time-sep, .bt-new-sep, .bt-part-line, .bt-btw-card, .bt-learn-card'
 export function syncGroupChains(flow) {
   const items = [...flow.querySelectorAll(CHAIN_BREAK_SEL)]
   for (let i = 0; i < items.length; i += 1) {
     const curr = items[i]
-    if (!curr.classList.contains('bt-group-msg')) continue
     const prev = items[i - 1]
     const next = items[i + 1]
+    // A one-to-one Bot reply is an assistant step, not a group message: only the
+    // step that opens a Turn carries the speaker head, so a head-less step after
+    // another step is the same Bot speaking again.
+    if (curr.getAttribute('data-chat-flow-kind') === 'assistant-step') {
+      const step = node => node?.getAttribute('data-chat-flow-kind') === 'assistant-step' ? node : undefined
+      const sameAsPrev = step(prev) !== undefined && curr.querySelector('.bt-group-name') === null
+      const sameAsNext = step(next) !== undefined && next.querySelector('.bt-group-name') === null
+      if (sameAsPrev) curr.dataset.seamPrev = ''; else delete curr.dataset.seamPrev
+      if (sameAsNext) curr.dataset.seamNext = ''; else delete curr.dataset.seamNext
+      continue
+    }
+    if (!curr.classList.contains('bt-group-msg')) continue
     const botId = curr.dataset.botId
     const chainPrev = Boolean(botId && prev?.classList.contains('bt-group-msg') && prev.dataset.botId === botId)
     const chainNext = Boolean(botId && next?.classList.contains('bt-group-msg') && next.dataset.botId === botId)

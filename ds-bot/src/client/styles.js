@@ -19,7 +19,7 @@ import { SPRING_SHAPE, SPRING_TAP, SPRING_STRETCH, SPRING_POP, spring } from './
 // the conversation renders.
 export const SHELL_CSS = `
 ${GROUP_LIBRARY_CSS}
-body{--bt-im-telegram:#229ed9;--bt-im-weixin:#07c160;--bt-im-feishu:#3370ff;--bt-im-dingtalk:#1e88e5;--bt-im-wecom:#0082ef;--bt-im-qq:#e03e3e;--bt-im-discord:#5865f2;--bt-im-slack:#4a154b;--bt-im-mark-ink:#ffffff;--bt-qr-paper:#ffffff;--bt-qr-ink:#141414;--bt-ink:#141414;--bt-danger:#e02135;--bt-ink-2:rgba(20,20,20,.6);--bt-ink-3:rgba(20,20,20,.36);--bt-bubble:#eeeeee;--bt-sidebar:#f7f7f7;--bt-main:#fcfcfc;--bt-line:rgba(20,20,20,.08);--bt-line-2:rgba(20,20,20,.15);--bt-line-weak:rgba(20,20,20,.1);--bt-hover:rgba(119,119,119,.09);--bt-active:rgba(119,119,119,.17);--bt-card:#ffffff;--bt-accent:#4d6bfe;--bt-green:#00c972;--bt-star:#ff9800;--bt-user:#070707;--bt-user-ink:#fcfcfc;--bt-tag-bg:rgba(20,20,20,.06);--bt-tag-ink:rgba(20,20,20,.56);--bt-knob:#ffffff;--bt-glass-bg:color-mix(in srgb,var(--bt-main) 78%,transparent);--bt-glass-border:rgba(255,255,255,.72);--bt-glass-rim:rgba(20,20,20,.09);--bt-glass-shadow:0 8px 28px -6px rgba(0,0,0,.08),0 2px 6px -1px rgba(0,0,0,.04),inset 0 1px 0 rgba(255,255,255,.82);--bt-accent-soft:color-mix(in srgb,var(--bt-accent) 14%,transparent);--bt-danger-soft:color-mix(in srgb,var(--bt-danger) 14%,transparent);--bt-danger-glow:color-mix(in srgb,var(--bt-danger) 24%,transparent);-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%;--bt-font:var(--dsw-font-family,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif)}
+body{--bt-im-telegram:#229ed9;--bt-im-weixin:#07c160;--bt-im-feishu:#3370ff;--bt-im-dingtalk:#1e88e5;--bt-im-wecom:#0082ef;--bt-im-qq:#e03e3e;--bt-im-discord:#5865f2;--bt-im-slack:#4a154b;--bt-im-mark-ink:#ffffff;--bt-qr-paper:#ffffff;--bt-qr-ink:#141414;--bt-ink:#141414;--bt-danger:#e02135;--bt-ink-2:rgba(20,20,20,.6);--bt-ink-3:rgba(20,20,20,.36);--bt-gap-same:2px;--bt-gap-turn:16px;--bt-gap-name:4px;--bt-avatar-col:46px;--bt-radius:18px;--bt-radius-seam:4px;--bt-bubble:#eeeeee;--bt-sidebar:#f7f7f7;--bt-main:#fcfcfc;--bt-line:rgba(20,20,20,.08);--bt-line-2:rgba(20,20,20,.15);--bt-line-weak:rgba(20,20,20,.1);--bt-hover:rgba(119,119,119,.09);--bt-active:rgba(119,119,119,.17);--bt-card:#ffffff;--bt-accent:#4d6bfe;--bt-green:#00c972;--bt-star:#ff9800;--bt-user:#070707;--bt-user-ink:#fcfcfc;--bt-tag-bg:rgba(20,20,20,.06);--bt-tag-ink:rgba(20,20,20,.56);--bt-knob:#ffffff;--bt-glass-bg:color-mix(in srgb,var(--bt-main) 78%,transparent);--bt-glass-border:rgba(255,255,255,.72);--bt-glass-rim:rgba(20,20,20,.09);--bt-glass-shadow:0 8px 28px -6px rgba(0,0,0,.08),0 2px 6px -1px rgba(0,0,0,.04),inset 0 1px 0 rgba(255,255,255,.82);--bt-accent-soft:color-mix(in srgb,var(--bt-accent) 14%,transparent);--bt-danger-soft:color-mix(in srgb,var(--bt-danger) 14%,transparent);--bt-danger-glow:color-mix(in srgb,var(--bt-danger) 24%,transparent);-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%;--bt-font:var(--dsw-font-family,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif)}
 /* iOS waits out a double-tap zoom on buttons; the plugin's own controls never zoom. */
 :is(.bt-tool,.bt-uaction,.bt-menu button,.bt-menu-item,.bt-icon-btn,.bt-round,.bt-pill,.bt-account,.bt-set-row,.bt-settings-item,.bt-react-strip button,.bt-palette-row,.bt-palette-clear,.bt-tab,.bt-ptab,.bt-ptab-x,.bt-bcard-x,.bt-plus,.bt-q-btn,.bt-q-x,.bt-x,.bt-nc-send,.bt-send,.bt-soft,.bt-mini,.bt-side-send,.bt-shape,.bt-swatch,.bt-color,.bt-newchat,.bt-task-day,.bt-task-remove,.bt-fb-btn){touch-action:manipulation}
 :is(.bt-round,.bt-you,.bt-account,.bt-color,.bt-color span,.bt-swatch,.bt-icon-btn,.bt-avatar-trigger,.bt-avatar-pencil,.bt-plus,.bt-mic,.bt-voice){corner-shape:round}
@@ -188,18 +188,18 @@ body[data-bt-motion=quiet] .bt-mark[data-poke]{cursor:default}
 
 /* The width settings: the share of the column a bubble may take, and the flat text. */
 body{--bt-msg-w:.8;--bt-flat-w:1}
-.bt-astack{display:flex;flex-direction:column;align-items:flex-start;gap:2px;margin:0}
+.bt-astack{display:flex;flex-direction:column;align-items:flex-start;gap:var(--bt-gap-same);margin:0}
 .bt-bubble{max-width:min(calc(var(--bt-msg-w) * 100%),calc(100% - 82px));background:var(--bt-bubble);color:var(--bt-ink);border-radius:18px;padding:7px 12px;font-size:var(--dsh-content-font-size,14px);line-height:calc(var(--dsh-content-font-size,14px) + 10px);box-sizing:border-box;overflow-wrap:anywhere;text-wrap:pretty;text-autospace:normal}
-/* One Bot chat has exactly one speaker, so any two assistant steps that sit side by
-   side are the same speaker's consecutive replies: close them to 2px and square the
-   facing corners, without touching a step that has a card in between. */
-[data-chat-flow-kind=assistant-step]+[data-chat-flow-kind=assistant-step]{margin-top:2px!important}
-[data-chat-flow-kind=assistant-step]:has(+[data-chat-flow-kind=assistant-step]) .bt-msg:last-child>.bt-msg-line>.bt-bubble{border-end-start-radius:4px}
-[data-chat-flow-kind=assistant-step]+[data-chat-flow-kind=assistant-step] .bt-msg:first-child>.bt-msg-line>.bt-bubble{border-start-start-radius:4px}
+/* One Bot chat has exactly one speaker: a step without a speaker head continues the
+   previous step, and syncGroupChains marks both ends so the seam closes to 2px and
+   squares off. A card between two steps keeps them apart. */
+[data-chat-flow-kind=assistant-step][data-seam-prev]{margin-top:var(--bt-gap-same)!important}
+[data-chat-flow-kind=assistant-step][data-seam-prev] .bt-msg:first-child>.bt-msg-line>.bt-bubble{border-start-start-radius:var(--bt-radius-seam)}
+[data-chat-flow-kind=assistant-step][data-seam-next] .bt-msg:last-child>.bt-msg-line>.bt-bubble{border-end-start-radius:var(--bt-radius-seam)}
 /* Two bubbles of one speaker meet flat: the facing corners square off so the pair
    reads as one block instead of two separate cards. */
-.bt-msg:not(:first-child)>.bt-msg-line>.bt-bubble{border-start-start-radius:4px}
-.bt-msg:not(:last-child)>.bt-msg-line>.bt-bubble{border-end-start-radius:4px}
+.bt-msg:not(:first-child)>.bt-msg-line>.bt-bubble{border-start-start-radius:var(--bt-radius-seam)}
+.bt-msg:not(:last-child)>.bt-msg-line>.bt-bubble{border-end-start-radius:var(--bt-radius-seam)}
 .bt-bubble [class*="_markdown"]>*+*{margin-top:10px}
 .bt-bubble [class*="_markdown"]{color:inherit!important;font-size:inherit!important;line-height:inherit!important}
 .bt-bubble p{margin:0}
@@ -212,13 +212,13 @@ body{--bt-msg-w:.8;--bt-flat-w:1}
 .bt-bubble :is(img,video),.bt-ububble :is(img,video),[data-chat-flow] [class*="_bubble"] :is(img,video){max-width:100%;height:auto}
 .bt-bubble a[href^="${MENTION_ORIGIN}"]{text-decoration:none;font-weight:400;cursor:pointer;white-space:nowrap}
 .bt-bubble a[href^="${MENTION_ORIGIN}"]::before{content:"";display:inline-block;width:16px;height:16px;margin-right:3px;vertical-align:-3px;background:currentColor;-webkit-mask:${DEFAULT_MASK} center/contain no-repeat;mask:${DEFAULT_MASK} center/contain no-repeat}
-.bt-group-msg{display:flex;flex-direction:column;gap:0;margin:16px 0 0}
+.bt-group-msg{display:flex;flex-direction:column;gap:0;margin:var(--bt-gap-turn) 0 0}
 .bt-group-msg:first-child{margin-top:0}
 .bt-group-msg[data-chain-prev]{margin-top:0}
 .bt-group-msg[data-chain-prev]>.bt-group-name{display:none}
 body:not([data-bt-layout=flat]) .bt-group-msg[data-chain-next] .bt-lead{visibility:hidden}
-body:not([data-bt-layout=flat]) .bt-group-msg[data-chain-prev]>.bt-astack>.bt-msg:first-child>.bt-msg-line>.bt-bubble{border-start-start-radius:4px}
-body:not([data-bt-layout=flat]) .bt-group-msg[data-chain-next]>.bt-astack>.bt-msg:last-child>.bt-msg-line>.bt-bubble{border-end-start-radius:4px}
+body:not([data-bt-layout=flat]) .bt-group-msg[data-chain-prev]>.bt-astack>.bt-msg:first-child>.bt-msg-line>.bt-bubble{border-start-start-radius:var(--bt-radius-seam)}
+body:not([data-bt-layout=flat]) .bt-group-msg[data-chain-next]>.bt-astack>.bt-msg:last-child>.bt-msg-line>.bt-bubble{border-end-start-radius:var(--bt-radius-seam)}
 [data-chat-flow]{row-gap:0!important}
 [data-chat-flow]>[data-chat-group-key][data-bt-chain-next]{padding-bottom:0!important;margin-bottom:0!important}
 [data-chat-flow]>[data-chat-group-key][data-bt-chain-prev]{padding-top:0!important;margin-top:0!important}
@@ -226,7 +226,7 @@ body:not([data-bt-layout=flat]) .bt-group-msg[data-chain-next]>.bt-astack>.bt-ms
 button.bt-lead{border:0;background:none;padding:0;cursor:pointer}
 /* The speaker's avatar sits in the head above the bubbles, so every row of the turn
    starts in the same 46px column and nothing shifts right for the thumbnail. */
-[data-chat-flow-kind=assistant-step] .bt-astack{margin-left:46px}
+[data-chat-flow-kind=assistant-step] .bt-astack{margin-left:var(--bt-avatar-col)}
 .bt-group-name{font-size:12px;line-height:16px;font-weight:500;margin-left:42px}
 .bt-group-name:has(>.bt-lead){display:flex;align-items:center;gap:8px;margin:0 0 2px;font-size:13px;line-height:22px;font-weight:600;color:var(--bt-ink)}
 .bt-group-name>.bt-lead{margin:0}
@@ -235,7 +235,7 @@ button.bt-lead{border:0;background:none;padding:0;cursor:pointer}
    36px, and the bubbles start one 4px margin under the name in the same 46px column. */
 .bt-group-name.bt-speaker{position:relative;display:block;min-height:18px;padding-left:46px;margin:14px 0 4px;font-size:12px;line-height:18px;font-weight:500;color:var(--bt-ink-2)}
 .bt-group-name.bt-speaker>.bt-lead{position:absolute;left:0;top:0;margin:0}
-.bt-group-name.bt-speaker~.bt-astack{margin-left:46px}
+.bt-group-name.bt-speaker~.bt-astack{margin-left:var(--bt-avatar-col)}
 .bt-group-time,.bt-group-took{margin-left:6px;font-size:11px;line-height:16px;font-weight:400;color:var(--bt-ink-2);font-variant-numeric:tabular-nums;white-space:nowrap}
 .bt-x{border:0;background:none;color:var(--bt-ink-2);cursor:pointer;width:24px;height:24px;border-radius:6px;font-size:16px;line-height:24px;padding:0;transition:background-color .12s ease,color .12s ease,${spring(SPRING_TAP, 'scale')}}
 .bt-x:hover{background:var(--bt-hover);color:var(--bt-ink)}
