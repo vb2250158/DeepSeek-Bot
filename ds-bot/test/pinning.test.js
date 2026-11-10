@@ -65,11 +65,22 @@ test('dragging a team row into the pin region persists through the same action a
   const changed = []
   const tree = sidebar(roster(), { setFlags: async (id, flags) => changed.push([id, flags.pinned]) })
   const target = nodes(tree, node => node.props['aria-label'] === 'Pinned chats')[0]
-  target.props.ref.current = { getBoundingClientRect: () => ({ left: 0, top: 0, right: 200, bottom: 100 }) }
-  const event = (x, y) => ({ clientX: x, clientY: y, pointerId: 1, button: 0, preventDefault() {},
-    target: { closest: () => ({ dataset: { botId: 'other' } }) },
-    currentTarget: { setPointerCapture() {}, hasPointerCapture: () => true, releasePointerCapture() {} },
-  })
+  target.props.ref.current = {
+    getBoundingClientRect: () => ({ left: 0, top: 0, right: 200, bottom: 100 }),
+    querySelectorAll: () => [],
+  }
+  // closest on the matched row is the DOM contract pointerDown uses to tell a list row from a pin tile.
+  const event = (x, y, pinned = false) => {
+    const row = {
+      dataset: { botId: 'other' },
+      closest: selector => (selector === '.bt-pinned-grid' && pinned ? row : null),
+    }
+    return {
+      clientX: x, clientY: y, pointerId: 1, button: 0, preventDefault() {},
+      target: { closest: () => row },
+      currentTarget: { setPointerCapture() {}, hasPointerCapture: () => true, releasePointerCapture() {} },
+    }
+  }
   tree.props.onPointerUp(event(50, 40))
   assert.equal(changed.length, 0)
   tree.props.onPointerDown(event(50, 200))
@@ -84,4 +95,8 @@ test('dragging a team row into the pin region persists through the same action a
   tree.props.onPointerCancel()
   tree.props.onPointerUp(event(50, 40))
   assert.equal(changed.length, 1, 'cancelled drags never write')
+  tree.props.onPointerDown(event(40, 20, true))
+  tree.props.onPointerMove(event(160, 20, true))
+  tree.props.onPointerUp(event(160, 20, true))
+  assert.equal(changed.length, 1, 'a tile already in the pin grid does not pin again')
 })
