@@ -17877,15 +17877,16 @@ body:not([data-bt-layout=flat]) .bt-group-msg[data-chain-next]>.bt-astack>.bt-ms
 [data-chat-flow]>[data-chat-group-key][data-bt-chain-prev]{padding-top:2px!important;margin-top:0!important}
 .bt-lead{flex:none;display:flex;margin-bottom:1px}
 button.bt-lead{border:0;background:none;padding:0;cursor:pointer}
-/* Rows without the avatar start where the bubble beside it starts: 22px avatar + 8px gap. */
-.bt-astack[data-lead]>.bt-msg:not(:last-child)>.bt-msg-line,.bt-astack[data-lead] .bt-reacts{margin-left:30px}
+/* The speaker's avatar sits in the head above the bubbles, so every row of the turn
+   starts in the same 46px column and nothing shifts right for the thumbnail. */
+[data-chat-flow-kind=assistant-step] .bt-astack{margin-left:46px}
 .bt-group-name{font-size:12px;line-height:16px;font-weight:500;margin-left:42px}
 .bt-group-name:has(>.bt-lead){display:flex;align-items:center;gap:8px;margin:0 0 2px;font-size:13px;line-height:22px;font-weight:600;color:var(--bt-ink)}
 .bt-group-name>.bt-lead{margin:0}
 /* QQ-style speaker head, as Rabi's qq-message-row/qq-sender/qq-bubble-line: the name
    is a single 18px line, the avatar hangs beside it instead of stretching the row to
    36px, and the bubbles start one 4px margin under the name in the same 46px column. */
-.bt-group-name.bt-speaker{position:relative;display:block;min-height:18px;padding-left:46px;margin:0 0 4px;font-size:12px;line-height:18px;font-weight:500;color:var(--bt-ink-2)}
+.bt-group-name.bt-speaker{position:relative;display:block;min-height:18px;padding-left:46px;margin:14px 0 4px;font-size:12px;line-height:18px;font-weight:500;color:var(--bt-ink-2)}
 .bt-group-name.bt-speaker>.bt-lead{position:absolute;left:0;top:0;margin:0}
 .bt-group-name.bt-speaker~.bt-astack{margin-left:46px}
 .bt-group-time,.bt-group-took{margin-left:6px;font-size:11px;line-height:16px;font-weight:400;color:var(--bt-ink-2);font-variant-numeric:tabular-nums;white-space:nowrap}
@@ -18342,9 +18343,9 @@ button.bt-set-row:hover{background:var(--bt-hover)}
 .bt-msg-line{position:relative;display:flex;align-items:flex-end;gap:8px;max-width:100%}
 .bt-msg-line>.bt-bubble{max-width:none;min-width:0}
 /* The same bubble width as beside an avatar column: the share of (100% - 30px), plus the 30px. */
-.bt-astack[data-lead]>.bt-msg{max-width:min(calc(var(--bt-msg-w) * (100% - 30px) + 30px),calc(100% - 82px))}
+.bt-astack[data-lead]>.bt-msg{max-width:min(calc(var(--bt-msg-w) * 100%),calc(100% - 82px))}
 /* The indent of earlier rows comes out of their line, so their toolbar keeps its 82px too. */
-.bt-astack[data-lead]>.bt-msg:not(:last-child)>.bt-msg-line{max-width:calc(100% - 30px)}
+.bt-astack[data-lead]>.bt-msg:not(:last-child)>.bt-msg-line{max-width:100%}
 .bt-tools{position:absolute;bottom:0;z-index:0;left:100%;margin-left:6px;display:flex;gap:2px;opacity:0;visibility:hidden;transition:opacity .12s ease,visibility .12s}
 /* The hover bridge spans only the 6px gap (plus a little overlap) between the
    bubble's edge and the toolbar: wider, it sits over the bubble's tail and
