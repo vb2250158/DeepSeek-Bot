@@ -491,8 +491,16 @@ export function install(rt) {
     const entry = rt.botOf(id) ?? rt.roomOf(id) ?? rt.own(state.agents, id)
     if (entry === undefined) throw new Error('Unknown conversation')
     if (typeof pinned === 'boolean') {
-      if (pinned && !entry.pinned) entry.pinnedAt = Date.now()
-      if (!pinned) delete entry.pinnedAt
+      // A conversation pinned again starts as the newest pin, not at the slot it held
+      // before it was unpinned.
+      if (pinned && !entry.pinned) {
+        entry.pinnedAt = Date.now()
+        delete entry.pinOrder
+      }
+      if (!pinned) {
+        delete entry.pinnedAt
+        delete entry.pinOrder
+      }
       entry.pinned = pinned
       if (pinned) delete entry.hidden
     }
@@ -504,6 +512,24 @@ export function install(rt) {
     }
     await rt.save()
     return entry
+  }
+
+  // The pinned grid is ordered by hand: `pinOrder` is the slot the user dropped a tile
+  // into, and tiles never dragged fall in behind them by pin time.
+  async function reorderPins(ids) {
+    if (!Array.isArray(ids)) throw new Error('Pin order must be an array of conversation ids')
+    const seen = new Set()
+    let slot = 0
+    for (const id of ids) {
+      if (typeof id !== 'string' || seen.has(id)) continue
+      const entry = rt.botOf(id) ?? rt.roomOf(id) ?? rt.own(state.agents, id)
+      if (entry === undefined || entry.pinned !== true) continue
+      seen.add(id)
+      entry.pinOrder = slot
+      slot += 1
+    }
+    await rt.save()
+    return true
   }
 
   async function saveSection({ id, name, collapsed, color, items, add, remove } = {}) {
@@ -961,7 +987,7 @@ export function install(rt) {
 
   Object.assign(rt, {
     ensureWorkspace, keepTeamFolder, createSession, createBot, duplicateBot, updateBot, setFlags,
-    saveSection, reorderSections, deleteSection,
+    saveSection, reorderSections, reorderPins, deleteSection,
     roomBusy, autoRoomName, retitleRoom, createRoom, updateRoom, deleteRoom,
     setMain, deleteBot, bootstrap, releaseKickoff, greetingOut, holdKickoffAgain, userWrote, userAnswered,
   })

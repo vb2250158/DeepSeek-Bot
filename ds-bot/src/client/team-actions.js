@@ -79,6 +79,7 @@ export function teamActions({ call, after, partFor, roster, ui, live, cards, hel
     setFlags: (id, flags) => after(call('set-flags', { id, ...flags })),
     saveSection: payload => after(call('section-save', payload)),
     reorderSections: ids => after(call('section-order', { ids })),
+    reorderPins: ids => after(call('pin-order', { ids })),
     deleteSection: id => after(call('section-delete', { id })),
     beginSectionRename: id => ui.set(state => ({ ...state, renameSection: id })),
     endSectionRename: () => ui.set(state => (state.renameSection ? { ...state, renameSection: null } : state)),

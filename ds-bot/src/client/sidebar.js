@@ -54,7 +54,7 @@ const waitingFor = (roster, waits) => {
   return names.length === 0 ? '' : t('Waiting for {names}', { names: names.join(t(' and ')) })
 }
 
-function PinnedChat({ entry: { kind, item }, roster, actions, useSessions, useSessionStatus, useWork, marked }) {
+function PinnedChat({ entry: { kind, item }, roster, actions, useSessions, useSessionStatus, useWork, marked, lifted, drop }) {
   const ids = kind === 'bot' ? [currentPart(item)] : kind === 'agent' ? item.sessions : [item.id]
   const active = useSessions(list => ids.some(id => (list.byId[id]?.retainedBy?.mainView ?? 0) > 0))
   const running = useSessionStatus(map => ids.some(id => map.get(id)?.running === true))
@@ -66,6 +66,7 @@ function PinnedChat({ entry: { kind, item }, roster, actions, useSessions, useSe
     type: 'button', className: 'bt-group-tile', draggable: false,
     [kind === 'bot' ? 'data-bot-id' : kind === 'room' ? 'data-room-id' : 'data-agent-id']: item.id,
     title: item.name, 'aria-label': label, 'aria-current': active ? 'page' : undefined,
+    'data-lifted': lifted || undefined, 'data-pin-drop': drop,
     onClick: () => kind === 'agent' ? actions.openAgent(item.id) : actions.openSession(item.id),
     onContextMenu: event => { event.preventDefault(); actions.openMenu({ kind, id: item.id, x: event.clientX, y: event.clientY }) },
   }, kind === 'bot' ? h(BotAvatar, { bot: item, size: 48, state: botState(running, undefined, approval || roster.questions?.[ids[0]] !== undefined) })
@@ -452,8 +453,9 @@ export function TeamSidebar(props) {
   const pinRef = useRef(null)
   const dragged = useRef(null)
   const suppressClickUntil = useRef(0)
-  const [dragging, setDragging] = useState(false)
+  const [dragSource, setDragSource] = useState(null)
   const [overPins, setOverPins] = useState(false)
+  const [pinDrop, setPinDrop] = useState(null)
   const closing = useRef(false)
   useLayoutEffect(() => { closing.current = false })
   const roster = useRoster(value => value)
@@ -474,7 +476,10 @@ export function TeamSidebar(props) {
       // The Agent sorts by its most recent Session, falling back to when it was added.
       ...(roster.agents ?? []).map(agent => ({ kind: 'agent', item: agent, at: Math.max(0, ...agent.sessions.map(id => stamps[id] ?? 0)) || agent.createdAt })),
     ]
-    return entries.sort((a, b) => Number(Boolean(b.item.pinned)) - Number(Boolean(a.item.pinned)) || (a.item.pinned ? (b.item.pinnedAt ?? 0) - (a.item.pinnedAt ?? 0) || a.item.createdAt - b.item.createdAt : b.at - a.at))
+    // Pinned entries follow the order the user dragged them into; ones never dragged
+    // keep the newest-pin-first rule behind those.
+    const slot = entry => entry.item.pinOrder ?? Number.MAX_SAFE_INTEGER
+    return entries.sort((a, b) => Number(Boolean(b.item.pinned)) - Number(Boolean(a.item.pinned)) || (a.item.pinned ? slot(a) - slot(b) || (b.item.pinnedAt ?? 0) - (a.item.pinnedAt ?? 0) || a.item.createdAt - b.item.createdAt : b.at - a.at))
   }, [roster, updated])
   useReportReady(roster.ready, roster)
   const pins = order.filter(entry => entry.item.pinned && !entry.item.hidden)
@@ -482,13 +487,39 @@ export function TeamSidebar(props) {
     const rect = pinRef.current?.getBoundingClientRect()
     return Boolean(rect && event.clientX >= rect.left && event.clientX <= rect.right && event.clientY >= rect.top && event.clientY <= rect.bottom)
   }
-  const dragEnd = () => { dragged.current = null; setDragging(false); setOverPins(false) }
+  // The tile nearest the pointer, and which half of it: the drop lands before or after.
+  const pinSlotAt = event => {
+    const tiles = [...(pinRef.current?.querySelectorAll('.bt-pinned-grid .bt-group-tile') ?? [])]
+    if (tiles.length === 0) return null
+    let best = 0
+    let nearest = Infinity
+    tiles.forEach((tile, index) => {
+      const rect = tile.getBoundingClientRect()
+      const distance = (event.clientX - (rect.left + rect.width / 2)) ** 2 + (event.clientY - (rect.top + rect.height / 2)) ** 2
+      if (distance < nearest) { nearest = distance; best = index }
+    })
+    const rect = tiles[best].getBoundingClientRect()
+    return { index: best, after: event.clientX > rect.left + rect.width / 2 }
+  }
+  const dropPin = (id, slot) => {
+    const from = pins.findIndex(entry => entry.item.id === id)
+    if (from < 0) return
+    let to = slot.index + (slot.after ? 1 : 0)
+    if (to > from) to -= 1
+    if (to === from || to < 0) return
+    const ids = pins.map(entry => entry.item.id)
+    ids.splice(from, 1)
+    ids.splice(to, 0, id)
+    void Promise.resolve(actions.reorderPins(ids)).catch(error => actions.reportError(error, 'pin'))
+  }
+  const dragEnd = () => { dragged.current = null; setDragSource(null); setOverPins(false); setPinDrop(null) }
   const pointerDown = event => {
     if (event.button !== 0 || roster.readOnly) return
     const row = event.target.closest('[data-bot-id],[data-room-id],[data-agent-id]')
     const id = row?.dataset.botId ?? row?.dataset.roomId ?? row?.dataset.agentId
     if (!id) return
-    dragged.current = { id, pointerId: event.pointerId, x: event.clientX, y: event.clientY, started: false }
+    // A tile in the pinned grid reorders; a row dragged up from the list pins.
+    dragged.current = { id, pointerId: event.pointerId, x: event.clientX, y: event.clientY, started: false, pinned: Boolean(row.closest('.bt-pinned-grid')) }
   }
   const pointerMove = event => {
     const drag = dragged.current
@@ -497,19 +528,25 @@ export function TeamSidebar(props) {
     if (!drag.started) {
       drag.started = true
       event.currentTarget.setPointerCapture(event.pointerId)
-      setDragging(true)
+      setDragSource(drag.pinned ? 'pin' : 'list')
     }
     event.preventDefault()
-    setOverPins(inPins(event))
+    const inside = inPins(event)
+    setOverPins(inside && !drag.pinned)
+    const slot = drag.pinned && inside ? pinSlotAt(event) : null
+    setPinDrop(last => (last && slot && last.index === slot.index && last.after === slot.after ? last : slot))
   }
   const pointerUp = event => {
     const drag = dragged.current
     if (!drag || event.pointerId !== drag.pointerId) return
-    const pin = drag.started && inPins(event)
+    const inside = inPins(event)
+    const slot = drag.started && drag.pinned && inside ? pinSlotAt(event) : null
+    const pin = drag.started && !drag.pinned && inside
     if (drag.started) suppressClickUntil.current = Date.now() + 250
     dragEnd()
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
-    if (pin) void actions.setFlags(drag.id, { pinned: true }).catch(error => actions.reportError(error, 'pin'))
+    if (slot) dropPin(drag.id, slot)
+    else if (pin) void Promise.resolve(actions.setFlags(drag.id, { pinned: true })).catch(error => actions.reportError(error, 'pin'))
   }
   useListGlide(listRef, wide, order.map(entry => entry.item.id).join(','))
   useLandOnMainBot(roster, useSessions, actions)
@@ -553,11 +590,15 @@ export function TeamSidebar(props) {
           h(UpdateButton, { useUpdate: props.useUpdate, actions }),
           h('button', { type: 'button', className: 'bt-round', 'aria-label': t('New…'), title: t('New…'), onClick: () => actions.openNewChat('new') }, h(PlusIcon))),
     h('div', {
-      ref: pinRef, className: 'bt-pinned-area', 'data-dragging': dragging || undefined, 'data-over': overPins || undefined,
+      ref: pinRef, className: 'bt-pinned-area', 'data-dragging': dragSource === 'list' || undefined, 'data-over': overPins || undefined,
       role: 'region', 'aria-label': t('Pinned chats'),
     },
-      pins.length ? h('div', { className: 'bt-group-grid bt-pinned-grid' }, pins.map(entry => h(PinnedChat, { key: entry.item.id, ...rowProps, entry, marked: markedUnread[entry.item.id] === true }))) : null,
-      h('div', { className: 'bt-pin-drop', role: dragging ? 'status' : undefined }, t('Drop here to pin'))),
+      pins.length ? h('div', { className: 'bt-group-grid bt-pinned-grid' }, pins.map((entry, index) => h(PinnedChat, {
+        key: entry.item.id, ...rowProps, entry, marked: markedUnread[entry.item.id] === true,
+        lifted: dragSource === 'pin' && dragged.current?.id === entry.item.id,
+        drop: pinDrop && pinDrop.index === index ? (pinDrop.after ? 'after' : 'before') : undefined,
+      }))) : null,
+      h('div', { className: 'bt-pin-drop', role: dragSource === 'list' ? 'status' : undefined }, t('Drop here to pin'))),
     wide && roster.readOnly ? h('div', { className: 'bt-hint bt-read-only', role: 'status' }, hostText(roster.readOnly)) : null,
     h('div', { ref: listRef, className: 'bt-list', role: 'region', 'aria-label': t('Bot list') },
       roster.ready ? null : h('div', { className: 'bt-hint', role: bootFailed ? 'alert' : 'status' }, bootFailed ? bootHint() : t('Setting up your Bots…')),
@@ -1119,6 +1160,12 @@ export const SIDEBAR_CSS = `
 .bt-pinned-area[data-dragging]{min-height:64px;background:var(--bt-hover);outline:1px dashed var(--bt-line-2)}
 .bt-pinned-area[data-over]{outline:2px solid var(--bt-accent);background:var(--bt-hover)}
 .bt-pin-drop{display:none;padding:18px 8px;text-align:center;font-size:13px;color:var(--bt-ink-2)}
+/* Dragging a pin lifts it out of the grid and marks the slot it would take. */
+.bt-pinned-grid .bt-group-tile[data-lifted]{opacity:.35}
+.bt-pinned-grid .bt-group-tile[data-pin-drop=before]{box-shadow:inset 2px 0 0 0 var(--bt-accent)}
+.bt-pinned-grid .bt-group-tile[data-pin-drop=after]{box-shadow:inset -2px 0 0 0 var(--bt-accent)}
+.bt-rail .bt-pinned-grid .bt-group-tile[data-pin-drop=before]{box-shadow:inset 0 2px 0 0 var(--bt-accent)}
+.bt-rail .bt-pinned-grid .bt-group-tile[data-pin-drop=after]{box-shadow:inset 0 -2px 0 0 var(--bt-accent)}
 .bt-pinned-area[data-dragging] .bt-pin-drop{display:block}
 .bt-pinned-grid{margin:0!important;max-height:36vh;overflow-y:auto}
 .bt-pinned-grid .bt-group-tile{position:relative}

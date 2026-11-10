@@ -434,6 +434,10 @@ export function install(rt) {
           await rt.load()
           await rt.reorderSections(body.ids)
           return ok(view())
+        case 'pin-order':
+          await rt.load()
+          await rt.reorderPins(body.ids)
+          return ok(view())
         case 'section-delete':
           await rt.load()
           await rt.deleteSection(body.id)
