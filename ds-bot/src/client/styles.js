@@ -218,10 +218,14 @@ button.bt-lead{border:0;background:none;padding:0;cursor:pointer}
 /* Rows without the avatar start where the bubble beside it starts: 22px avatar + 8px gap. */
 .bt-astack[data-lead]>.bt-msg:not(:last-child)>.bt-msg-line,.bt-astack[data-lead] .bt-reacts{margin-left:30px}
 .bt-group-name{font-size:12px;line-height:16px;font-weight:500;margin-left:42px}
-.bt-group-name:has(>.bt-lead){display:flex;align-items:flex-start;gap:10px;margin:0 0 4px;font-size:12px;line-height:18px;font-weight:500;color:var(--bt-ink-2)}
+.bt-group-name:has(>.bt-lead){display:flex;align-items:center;gap:8px;margin:0 0 2px;font-size:13px;line-height:22px;font-weight:600;color:var(--bt-ink)}
 .bt-group-name>.bt-lead{margin:0}
-/* QQ-style column: avatar on the left, name and bubbles aligned beside it. */
-.bt-group-name:has(>.bt-lead)~.bt-astack{margin-left:46px}
+/* QQ-style speaker head, as Rabi's qq-message-row/qq-sender/qq-bubble-line: the name
+   is a single 18px line, the avatar hangs beside it instead of stretching the row to
+   36px, and the bubbles start one 4px margin under the name in the same 46px column. */
+.bt-group-name.bt-speaker{position:relative;display:block;min-height:18px;padding-left:46px;margin:0 0 4px;font-size:12px;line-height:18px;font-weight:500;color:var(--bt-ink-2)}
+.bt-group-name.bt-speaker>.bt-lead{position:absolute;left:0;top:0;margin:0}
+.bt-group-name.bt-speaker~.bt-astack{margin-left:46px}
 .bt-group-time,.bt-group-took{margin-left:6px;font-size:11px;line-height:16px;font-weight:400;color:var(--bt-ink-2);font-variant-numeric:tabular-nums;white-space:nowrap}
 .bt-x{border:0;background:none;color:var(--bt-ink-2);cursor:pointer;width:24px;height:24px;border-radius:6px;font-size:16px;line-height:24px;padding:0;transition:background-color .12s ease,color .12s ease,${spring(SPRING_TAP, 'scale')}}
 .bt-x:hover{background:var(--bt-hover);color:var(--bt-ink)}

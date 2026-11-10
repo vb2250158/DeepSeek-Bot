@@ -339,7 +339,7 @@ function EventLine({ prefix, bots, joiner = t('and'), onOpen, whole = false }) {
 // with the bubbles below aligned to the same column. No per-message clock here
 // or under the bubbles — time lives in the shared separators and the list row.
 function SpeakerHead({ bot }) {
-  return h('div', { className: 'bt-group-name' },
+  return h('div', { className: 'bt-group-name bt-speaker' },
     h('span', { className: 'bt-lead' }, h(BotMark, { bot, size: 36 })), bot.name)
 }
 

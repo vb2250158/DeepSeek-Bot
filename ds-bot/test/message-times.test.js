@@ -93,8 +93,9 @@ test('a Bot reply in its own chat shows no per-message clock', () => {
   const tree = bubbles(AssistantCell(assistantProps()))
   assert.equal(times(tree).length, 0)
   assert.equal(find(tree, node => node.props?.className === 'bt-group-time').length, 0)
-  // The QQ-style head still carries the avatar and the speaker name.
-  const head = find(tree, node => node.props?.className === 'bt-group-name')[0]
+  // The QQ-style head still carries the avatar and the speaker name; the speaker
+  // class is what makes it one 18px name line instead of the avatar's 36px row.
+  const head = find(tree, node => node.props?.className === 'bt-group-name bt-speaker')[0]
   assert.ok(head)
   assert.equal(find(head, node => node.props?.className === 'bt-lead').length, 1)
   assert.match(String(head.children[1] ?? ''), /Writer/)
@@ -106,6 +107,7 @@ test('an ordinary DSH Session keeps its own message clock and gets no speaker he
   const tree = bubbles(AssistantCell(props))
   assert.equal(times(tree).length, 1)
   assert.equal(find(tree, node => node.props?.className === 'bt-group-name').length, 0)
+  assert.equal(find(tree, node => node.props?.className === 'bt-group-name bt-speaker').length, 0)
   assert.equal(find(tree, node => node.props?.className === 'bt-lead').length, 0)
 })
 
