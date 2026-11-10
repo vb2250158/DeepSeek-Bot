@@ -1104,7 +1104,16 @@ export function apply(ctx) {
     sync()
     return off
   }, 'ds-bot: panel navigation')
-  ctx.effect(() => publishUserHead({ actions, roster }), 'ds-bot: user row head')
+  // The byline answers only while DS Bot's own chat column is on screen. A Bot Session
+  // opened from the shell's list renders in the shell's chat instead, so its row keeps
+  // exactly what the shell draws. Checked in the DOM because the surface flag can lag
+  // behind a panel switch, and because a hidden workbench still sits in the tree.
+  const headActive = () => {
+    if (typeof document === 'undefined') return false
+    const column = document.querySelector('.bt-chat-column')
+    return column !== null && column.getClientRects().length > 0
+  }
+  ctx.effect(() => publishUserHead({ actions, roster, isActive: headActive }), 'ds-bot: user row head')
   ctx.effect(() => installCompiledStyles(COMPUTER_CSS, 'computer'), 'ds-bot: computer styles')
 
   // The main view decides `plain`: a DSH Agent Session keeps the Bot shell but

@@ -35,8 +35,12 @@ export function UserHead({ actions }) {
  * @param options - DS Bot's actions and roster source.
  * @returns disposer that withdraws the contract.
  */
-export function publishUserHead({ actions, roster }) {
+export function publishUserHead({ actions, roster, isActive }) {
   const head = (sessionId) => {
+    // A Bot's own Session is also a plain DSH Session: the shell lists it and can open
+    // it outside the Bot panel. The byline belongs to DS Bot's surface only, so a view
+    // that is not hosting it keeps exactly what the shell draws.
+    if (typeof isActive === 'function' && !isActive()) return null
     const snapshot = roster.getSnapshot()
     if (snapshot.roomsById?.[sessionId] === undefined && snapshot.byId?.[sessionId] === undefined) return null
     return h(UserHead, { actions })

@@ -19641,8 +19641,9 @@ function UserHead({ actions }) {
     )
   );
 }
-function publishUserHead({ actions, roster }) {
+function publishUserHead({ actions, roster, isActive }) {
   const head = (sessionId) => {
+    if (typeof isActive === "function" && !isActive()) return null;
     const snapshot = roster.getSnapshot();
     if (snapshot.roomsById?.[sessionId] === void 0 && snapshot.byId?.[sessionId] === void 0) return null;
     return (0, import_react48.createElement)(UserHead, { actions });
@@ -30757,7 +30758,12 @@ function apply(ctx) {
     sync();
     return off;
   }, "ds-bot: panel navigation");
-  ctx.effect(() => publishUserHead({ actions, roster }), "ds-bot: user row head");
+  const headActive = () => {
+    if (typeof document === "undefined") return false;
+    const column = document.querySelector(".bt-chat-column");
+    return column !== null && column.getClientRects().length > 0;
+  };
+  ctx.effect(() => publishUserHead({ actions, roster, isActive: headActive }), "ds-bot: user row head");
   ctx.effect(() => installCompiledStyles(COMPUTER_CSS, "computer"), "ds-bot: computer styles");
   ctx.effect(() => {
     let previous;
