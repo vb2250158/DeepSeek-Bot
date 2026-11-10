@@ -147,8 +147,10 @@ export const USER_MESSAGE_CSS = `
    hanging beside it, and the bubbles inset by that picture column so nothing runs under
    it. The inset goes on whichever row carries the head — DS Bot's own, or the shell's
    user row that the conversation.chat.user.before slot decorates. */
-:has(>.bt-uhead){position:relative;padding-right:46px}
-.bt-uhead{display:flex;justify-content:flex-end;align-items:flex-start;max-width:100%;min-height:18px;margin:0 0 -2px;font-size:12px;line-height:18px;color:var(--bt-ink-2)}
+/* DS Bot's own row, and the renderer row that carries the head: the picture keeps its
+   column on the right, and the row never grows past the chat column. */
+.bt-urow-me,[data-rabi-message]:has(>.bt-uhead){position:relative;width:100%;max-width:100%;box-sizing:border-box;padding-right:46px}
+.bt-uhead{display:flex;justify-content:flex-end;align-items:flex-start;max-width:100%;min-height:18px;margin:0;font-size:12px;line-height:18px;color:var(--bt-ink-2)}
 .bt-uname{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bt-uavatar{position:absolute;right:0;top:0;display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:50%;overflow:hidden;background:var(--bt-hover);color:var(--bt-ink-2);flex:none}
 .bt-uavatar>img{width:100%;height:100%;object-fit:cover;display:block}
