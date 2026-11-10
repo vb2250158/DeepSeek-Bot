@@ -2,7 +2,7 @@ import { installSettingsShell, SETTINGS_SHELL_CSS } from './settings-shell.js'
 import { call } from './api.js'
 import { isHex, inkText, paintCss } from './inks.js'
 import { DEFAULT_MASK, SHAPES, markupCache, maskOf } from './characters.js'
-import { createSource, EMPTY_ROSTER, indexRoster, isAgentSession } from './sources.js'
+import { createSource, EMPTY_ROSTER, indexRoster, isAgentSession, botSurfaceTarget } from './sources.js'
 import { teamActions } from './team-actions.js'
 import { themeCss, shellTokens, registry, registerShape, registerTheme, allThemes, layoutOf, widthOf, flatWidthOf } from './themes.js'
 import { MENTION_ORIGIN, currentPart } from './text.js'
@@ -433,6 +433,15 @@ export function apply(ctx) {
     for (const [id, owner] of pendingAdopt) if (owner === agentId && !ids.includes(id)) ids.push(id)
     return ids
   }
+  // The Bot chat this browser showed last, so entering the Bot surface returns to it
+  // instead of to whatever Session the shell happened to restore.
+  const LAST_BOT_KEY = 'ds-bot:last-bot'
+  const readLastBot = () => {
+    try { return window.localStorage.getItem(LAST_BOT_KEY) || undefined } catch { return undefined }
+  }
+  const rememberBot = (id) => {
+    try { if (typeof id === 'string' && id !== '') window.localStorage.setItem(LAST_BOT_KEY, id) } catch { /* storage may be unavailable */ }
+  }
   const actions = {
     ...teamActions({ call, after, partFor, roster, ui, live, cards, heldCards, turnClock }),
     learningAnswer: (id, approve) => after(call('learning-answer', { id, approve })),
@@ -442,6 +451,8 @@ export function apply(ctx) {
     openSession: (id) => {
       // A DSH Agent Session id lands on the plain surface, not the Bot skin.
       if (isAgentSessionId(id)) return actions.openAgentSession(id)
+      const opened = roster.getSnapshot().byId[id]
+      if (opened !== undefined) rememberBot(opened.id)
       ui.set(state => (state.newChat || state.exchange || state.menu || state.palette ? { ...state, newChat: null, exchange: null, menu: null, palette: null } : state))
       setPlain(false)
       const target = partFor(id)
@@ -512,8 +523,21 @@ export function apply(ctx) {
       const bot = last ? roster.getSnapshot().byId[last.botId] : undefined
       setPlain(false)
       const target = bot && currentPart(bot) !== last.sessionId ? currentPart(bot) : partFor(id)
+      const landed = roster.getSnapshot().byId[target]
+      if (landed !== undefined) rememberBot(landed.id)
       expected = target
       return navigateTo(target)
+    },
+    // Entering the Bot surface must show a Bot conversation: the one this browser showed
+    // last, else the Main Bot. The shell restores whatever Session was open — often an
+    // archived one whose page is empty — and selects nothing anywhere.
+    landOnBot: () => {
+      const snapshot = roster.getSnapshot()
+      if (!snapshot.ready) return
+      const list = ctx.sessions.list.getSnapshot()
+      const main = Object.values(list.byId ?? {}).find(session => (session?.retainedBy?.mainView ?? 0) > 0)?.id
+      const decision = botSurfaceTarget(snapshot, main, readLastBot())
+      if (decision.open !== undefined) actions.openSession(decision.open)
     },
     selectPanel: (id) => { ctx.layout.selectPanel(id) },
     toggleSidebar: () => { ctx.layout.toggleSidebar() },
@@ -1069,6 +1093,9 @@ export function apply(ctx) {
     const sync = () => {
       const mode = ctx.layout.panelInfo.getSnapshot().activePanelId === BOT_PANEL ? 'bot' : 'agent'
       actions.setSurface(mode)
+      // The shell's own Session may stay open under the panel; the surface lands on a
+      // Bot conversation rather than on its empty page, and lets the sidebar follow.
+      if (mode === 'bot') actions.landOnBot()
     }
     if (surface.getSnapshot().mode === 'bot') ctx.layout.selectPanel(BOT_PANEL)
     const off = ctx.layout.panelInfo.subscribe(sync)

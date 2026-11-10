@@ -202,6 +202,12 @@ function createSource(initial) {
 }
 var EMPTY_ROSTER = { revision: -1, mainBotId: null, mainBotIds: [], bots: [], rooms: [], agents: [], sections: [], exchangeTurns: {}, questions: {}, btwCards: {}, sideChats: {}, learning: {}, secrets: [], capabilities: [], capabilityStatuses: {}, secretRequests: {}, models: [], defaultModel: null, modelsKey: null, prefs: {}, byId: {}, roomsById: {}, agentsById: {}, agentOf: {}, ready: false };
 var isMainOf = (roster, id) => id !== void 0 && (roster.mainBotIds ?? []).includes(id);
+function botSurfaceTarget(roster, mainSessionId, remembered) {
+  if (mainSessionId !== void 0 && (roster.byId[mainSessionId] !== void 0 || roster.roomsById[mainSessionId] !== void 0)) return {};
+  const rememberedBot = remembered === void 0 ? void 0 : roster.byId[remembered];
+  const target = rememberedBot?.id ?? roster.mainBotId;
+  return typeof target === "string" && target !== "" ? { open: target } : {};
+}
 function indexRoster(value) {
   const byId = {};
   for (const bot of value.bots) {
@@ -29969,6 +29975,20 @@ function apply(ctx) {
     for (const [id, owner] of pendingAdopt) if (owner === agentId && !ids.includes(id)) ids.push(id);
     return ids;
   };
+  const LAST_BOT_KEY = "ds-bot:last-bot";
+  const readLastBot = () => {
+    try {
+      return window.localStorage.getItem(LAST_BOT_KEY) || void 0;
+    } catch {
+      return void 0;
+    }
+  };
+  const rememberBot = (id) => {
+    try {
+      if (typeof id === "string" && id !== "") window.localStorage.setItem(LAST_BOT_KEY, id);
+    } catch {
+    }
+  };
   const actions = {
     ...teamActions({ call, after, partFor, roster, ui: ui2, live, cards, heldCards, turnClock }),
     learningAnswer: (id, approve) => after(call("learning-answer", { id, approve })),
@@ -29977,6 +29997,8 @@ function apply(ctx) {
     isAgentSession: (id) => isAgentSessionId(id),
     openSession: (id) => {
       if (isAgentSessionId(id)) return actions.openAgentSession(id);
+      const opened = roster.getSnapshot().byId[id];
+      if (opened !== void 0) rememberBot(opened.id);
       ui2.set((state) => state.newChat || state.exchange || state.menu || state.palette ? { ...state, newChat: null, exchange: null, menu: null, palette: null } : state);
       setPlain(false);
       const target = partFor(id);
@@ -30047,8 +30069,21 @@ function apply(ctx) {
       const bot = last ? roster.getSnapshot().byId[last.botId] : void 0;
       setPlain(false);
       const target = bot && currentPart(bot) !== last.sessionId ? currentPart(bot) : partFor(id);
+      const landed = roster.getSnapshot().byId[target];
+      if (landed !== void 0) rememberBot(landed.id);
       expected2 = target;
       return navigateTo(target);
+    },
+    // Entering the Bot surface must show a Bot conversation: the one this browser showed
+    // last, else the Main Bot. The shell restores whatever Session was open — often an
+    // archived one whose page is empty — and selects nothing anywhere.
+    landOnBot: () => {
+      const snapshot = roster.getSnapshot();
+      if (!snapshot.ready) return;
+      const list = ctx.sessions.list.getSnapshot();
+      const main = Object.values(list.byId ?? {}).find((session) => (session?.retainedBy?.mainView ?? 0) > 0)?.id;
+      const decision = botSurfaceTarget(snapshot, main, readLastBot());
+      if (decision.open !== void 0) actions.openSession(decision.open);
     },
     selectPanel: (id) => {
       ctx.layout.selectPanel(id);
@@ -30590,6 +30625,7 @@ function apply(ctx) {
     const sync = () => {
       const mode = ctx.layout.panelInfo.getSnapshot().activePanelId === BOT_PANEL ? "bot" : "agent";
       actions.setSurface(mode);
+      if (mode === "bot") actions.landOnBot();
     };
     if (surface.getSnapshot().mode === "bot") ctx.layout.selectPanel(BOT_PANEL);
     const off = ctx.layout.panelInfo.subscribe(sync);

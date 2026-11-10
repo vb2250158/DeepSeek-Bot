@@ -20,6 +20,18 @@ export const EMPTY_ROSTER = { revision: -1, mainBotId: null, mainBotIds: [], bot
 // Any Main Bot holds the Main Bot powers; `mainBotId`, the first one, is the sidebar tile.
 export const isMainOf = (roster, id) => id !== undefined && (roster.mainBotIds ?? []).includes(id)
 
+// What the Bot surface shows when it takes the main view: a Bot or group chat already
+// there stays, and anything else — an archived Session, a DSH Agent Session, or nothing —
+// gives way to the Bot this browser showed last, then to the Main Bot. Without this the
+// panel opens on whatever the shell restored, which for an archived Session is a blank
+// page with no Bot selected anywhere.
+export function botSurfaceTarget(roster, mainSessionId, remembered) {
+  if (mainSessionId !== undefined && (roster.byId[mainSessionId] !== undefined || roster.roomsById[mainSessionId] !== undefined)) return {}
+  const rememberedBot = remembered === undefined ? undefined : roster.byId[remembered]
+  const target = rememberedBot?.id ?? roster.mainBotId
+  return typeof target === 'string' && target !== '' ? { open: target } : {}
+}
+
 // A Bot's chat is a chain of Sessions ("parts"): the Bot id is its first part's id
 // and `sessionId` its current one. Every part id finds the Bot; Session state
 // (running, unread, turns) is read from the current part, team state from the Bot id.
