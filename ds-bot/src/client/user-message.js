@@ -143,4 +143,14 @@ export const USER_MESSAGE_CSS = `
 .bt-uvia{display:inline-block;margin-right:6px;padding:0 6px;border-radius:6px;background:var(--bt-hover);color:var(--bt-ink-3);font-size:11px;line-height:16px;vertical-align:1px}
 .bt-utools{display:flex;flex:none;gap:2px;opacity:0;visibility:hidden;transition:opacity .12s ease,visibility .12s}
 .bt-umsg:hover .bt-utools,.bt-umsg:focus-within .bt-utools{opacity:1;visibility:visible}
+/* The user's own head mirrors the Bot's: the name on one 18px line, the 36px picture
+   hanging beside it, and the bubbles inset by that picture column so nothing runs under
+   it. The inset goes on whichever row carries the head — DS Bot's own, or the shell's
+   user row that the conversation.chat.user.before slot decorates. */
+:has(>.bt-uhead){position:relative;padding-right:46px}
+.bt-uhead{display:flex;justify-content:flex-end;align-items:flex-start;max-width:100%;min-height:18px;margin:0 0 -2px;font-size:12px;line-height:18px;color:var(--bt-ink-2)}
+.bt-uname{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bt-uavatar{position:absolute;right:0;top:0;display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:50%;overflow:hidden;background:var(--bt-hover);color:var(--bt-ink-2);flex:none}
+.bt-uavatar>img{width:100%;height:100%;object-fit:cover;display:block}
+.bt-uavatar>.bt-dsh-mark{width:22px;height:22px}
 `

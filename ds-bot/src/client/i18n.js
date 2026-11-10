@@ -5,6 +5,7 @@
 export const NAMESPACE = 'ds-bot'
 
 const ZH = {
+  'User': '用户',
   'Group folder': '群资料文件夹',
   'Back to library': '返回资料库',
   'File name': '文件名',
