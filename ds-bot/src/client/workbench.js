@@ -75,7 +75,7 @@ export const WORKBENCH_CSS = `
 .bt-team-column .bt-row{min-height:58px}
 .bt-team-footer{display:flex;align-items:center;gap:8px;padding:8px 12px 12px}
 .bt-team-footer .bt-account{width:100%}
-.bt-chat-column{display:flex;flex:1;flex-direction:column;position:relative;min-width:320px;min-height:0;background:var(--bt-main)}
+.bt-chat-column{display:flex;flex:1;flex-direction:column;position:relative;min-width:320px;min-height:0;overflow:hidden;background:var(--bt-main)}
 .bt-chat-column>.bt-island{flex:none;align-self:stretch;width:auto;margin:8px 16px 0;max-height:45%;overflow:auto;background:var(--bt-card);border-color:var(--bt-line);box-shadow:none}
 .bt-chat-column [class*="_composerSeat"]{margin-top:auto}
 .bt-chat-column [data-conversation-scroll]{padding-top:32px!important}
