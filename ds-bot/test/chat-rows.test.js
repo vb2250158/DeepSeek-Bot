@@ -107,12 +107,14 @@ test('a settled reasoning row shows the turn’s thinking time when known', () =
 })
 
 test('consecutive group messages from the same Bot chain together, and cards or user rows break the chain', () => {
-  const node = (classes, botId, turn = {}) => ({
+  // A flow row is a real element here: the seam pass reads `data-chat-flow-kind`
+  // through getAttribute and looks for the speaker head by selector.
+  const node = (classes, botId, turn = {}, attrs = {}, children = {}) => ({
     dataset: botId ? { botId } : {},
     classList: { contains: name => classes.includes(name) },
     closest: sel => (sel === '[data-chat-group-key]' ? turn : null),
-    getAttribute: () => null,
-    querySelector: () => null,
+    getAttribute: name => attrs[name] ?? null,
+    querySelector: sel => children[sel] ?? null,
   })
   const t1 = { dataset: {} }, t2 = { dataset: {} }, t3 = { dataset: {} }, t4 = { dataset: {} }
   const m1 = node(['bt-group-msg'], 'a', t1)
@@ -131,6 +133,26 @@ test('consecutive group messages from the same Bot chain together, and cards or 
   assert.equal(m3.dataset.chainPrev, undefined)
   assert.equal(m3.dataset.chainNext, undefined)
   assert.equal(m4.dataset.chainPrev, undefined)
+})
+
+test('head-less replies from one Bot meet at a seam, and the head opens a new one', () => {
+  const step = (headless) => ({
+    dataset: {},
+    classList: { contains: () => false },
+    closest: () => null,
+    getAttribute: name => (name === 'data-chat-flow-kind' ? 'assistant-step' : null),
+    querySelector: sel => (sel === '.bt-group-name' && !headless ? { head: true } : null),
+  })
+  const opening = step(false)
+  const second = step(true)
+  const third = step(true)
+  syncGroupChains({ querySelectorAll: () => [opening, second, third] })
+  assert.equal(opening.dataset.seamPrev, undefined)
+  assert.equal(opening.dataset.seamNext, '')
+  assert.equal(second.dataset.seamPrev, '')
+  assert.equal(second.dataset.seamNext, '')
+  assert.equal(third.dataset.seamPrev, '')
+  assert.equal(third.dataset.seamNext, undefined)
 })
 
 test('native and pending steering rows break assistant bubble seams', () => {

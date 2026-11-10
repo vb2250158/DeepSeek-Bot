@@ -17,7 +17,7 @@ const { JSDOM } = requireHarness('jsdom')
 // motion.js; they run in each test's jsdom document through the vm context.
 const { outputFiles } = await build({
   stdin: {
-    contents: "export { installStyles, installCompiledStyles } from './src/client/styles.js'",
+    contents: "export { installStyles, installCompiledStyles, CONVERSATION_CSS } from './src/client/styles.js'",
     resolveDir: PLUGIN,
   },
   bundle: true, format: 'cjs', platform: 'browser', write: false, logLevel: 'silent',
@@ -191,4 +191,21 @@ test('the tools toolbar keeps its own stacking context for the hover bridge', ()
 test('the flat toolbar does not cover reactions below the message', () => {
   const css = readFileSync(new URL('../src/client/styles.js', import.meta.url), 'utf8')
   assert.match(css, /body\[data-bt-layout=flat\] \.bt-msg:has\(>\.bt-reacts\) \.bt-tools\{bottom:0\}/)
+})
+
+
+test('Bot tail controls hide inside its chat column while ordinary Session controls remain visible', () => {
+  const { window, module } = bench([])
+  try {
+    window.document.body.innerHTML = '<section id="ordinary"><div data-turn-tail><button>Copy</button><span data-slot="conversation.chat.turnTail">File</span></div></section><section id="bot" class="bt-chat-column"><div data-turn-tail><button>Copy</button><span data-slot="conversation.chat.turnTail">File</span></div></section>'
+    const css = module.exports.CONVERSATION_CSS.replace(/\/\*[\s\S]*?\*\//g, '')
+    const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+    const hideTail = rules.find(([, selector, declarations]) => selector.includes('[data-turn-tail]>') && declarations.includes('display:none!important'))
+    assert.ok(hideTail, 'The Bot tail rule must still hide its shell action buttons')
+    const hidden = [...window.document.querySelectorAll(hideTail[1].trim())]
+    assert.deepEqual(hidden.map(node => node.closest('section').id), ['bot'])
+    assert.equal(hidden[0].tagName, 'BUTTON')
+    assert.equal(window.document.querySelector('#ordinary button').textContent, 'Copy')
+    assert.ok(!hidden.includes(window.document.querySelector('#bot [data-slot]')), 'Plugin tail content stays visible')
+  } finally { window.close() }
 })

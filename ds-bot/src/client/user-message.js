@@ -147,9 +147,11 @@ export const USER_MESSAGE_CSS = `
    hanging beside it, and the bubbles inset by that picture column so nothing runs under
    it. The inset goes on whichever row carries the head — DS Bot's own, or the shell's
    user row that the conversation.chat.user.before slot decorates. */
-/* DS Bot's own row, and the renderer row that carries the head: the picture keeps its
-   column on the right, and the row never grows past the chat column. */
-.bt-urow-me,[data-rabi-message]:has(>.bt-uhead){position:relative;width:100%;max-width:100%;box-sizing:border-box;padding-right:46px}
+.bt-urow-me,[data-rabi-message]:has(>.bt-uhead){position:relative;width:100%;max-width:100%;box-sizing:border-box;padding-right:var(--bt-avatar-col,46px)}
+/* A row another renderer draws takes the same width step as the Bot's own bubbles:
+   the --bt-msg-w share of the row, and never the full width. Without it a long message
+   ran on to the far end of the chat while every Bot bubble stopped well short of it. */
+[data-rabi-message]:has(>.bt-uhead)>div{max-width:min(calc(var(--bt-msg-w,.8) * 100%),calc(100% - 82px))!important}
 /* Whatever the renderer puts inside a user row, it cannot leave the chat column:
    a long message used to widen the row and slide under the detail panel. */
 [data-rabi-message]{max-width:100%;min-width:0;box-sizing:border-box}

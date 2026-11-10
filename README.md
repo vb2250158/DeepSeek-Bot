@@ -42,9 +42,11 @@ Local agents settings read the request data directly. A failed settings page sta
 
 ## Tested host and environment
 
+Release `0.3.2-rabi.22` confines Bot layout overrides to its own chat column so ordinary Sessions retain their controls. Rabi user messages use the same avatar-column spacing and bounded bubble width as Bot messages. The published fixture corrections and upstream sponsor documentation are included.
+
 Version 0.3.2-rabi.1 adds sidebar sections, one settings dialog for Bot and Harness pages, explicit Bot run modes, current local-agent protocol fixes, IM connection recovery, and memory entry IDs, pins, limits, recall, moves and reversible tidying. Existing team data gains optional sections and closed-view records; saved local CLI routes migrate to the `local-` prefix, preserving native OpenCode provider routes. Memory metadata is extended in place and group logs remain readable. Rabi-bound personas continue using Rabi memory and skills exclusively. The Bot workbench, independent pinned chats, reply avatars and last-reply times stay in place.
 
-This maintenance fork tests Windows x64, Node.js `24.15.0`, npm `11.12.1` and pnpm `11.28.5`, running Web from public Core source `vb2250158/deepseek-harness@955ba060b3bfa9908cb3ea4da63ff580f51beb72` (`0.2.2-rc.1`). The CI runner is `windows-2025`. Earlier-host and cross-platform compatibility matrices are outside this target.
+This maintenance fork tests Windows x64, Node.js `24.15.0`, npm `11.12.1` and pnpm `11.28.5`, running Web from public Core source `vb2250158/deepseek-harness@54931fbd25050ef036e44b1daec931da2bfe7b39` (`0.2.2-rc.1`). The CI runner is `windows-2025`. Earlier-host and cross-platform compatibility matrices are outside this target.
 
 Windows local-agent discovery and the Codex, Claude and ACP drivers resolve npm `.cmd` shims to their Node entry point and run without a shell or console window. Paths with spaces and array arguments are preserved; cancellation and timeouts target the CLI process itself. Arbitrary `.cmd`/`.bat` scripts are rejected with `UNSUPPORTED_AGENT_WRAPPER`: select the executable or a Node npm entry point instead. No local-agent account is signed in automatically.
 

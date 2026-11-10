@@ -42,9 +42,11 @@ Still stuck? [Report an install problem](https://github.com/Fei2411/DS-Bot/issue
 
 ## 受测宿主与环境
 
+`0.3.2-rabi.22` 将 Bot 布局覆盖限定在自己的聊天栏，普通会话保留原有控件；Rabi 来源的用户消息沿用头像列间距，并按聊天栏限制气泡宽度。本版同时合入已发布的测试夹具修复和上游赞助说明。
+
 0.3.2-rabi.1 新增侧栏分组、统一 Bot 与 Harness 设置、明确的 Bot 运行方式、本地 Agent 协议修正、IM 连接恢复，以及记忆条目编号、置顶、容量、召回、移动和可撤销整理。现有团队数据增加可选分组和已关闭视图记录；已保存的本地 CLI 路由迁移到 `local-` 前缀，保留原生 OpenCode 服务商路由。记忆元数据在原文件中扩展，原群聊日志继续可读。Rabi 绑定人格的记忆和技能仍由 Rabi 独占管理，保留 Bot 工作台、独立置顶、回复头像和最后回复时间。
 
-本维护 fork 的单一受测目标为 Windows x64、Node.js `24.15.0`、npm `11.12.1`、pnpm `11.28.5`，使用公开 Core 源码 `vb2250158/deepseek-harness@955ba060b3bfa9908cb3ea4da63ff580f51beb72`（`0.2.2-rc.1`）运行 Web。CI runner 为 `windows-2025`。不运行旧宿主或跨平台兼容矩阵。
+本维护 fork 的单一受测目标为 Windows x64、Node.js `24.15.0`、npm `11.12.1`、pnpm `11.28.5`，使用公开 Core 源码 `vb2250158/deepseek-harness@54931fbd25050ef036e44b1daec931da2bfe7b39`（`0.2.2-rc.1`）运行 Web。CI runner 为 `windows-2025`。不运行旧宿主或跨平台兼容矩阵。
 
 Windows 本地 Agent 发现及 Codex、Claude、ACP 驱动会把 npm `.cmd` 启动器解析为 Node 入口，不经过 shell，也不弹出控制台窗口。含空格的路径和数组参数保持原样；取消和超时直接作用于 CLI 进程。任意 `.cmd`/`.bat` 脚本会以 `UNSUPPORTED_AGENT_WRAPPER` 明确拒绝，请选择可执行文件或 Node npm 入口。不会自动登录本地 Agent 账号。
 
