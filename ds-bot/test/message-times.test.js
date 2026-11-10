@@ -89,17 +89,21 @@ const assistantProps = (data = {}, rosterPrefs) => ({
 })
 const bubbles = node => expand(node, ['Bubbles', 'Bubble', 'SpeakerHead'])
 
-test('a Bot reply in its own chat shows when it went out under the bubbles', () => {
-  const [when] = times(bubbles(AssistantCell(assistantProps())))
-  assert.equal(when.props.className, 'bt-utime')
-  assert.equal(typeof when.props.title, 'string')
-  assert.equal(typeof when.children[0], 'string')
+test('a Bot reply in its own chat shows no per-message clock', () => {
+  const tree = bubbles(AssistantCell(assistantProps()))
+  assert.equal(times(tree).length, 0)
+  assert.equal(find(tree, node => node.props?.className === 'bt-group-time').length, 0)
+  // The QQ-style head still carries the avatar and the speaker name.
+  const head = find(tree, node => node.props?.className === 'bt-group-name')[0]
+  assert.ok(head)
+  assert.equal(find(head, node => node.props?.className === 'bt-lead').length, 1)
+  assert.match(String(head.children[1] ?? ''), /Writer/)
 })
 
-test('a reply without a real time, and the flat layout whose head already shows one, draw no extra time', () => {
+test('a reply without a real time, and the flat layout, also draw no clock', () => {
   assert.equal(times(bubbles(AssistantCell(assistantProps({ time: undefined })))).length, 0)
   const flat = bubbles(AssistantCell(assistantProps({}, { layout: 'flat' })))
-  // The speaker head keeps the turn's one time; nothing repeats it under the bubbles.
-  assert.equal(find(flat, node => node.props?.className === 'bt-group-time').length, 1)
+  assert.equal(find(flat, node => node.props?.className === 'bt-group-time').length, 0)
   assert.equal(times(flat).length, 0)
+  assert.equal(find(flat, node => node.props?.className === 'bt-lead').length, 1)
 })

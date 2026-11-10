@@ -121,7 +121,7 @@ function lookOf(bot) {
   const avatar = bot?.avatar ?? {};
   return {
     shape: hasShape(avatar.shape) ? avatar.shape : bot?.id ? defaultShape(String(bot.id)) : FALLBACK_SHAPE,
-    image: bot?.rabiPersona && bot.rabiPersona.enabled !== false ? `api/ds-bot-rabi-avatar?botId=${encodeURIComponent(bot.id)}` : avatar.image,
+    image: bot?.rabiPersona && bot.rabiPersona.enabled !== false && bot.rabiPersona.roleId ? `api/ds-bot-rabi-avatar?roleId=${encodeURIComponent(bot.rabiPersona.roleId)}` : avatar.image,
     color: colorOf(bot)
   };
 }
@@ -2623,6 +2623,16 @@ function BotMark({ bot, look: given, size = 36, state = "idle", live = false, ga
   const [poked, setPoked] = (0, import_react3.useState)(false);
   const [broken, setBroken] = (0, import_react3.useState)("");
   const image = look.image && look.image !== broken ? look.image : void 0;
+  (0, import_react3.useEffect)(() => {
+    if (!image || !ref.current) return void 0;
+    const node = ref.current.querySelector("img");
+    if (node && node.complete && node.naturalWidth > 0) return void 0;
+    const timer = setTimeout(() => {
+      const img = ref.current?.querySelector("img");
+      if (img && !(img.complete && img.naturalWidth > 0)) setBroken(image);
+    }, 3e3);
+    return () => clearTimeout(timer);
+  }, [image]);
   useGaze(ref, gaze);
   const common = {
     ref,
@@ -17863,8 +17873,10 @@ button.bt-lead{border:0;background:none;padding:0;cursor:pointer}
 /* Rows without the avatar start where the bubble beside it starts: 22px avatar + 8px gap. */
 .bt-astack[data-lead]>.bt-msg:not(:last-child)>.bt-msg-line,.bt-astack[data-lead] .bt-reacts{margin-left:30px}
 .bt-group-name{font-size:12px;line-height:16px;font-weight:500;margin-left:42px}
-.bt-group-name:has(>.bt-lead){display:flex;align-items:center;margin:0 0 2px;font-size:13px;line-height:22px;font-weight:600;color:var(--bt-ink)}
-.bt-group-name>.bt-lead{margin:0 8px 0 0}
+.bt-group-name:has(>.bt-lead){display:flex;align-items:flex-start;gap:10px;margin:0 0 4px;font-size:12px;line-height:18px;font-weight:500;color:var(--bt-ink-2)}
+.bt-group-name>.bt-lead{margin:0}
+/* QQ-style column: avatar on the left, name and bubbles aligned beside it. */
+.bt-group-name:has(>.bt-lead)~.bt-astack{margin-left:46px}
 .bt-group-time,.bt-group-took{margin-left:6px;font-size:11px;line-height:16px;font-weight:400;color:var(--bt-ink-2);font-variant-numeric:tabular-nums;white-space:nowrap}
 .bt-x{border:0;background:none;color:var(--bt-ink-2);cursor:pointer;width:24px;height:24px;border-radius:6px;font-size:16px;line-height:24px;padding:0;transition:background-color .12s ease,color .12s ease,${spring(SPRING_TAP, "scale")}}
 .bt-x:hover{background:var(--bt-hover);color:var(--bt-ink)}
@@ -20506,7 +20518,7 @@ function AssistantCell({ node, groupPart, sessionId, openFile, fileMentions, use
         whole: true
       });
     }),
-    head ? (0, import_react50.createElement)(SpeakerHead, { bot: speaker, time: layoutOf(roster.prefs) === "flat" ? data.time : void 0 }) : null,
+    head ? (0, import_react50.createElement)(SpeakerHead, { bot: speaker }) : null,
     activity.length ? (0, import_react50.createElement)("div", { className: "bt-agent-activity" }, activity.map((line, index) => (0, import_react50.createElement)("div", { key: index, className: "bt-agent-act", title: line }, (0, import_react50.createElement)("span", { className: "bt-agent-act-mark", "aria-hidden": true }), (0, import_react50.createElement)("span", { className: "bt-agent-act-text" }, activityParts(line))))) : null,
     reasoning ? (0, import_react50.createElement)(ThinkingRow, {
       text: reasoning,
@@ -20516,7 +20528,7 @@ function AssistantCell({ node, groupPart, sessionId, openFile, fileMentions, use
       // time makes one Elapsed show settled + running.
       ...thinking !== void 0 ? { at: typeof thinking.time === "number" ? thinking.time - (ms ?? 0) : void 0 } : { ms }
     }) : null,
-    texts2.length ? (0, import_react50.createElement)(Bubbles, { texts: texts2, roster, selfId, actions, streaming: running, sessionId, msgKey: `${sessionId}:${data.turn}:${node.key ?? data.seq ?? ""}`, useUi, mentions, fold: FOLD_HUGE, time: layoutOf(roster.prefs) === "flat" ? void 0 : data.time }) : null
+    texts2.length ? (0, import_react50.createElement)(Bubbles, { texts: texts2, roster, selfId, actions, streaming: running, sessionId, msgKey: `${sessionId}:${data.turn}:${node.key ?? data.seq ?? ""}`, useUi, mentions, fold: FOLD_HUGE }) : null
   );
 }
 var activityParts = (line) => line.split("`").map((part, index) => index % 2 === 1 ? (0, import_react50.createElement)("code", { key: index }, part) : part);
@@ -20547,13 +20559,12 @@ function EventLine({ prefix, bots, joiner = t("and"), onOpen, whole = false }) {
   });
   return (0, import_react50.createElement)("div", { className: "bt-event" }, parts);
 }
-function SpeakerHead({ bot, time }) {
+function SpeakerHead({ bot }) {
   return (0, import_react50.createElement)(
     "div",
     { className: "bt-group-name" },
-    (0, import_react50.createElement)("span", { className: "bt-lead" }, (0, import_react50.createElement)(BotMark, { bot, size: 22 })),
-    bot.name,
-    Number.isFinite(time) ? (0, import_react50.createElement)("span", { className: "bt-group-time", title: clockLabel(time) }, messageClock(time)) : null
+    (0, import_react50.createElement)("span", { className: "bt-lead" }, (0, import_react50.createElement)(BotMark, { bot, size: 36 })),
+    bot.name
   );
 }
 var CHAIN_BREAK_SEL = ".bt-group-msg, .bt-umsg, .bt-urow, [data-chat-flow-kind=user], [data-chat-flow-kind=command-input], .bt-q-inline, .bt-event, .bt-time-sep, .bt-new-sep, .bt-part-line, .bt-btw-card, .bt-learn-card";

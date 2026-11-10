@@ -303,7 +303,7 @@ export function AssistantCell({ node, groupPart, sessionId, openFile, fileMentio
         whole: true,
       })
     }),
-    head ? h(SpeakerHead, { bot: speaker, time: layoutOf(roster.prefs) === 'flat' ? data.time : undefined }) : null,
+    head ? h(SpeakerHead, { bot: speaker }) : null,
     activity.length ? h('div', { className: 'bt-agent-activity' }, activity.map((line, index) => h('div', { key: index, className: 'bt-agent-act', title: line }, h('span', { className: 'bt-agent-act-mark', 'aria-hidden': true }), h('span', { className: 'bt-agent-act-text' }, activityParts(line))))) : null,
     reasoning ? h(ThinkingRow, {
       text: reasoning, live: thinking !== undefined, viewKey: `${sessionId}:${data.turn}`,
@@ -311,7 +311,7 @@ export function AssistantCell({ node, groupPart, sessionId, openFile, fileMentio
       // time makes one Elapsed show settled + running.
       ...(thinking !== undefined ? { at: typeof thinking.time === 'number' ? thinking.time - (ms ?? 0) : undefined } : { ms }),
     }) : null,
-    texts.length ? h(Bubbles, { texts, roster, selfId, actions, streaming: running, sessionId, msgKey: `${sessionId}:${data.turn}:${node.key ?? data.seq ?? ''}`, useUi, mentions, fold: FOLD_HUGE, time: layoutOf(roster.prefs) === 'flat' ? undefined : data.time }) : null)
+    texts.length ? h(Bubbles, { texts, roster, selfId, actions, streaming: running, sessionId, msgKey: `${sessionId}:${data.turn}:${node.key ?? data.seq ?? ''}`, useUi, mentions, fold: FOLD_HUGE }) : null)
 }
 
 // `code` in an activity line is the command or path the agent works on.
@@ -333,13 +333,12 @@ function EventLine({ prefix, bots, joiner = t('and'), onOpen, whole = false }) {
   return h('div', { className: 'bt-event' }, parts)
 }
 
-// The head over a Bot's reply in its own chat: avatar and name, plus the time
-// when the flat layout keeps it there. Bubble layouts leave time to the row and
-// the shared separators, so a clock is not repeated beside every speaker.
-function SpeakerHead({ bot, time }) {
+// QQ-style speaker head: a 36px avatar on the left and the name beside it,
+// with the bubbles below aligned to the same column. No per-message clock here
+// or under the bubbles — time lives in the shared separators and the list row.
+function SpeakerHead({ bot }) {
   return h('div', { className: 'bt-group-name' },
-    h('span', { className: 'bt-lead' }, h(BotMark, { bot, size: 22 })), bot.name,
-    Number.isFinite(time) ? h('span', { className: 'bt-group-time', title: clockLabel(time) }, messageClock(time)) : null)
+    h('span', { className: 'bt-lead' }, h(BotMark, { bot, size: 36 })), bot.name)
 }
 
 const CHAIN_BREAK_SEL = '.bt-group-msg, .bt-umsg, .bt-urow, [data-chat-flow-kind=user], [data-chat-flow-kind=command-input], .bt-q-inline, .bt-event, .bt-time-sep, .bt-new-sep, .bt-part-line, .bt-btw-card, .bt-learn-card'

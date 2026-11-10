@@ -796,8 +796,10 @@ export function install(rt) {
     path: '/api/ds-bot-rabi-avatar', methods: ['GET'], requestBody: 'buffered',
     fetch: async request => {
       try {
-        const botId = new URL(request.url).searchParams.get('botId')
-        const image = await rt.rabiAvatar(botId, request.signal)
+        const url = new URL(request.url)
+        const roleId = url.searchParams.get('roleId')
+        const botId = url.searchParams.get('botId')
+        const image = roleId ? await rt.rabiRoleAvatar(roleId, request.signal) : await rt.rabiAvatar(botId, request.signal)
         return new Response(image.bytes, { headers: { 'content-type': image.contentType, 'cache-control': 'private, max-age=60', 'x-content-type-options': 'nosniff' } })
       } catch (error) {
         return new Response(null, { status: error.name === 'AbortError' ? 499 : 404, headers: { 'cache-control': 'no-store' } })

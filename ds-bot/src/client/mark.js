@@ -62,6 +62,19 @@ export function BotMark({ bot, look: given, size = 36, state = 'idle', live = fa
   // A photo that does not load shows the character instead; a new photo is tried again.
   const [broken, setBroken] = useState('')
   const image = look.image && look.image !== broken ? look.image : undefined
+  // A remote avatar that never settles (a hanging Rabi Manager read) must not
+  // leave an empty circle. Fall back to the Bot's own character mark; a later
+  // successful load keeps the photo because `broken` only names the failed URL.
+  useEffect(() => {
+    if (!image || !ref.current) return undefined
+    const node = ref.current.querySelector('img')
+    if (node && node.complete && node.naturalWidth > 0) return undefined
+    const timer = setTimeout(() => {
+      const img = ref.current?.querySelector('img')
+      if (img && !(img.complete && img.naturalWidth > 0)) setBroken(image)
+    }, 3000)
+    return () => clearTimeout(timer)
+  }, [image])
   useGaze(ref, gaze)
   const common = {
     ref,

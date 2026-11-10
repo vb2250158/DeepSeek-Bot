@@ -52,15 +52,25 @@ export function install(rt) {
     if ((await binding(bot.id, signal))?.roleId !== roleId) refuse('Rabi persona binding changed. Check the Bot in Rabi connection before continuing.')
     return { bot, roleId, base: `/api/roles/${segment(roleId)}` }
   }
-  rt.rabiAvatar = async (botId, callerSignal) => {
-    await rt.load()
-    const signal = signalOf(callerSignal)
-    const { base } = await linkedBot(botId, signal)
-    const image = await client.json(`${base}/avatar`, 'GET', undefined, signal)
+  // The roster renders a Bot under its Session id, which is not a key in the
+  // Bot table. Both the avatar route and the bound Bot resolve to the same
+  // persona id, so read the image by roleId and keep the Bot path as a check.
+  const roleAvatar = async (roleId, signal) => {
+    const image = await client.json(`/api/roles/${segment(roleId)}/avatar`, 'GET', undefined, signal)
     if (!/^image\/(png|jpeg|webp|gif)$/.test(image.contentType) || typeof image.contentBase64 !== 'string' || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(image.contentBase64)) refuse('Rabi returned an invalid avatar')
     const bytes = Buffer.from(image.contentBase64, 'base64')
     if (bytes.length > 5 * 1024 * 1024) refuse('Rabi avatar exceeds the image size limit')
     return { bytes, contentType: image.contentType }
+  }
+  rt.rabiRoleAvatar = async (roleId, callerSignal) => {
+    await rt.load()
+    return roleAvatar(roleId, signalOf(callerSignal))
+  }
+  rt.rabiAvatar = async (botId, callerSignal) => {
+    await rt.load()
+    const signal = signalOf(callerSignal)
+    const { roleId } = await linkedBot(botId, signal)
+    return roleAvatar(roleId, signal)
   }
   const imported = roleId => Object.values(state.bots).find(bot => bot.rabiPersona?.roleId === roleId)
   const uniqueName = name => {
