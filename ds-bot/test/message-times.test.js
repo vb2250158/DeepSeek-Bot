@@ -100,6 +100,15 @@ test('a Bot reply in its own chat shows no per-message clock', () => {
   assert.match(String(head.children[1] ?? ''), /Writer/)
 })
 
+test('an ordinary DSH Session keeps its own message clock and gets no speaker head', () => {
+  const props = assistantProps()
+  props.sessionId = 'not-a-bot'
+  const tree = bubbles(AssistantCell(props))
+  assert.equal(times(tree).length, 1)
+  assert.equal(find(tree, node => node.props?.className === 'bt-group-name').length, 0)
+  assert.equal(find(tree, node => node.props?.className === 'bt-lead').length, 0)
+})
+
 test('a reply without a real time, and the flat layout, also draw no clock', () => {
   assert.equal(times(bubbles(AssistantCell(assistantProps({ time: undefined })))).length, 0)
   const flat = bubbles(AssistantCell(assistantProps({}, { layout: 'flat' })))
