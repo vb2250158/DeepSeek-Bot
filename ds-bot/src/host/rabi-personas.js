@@ -105,12 +105,101 @@ export function install(rt) {
     pending.set(roleId, task)
     try { return await task } finally { pending.delete(roleId) }
   }
+  const scheduleOperations = new Map()
+  const validSchedule = schedule => schedule && ['interval', 'daily_time', 'once_at'].includes(schedule.type)
+    && (schedule.type !== 'interval' || Number.isFinite(schedule.intervalSeconds) && schedule.intervalSeconds > 0)
+    && (schedule.type !== 'daily_time' || /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(schedule.timeOfDay ?? ''))
+    && (schedule.type !== 'once_at' || typeof schedule.onceAt === 'string' && Number.isFinite(Date.parse(schedule.onceAt)))
+  const configuration = async (roleId, base, signal) => {
+    const { data } = await client.json(`${base}/configuration`, 'GET', undefined, signal)
+    if (data?.roleId !== roleId || !data.config || !Array.isArray(data.config.automationRules)) refuse('Rabi returned an invalid automation list')
+    return data
+  }
+  const scheduleView = (roleId, data) => {
+    const items = [], warnings = [], ids = new Set()
+    for (const [index, rule] of data.config.automationRules.entries()) {
+      if (rule?.trigger?.type !== 'schedule') continue
+      const schedule = rule.trigger.schedule
+      if (typeof rule.id !== 'string' || !rule.id || ids.has(rule.id) || !validSchedule(schedule)) { warnings.push(index); continue }
+      ids.add(rule.id)
+      const enabled = rule.enabled !== false && schedule.enabled !== false
+      items.push({ id: rule.id, source: 'rabi', title: typeof rule.name === 'string' && rule.name ? rule.name : rule.id,
+        status: enabled ? 'active' : 'paused', enabled, kind: 'rabi', actionType: rule.action?.type,
+        message: typeof rule.action?.message === 'string' ? rule.action.message : '', template: typeof rule.action?.template === 'string' ? rule.action.template : '', editable: ['deliver_agent', 'run_script'].includes(rule.action?.type),
+        schedule: { type: schedule.type, intervalSeconds: schedule.intervalSeconds, timeOfDay: schedule.timeOfDay,
+          onceAt: schedule.onceAt, windowStartTime: schedule.windowStartTime, windowEndTime: schedule.windowEndTime } })
+    }
+    return { roleId, revision: data.revision, items, warnings, nextCursor: null }
+  }
+  const invalidScheduleInput = message => refuse(message, 'bot/rabi-validation')
+  const changeSchedule = async (endpoint, body, signal) => {
+    const { roleId, base } = await linkedBot(body.botId, signal)
+    if (typeof body.expectedRoleId !== 'string' || body.expectedRoleId !== roleId) refuse('The Bot persona changed. Refresh Rabi schedules before continuing.', 'bot/rabi-binding-conflict')
+    if (typeof body.operationId !== 'string' || !/^[A-Za-z0-9:._-]{1,128}$/.test(body.operationId)) invalidScheduleInput('A stable Rabi operationId is required')
+    if (typeof body.revision !== 'string' || !body.revision) invalidScheduleInput('Refresh Rabi schedules before saving')
+    const signature = JSON.stringify({ endpoint, roleId, body })
+    let operation = scheduleOperations.get(body.operationId)
+    if (operation && operation.signature !== signature) refuse('Keep the original Rabi operation and payload while checking its result')
+    if (!operation) {
+      const data = await configuration(roleId, base, signal)
+      if (data.revision !== body.revision) refuse('Rabi schedules changed. Refresh before saving.', 'bot/rabi-revision-conflict')
+      const rules = data.config.automationRules.slice()
+      const matches = body.id === undefined ? [] : rules.map((rule, index) => rule?.id === body.id ? index : -1).filter(index => index >= 0)
+      if (body.id !== undefined && (typeof body.id !== 'string' || matches.length !== 1 || rules[matches[0]]?.trigger?.type !== 'schedule')) invalidScheduleInput('The Rabi scheduled rule is missing or ambiguous. Refresh the list.')
+      if (endpoint === 'rabi-schedule-delete') {
+        if (body.id === undefined) invalidScheduleInput('Select a Rabi scheduled rule to delete')
+        rules.splice(matches[0], 1)
+      } else if (endpoint === 'rabi-schedule-toggle') {
+        if (body.id === undefined || typeof body.enabled !== 'boolean') invalidScheduleInput('Select a Rabi scheduled rule and enabled state')
+        const previous = rules[matches[0]]
+        rules[matches[0]] = { ...previous, enabled: body.enabled, trigger: { ...previous.trigger, schedule: { ...previous.trigger.schedule, enabled: body.enabled } } }
+      } else {
+        if (typeof body.title !== 'string' || !body.title.trim() || body.title.trim().length > 120 || typeof body.enabled !== 'boolean' || !validSchedule(body.schedule)) invalidScheduleInput('Provide a title, enabled state and valid Rabi schedule')
+        const previous = matches.length ? rules[matches[0]] : undefined
+        if (previous && !['deliver_agent', 'run_script'].includes(previous.action?.type)) invalidScheduleInput('Edit this action type in Rabi')
+        if ((!previous || previous.action.type === 'deliver_agent') && (typeof body.message !== 'string' || !body.message.trim())) invalidScheduleInput('Provide the scheduled message')
+        if ((!previous || previous.action.type === 'deliver_agent') && Object.hasOwn(body, 'template') && typeof body.template !== 'string') invalidScheduleInput('Provide a text instructions template')
+        const id = previous?.id ?? `ds-bot-${body.operationId}`
+        if (!previous && rules.some(rule => rule?.id === id)) invalidScheduleInput('This schedule ID already exists. Refresh the list.')
+        const recipients = data.personaConfig?.agentRecipients ?? data.config.agentRecipients
+        if (!previous && Array.isArray(recipients) && !recipients.some(item => item?.id === 'primary')) invalidScheduleInput('Configure the primary Agent recipient in Rabi before creating a schedule')
+        const timing = { ...previous?.trigger?.schedule, type: body.schedule.type }
+        for (const key of ['intervalSeconds', 'timeOfDay', 'onceAt']) delete timing[key]
+        const timingKey = { interval: 'intervalSeconds', daily_time: 'timeOfDay', once_at: 'onceAt' }[body.schedule.type]
+        timing[timingKey] = body.schedule[timingKey]
+        if (Object.hasOwn(body.schedule, 'windowStartTime') || Object.hasOwn(body.schedule, 'windowEndTime')) {
+          const start = body.schedule.windowStartTime, end = body.schedule.windowEndTime
+          if (start === '' && end === '') {
+            delete timing.windowStartTime; delete timing.windowEndTime
+          } else {
+            const validTime = value => typeof value === 'string' && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value)
+            if (!validTime(start) || !validTime(end)) invalidScheduleInput('Provide both Rabi schedule window times as HH:mm, or clear both')
+            timing.windowStartTime = start; timing.windowEndTime = end
+          }
+        }
+        const rule = { ...previous, id, name: body.title.trim(), enabled: body.enabled,
+          trigger: { ...previous?.trigger, type: 'schedule', schedule: { id: previous?.trigger?.schedule?.id ?? id, ...timing, enabled: body.enabled } },
+          action: previous ? { ...previous.action, ...(previous.action.type === 'deliver_agent' ? { message: body.message, ...(Object.hasOwn(body, 'template') ? { template: body.template } : {}) } : {}) }
+            : { type: 'deliver_agent', target: { kind: 'recipient', recipientId: 'primary' }, message: body.message, ...(Object.hasOwn(body, 'template') ? { template: body.template } : {}) } }
+        if (previous) rules[matches[0]] = rule
+        else rules.push(rule)
+      }
+      operation = { signature, payload: { expectedRevision: body.revision, config: { automationRules: rules } } }
+      // Retain the exact CAS payload across an uncertain response; never rebuild it from newer configuration.
+      scheduleOperations.set(body.operationId, operation)
+    }
+    await client.json(`${base}/configuration`, 'PATCH', operation.payload, signal, { 'Idempotency-Key': body.operationId })
+    try { return scheduleView(roleId, await configuration(roleId, base, signal)) }
+    catch (error) { refuse(`Rabi accepted the schedule operation but its readback failed. Keep operation ${body.operationId} and refresh: ${error.message}`, 'bot/rabi-readback-failed') }
+  }
   rt.rabiPersonaEndpoint = async (endpoint, body = {}, callerSignal) => {
     await rt.load()
     if (endpoint === 'rabi-connection-status') return { available: client.available(), hooksReady: Boolean(hooks()?.requireBinding) }
     const signal = signalOf(callerSignal)
+    if (['rabi-schedule-save', 'rabi-schedule-delete', 'rabi-schedule-toggle'].includes(endpoint)) return changeSchedule(endpoint, body, signal)
     if (endpoint === 'rabi-bot-view') {
       const { roleId, base } = await linkedBot(body.botId, signal)
+      if (body.resource === 'schedules') return scheduleView(roleId, await configuration(roleId, base, signal))
       const resources = { plans: 'plans', memory: 'memory', skills: 'skills', persona: 'persona-document' }
       const resource = Object.hasOwn(resources, body.resource) ? resources[body.resource] : undefined
       if (!resource) refuse('Unknown Rabi resource')

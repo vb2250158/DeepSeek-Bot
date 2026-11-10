@@ -67,6 +67,34 @@ test('activation and local connection status never discover Manager or read pers
   assert.equal(f.requests.length, 0)
 })
 
+test('scheduled rules come from the verified persona without exposing execution paths or mutating configuration', async () => {
+  const f = fixture({ state: { bots: { bot: { id: 'bot', rabiPersona: { roleId: 'fixture' } } }, rooms: {} }, bindings: new Map([['bot', 'fixture']]) })
+  const rule = (id, schedule, extra = {}) => ({ id, name: id, enabled: true, trigger: { type: 'schedule', schedule }, action: { message: 'private prompt', scriptPath: 'private path' }, ...extra })
+  f.responses.set('/api/roles/fixture/configuration', { data: { roleId: 'fixture', config: { automationRules: [
+    rule('daily', { type: 'daily_time', timeOfDay: '09:00' }),
+    rule('held', { type: 'interval', intervalSeconds: 600, enabled: false }),
+    rule('disabled', { type: 'once_at', onceAt: '2030-01-01T09:00:00' }, { enabled: false }),
+    rule('broken', { type: 'daily_time', timeOfDay: '99:00' }),
+    { id: 'message', trigger: { type: 'message' } },
+  ] } } })
+  const view = await f.call('rabi-bot-view', { botId: 'bot', resource: 'schedules' })
+  assert.deepEqual(view.items.map(item => [item.id, item.source, item.status]), [['daily', 'rabi', 'active'], ['held', 'rabi', 'paused'], ['disabled', 'rabi', 'paused']])
+  assert.deepEqual(view.warnings, [3])
+  assert.equal(view.items[0].message, 'private prompt')
+  assert.equal(JSON.stringify(view).includes('private path'), false)
+  assert.ok(f.requests.every(request => request.method === 'GET'))
+  f.bindings.set('bot', 'another')
+  await assert.rejects(f.call('rabi-bot-view', { botId: 'bot', resource: 'schedules' }), /binding changed/)
+})
+
+test('missing or mismatched Rabi schedule configuration is an error instead of an empty task list', async () => {
+  const f = fixture({ state: { bots: { bot: { id: 'bot', rabiPersona: { roleId: 'fixture' } } }, rooms: {} }, bindings: new Map([['bot', 'fixture']]) })
+  for (const data of [{ roleId: 'another', config: { automationRules: [] } }, { roleId: 'fixture', config: {} }]) {
+    f.responses.set('/api/roles/fixture/configuration', { data })
+    await assert.rejects(f.call('rabi-bot-view', { botId: 'bot', resource: 'schedules' }), /invalid automation list/)
+  }
+})
+
 test('persona catalog returns only names and verified Bot links', async () => {
   const f = fixture()
   assert.deepEqual((await f.call('rabi-personas-list')).personas, [{ id: 'fixture', name: 'Fixture' }])
@@ -290,4 +318,140 @@ test('rebuild refuses pending input before creating a replacement', async () => 
   f.rt.resolveAgent = async () => ({ inbox: { nextStep: [], nextTurn: [{ id: 'queued' }] } })
   f.rt.createSession = async () => { throw new Error('must not create') }
   await assert.rejects(f.call('rabi-persona-rebuild', { botId: 'bot-1', expectedSessionId: 'bot-1' }), /pending Bot input/)
+})
+
+function scheduleFixture() {
+  const f = fixture({ state: { bots: { bot: { id: 'bot', rabiPersona: { roleId: 'fixture' } } }, rooms: {} }, bindings: new Map([['bot', 'fixture']]) })
+  const rule = { id: 'daily', name: 'Daily', enabled: true, custom: 7, trigger: { type: 'schedule', schedule: { id: 'timing', type: 'daily_time', timeOfDay: '09:00', windowStartTime: '08:00' } }, action: { type: 'deliver_agent', target: { kind: 'recipient', recipientId: 'custom' }, message: 'Original', template: 'retained' } }
+  const data = { roleId: 'fixture', revision: 'r1', config: { custom: 9, automationRules: [rule, { id: 'message', trigger: { type: 'message' } }, null] } }
+  f.responses.set('/api/roles/fixture/configuration', { data })
+  const execute = f.ctx.tools.execute
+  f.ctx.tools.execute = async input => {
+    if (input.arguments.method !== 'PATCH') return execute(input)
+    f.requests.push(input.arguments)
+    const payload = JSON.parse(input.arguments.bodyJson)
+    assert.equal(payload.expectedRevision, 'r1')
+    assert.ok(JSON.parse(input.arguments.requestHeadersJson)['Idempotency-Key'])
+    data.config.automationRules = payload.config.automationRules; data.revision = 'r2'
+    return { isError: false, value: { ok: true, body: JSON.stringify({ code: 0, state: 'committed' }) } }
+  }
+  return { ...f, data }
+}
+
+test('schedule CRUD preserves unrelated rules, action target and extra timing fields', async () => {
+  const f = scheduleFixture(), other = structuredClone(f.data.config.automationRules.slice(1))
+  const view = await f.call('rabi-schedule-save', { botId: 'bot', expectedRoleId: 'fixture', id: 'daily', revision: 'r1', operationId: 'edit', title: 'Changed', message: 'Updated', enabled: false, schedule: { type: 'daily_time', timeOfDay: '10:00' } })
+  assert.equal(view.revision, 'r2')
+  const rule = f.data.config.automationRules[0]
+  assert.deepEqual(rule.action, { type: 'deliver_agent', target: { kind: 'recipient', recipientId: 'custom' }, message: 'Updated', template: 'retained' })
+  assert.equal(rule.trigger.schedule.windowStartTime, '08:00'); assert.equal(rule.custom, 7)
+  assert.deepEqual(f.data.config.automationRules.slice(1), other); assert.equal(f.data.config.custom, 9)
+  const created = scheduleFixture()
+  await created.call('rabi-schedule-save', { botId: 'bot', expectedRoleId: 'fixture', revision: 'r1', operationId: 'create', title: 'New', message: 'Hello', enabled: true, schedule: { type: 'interval', intervalSeconds: 60 } })
+  assert.deepEqual(created.data.config.automationRules.at(-1).action.target, { kind: 'recipient', recipientId: 'primary' })
+  const deleted = scheduleFixture()
+  await deleted.call('rabi-schedule-delete', { botId: 'bot', expectedRoleId: 'fixture', id: 'daily', revision: 'r1', operationId: 'delete' })
+  assert.deepEqual(deleted.data.config.automationRules, other)
+})
+
+test('schedule toggle changes only the two enabled fields', async () => {
+  const f = scheduleFixture(), previous = structuredClone(f.data.config.automationRules[0])
+  await f.call('rabi-schedule-toggle', { botId: 'bot', expectedRoleId: 'fixture', id: 'daily', revision: 'r1', operationId: 'toggle', enabled: false })
+  previous.enabled = false; previous.trigger.schedule.enabled = false
+  assert.deepEqual(f.data.config.automationRules[0], previous)
+})
+
+test('stale revisions, wrong rule IDs and changed bindings never mutate schedules', async () => {
+  const f = scheduleFixture()
+  for (const [id, revision] of [['daily', 'stale'], ['message', 'r1'], ['missing', 'r1']]) await assert.rejects(f.call('rabi-schedule-delete', { botId: 'bot', expectedRoleId: 'fixture', id, revision, operationId: id + revision }))
+  f.bindings.set('bot', 'another')
+  await assert.rejects(f.call('rabi-schedule-delete', { botId: 'bot', expectedRoleId: 'fixture', id: 'daily', revision: 'r1', operationId: 'binding' }), /binding changed/)
+  assert.equal(f.requests.some(request => request.method === 'PATCH'), false)
+})
+
+test('uncertain retries retain the exact original schedule payload', async () => {
+  const f = scheduleFixture(), execute = f.ctx.tools.execute, payloads = []
+  let uncertain = true
+  f.ctx.tools.execute = async input => {
+    if (input.arguments.method === 'PATCH') {
+      payloads.push(input.arguments.bodyJson)
+      if (uncertain) return { isError: false, value: { ok: false, uncertain: true } }
+    }
+    return execute(input)
+  }
+  const body = { botId: 'bot', expectedRoleId: 'fixture', id: 'daily', revision: 'r1', operationId: 'uncertain' }
+  await assert.rejects(f.call('rabi-schedule-delete', body), /outcome is uncertain/)
+  await assert.rejects(f.call('rabi-schedule-delete', { ...body, id: 'message' }), /original Rabi operation/)
+  f.data.revision = 'concurrent'; uncertain = false
+  await f.call('rabi-schedule-delete', body)
+  assert.equal(payloads[0], payloads[1])
+})
+
+test('a failed schedule readback reports accepted operation without returning success', async () => {
+  const f = scheduleFixture(), execute = f.ctx.tools.execute
+  let saved = false
+  f.ctx.tools.execute = async input => {
+    if (saved && input.arguments.path.endsWith('/configuration') && input.arguments.method === 'GET') return { isError: false, value: { ok: false, statusCode: 503 } }
+    const result = await execute(input)
+    if (input.arguments.method === 'PATCH') saved = true
+    return result
+  }
+  await assert.rejects(f.call('rabi-schedule-delete', { botId: 'bot', expectedRoleId: 'fixture', id: 'daily', revision: 'r1', operationId: 'readback' }), error => error.code === 'bot/rabi-readback-failed')
+  assert.equal(saved, true)
+  assert.equal(f.requests.filter(request => request.method === 'PATCH').length, 1)
+})
+
+test('schedule edits update and clear windows while timing switches remove old values', async () => {
+  const body = { botId: 'bot', expectedRoleId: 'fixture', id: 'daily', revision: 'r1', operationId: 'window', title: 'Changed', message: 'Message', enabled: true, schedule: { type: 'interval', intervalSeconds: 60, windowStartTime: '10:00', windowEndTime: '18:00' } }
+  const f = scheduleFixture()
+  f.data.config.automationRules[0].trigger.schedule.skipWhenAgentBusy = true
+  await f.call('rabi-schedule-save', body)
+  const schedule = f.data.config.automationRules[0].trigger.schedule
+  assert.equal(schedule.windowStartTime, '10:00'); assert.equal(schedule.windowEndTime, '18:00')
+  assert.equal(schedule.skipWhenAgentBusy, true); assert.equal(Object.hasOwn(schedule, 'timeOfDay'), false)
+  const clear = scheduleFixture()
+  await clear.call('rabi-schedule-save', { ...body, schedule: { type: 'once_at', onceAt: '2030-01-01T10:00:00Z', windowStartTime: '', windowEndTime: '' } })
+  const cleared = clear.data.config.automationRules[0].trigger.schedule
+  assert.equal(Object.hasOwn(cleared, 'windowStartTime'), false); assert.equal(Object.hasOwn(cleared, 'windowEndTime'), false)
+  assert.equal(Object.hasOwn(cleared, 'timeOfDay'), false)
+})
+
+test('invalid schedule input rejects before a write with a known validation code', async () => {
+  const body = { botId: 'bot', expectedRoleId: 'fixture', revision: 'r1', operationId: 'invalid', title: 'New', message: 'Message', enabled: true, schedule: { type: 'daily_time', timeOfDay: '10:00' } }
+  for (const change of [{ title: 'x'.repeat(121) }, { message: ' ' }, { schedule: { ...body.schedule, windowStartTime: '10:00' } }, { schedule: { ...body.schedule, windowStartTime: '99:00', windowEndTime: '12:00' } }]) {
+    const f = scheduleFixture()
+    await assert.rejects(f.call('rabi-schedule-save', { ...body, ...change }), error => error.code === 'bot/rabi-validation')
+    assert.equal(f.requests.some(request => request.method === 'PATCH'), false)
+  }
+})
+
+test('schedule operations fence the expected role even when new persona revision matches', async () => {
+  const f = scheduleFixture()
+  f.rt.state.bots.bot.rabiPersona.roleId = 'another'; f.bindings.set('bot', 'another')
+  for (const endpoint of ['rabi-schedule-save', 'rabi-schedule-delete', 'rabi-schedule-toggle']) await assert.rejects(f.call(endpoint, { botId: 'bot', expectedRoleId: 'fixture', id: 'daily', revision: 'r1', operationId: endpoint }), error => error.code === 'bot/rabi-binding-conflict')
+  assert.equal(f.requests.some(request => request.path.endsWith('/configuration')), false)
+})
+
+test('Rabi receipt errors preserve uncertainty and known revision or validation failures', async () => {
+  for (const [receipt, code] of [[{ ok: false, uncertain: true }, 'bot/rabi-uncertain'], [{ ok: false, statusCode: 400, body: JSON.stringify({ mutationOutcome: 'unknown' }) }, 'bot/rabi-uncertain'], [{ ok: false, statusCode: 412 }, 'bot/rabi-revision-conflict'], [{ ok: false, statusCode: 400 }, 'bot/rabi-validation']]) {
+    const f = scheduleFixture(), execute = f.ctx.tools.execute
+    f.ctx.tools.execute = input => input.arguments.method === 'PATCH' ? Promise.resolve({ isError: false, value: receipt }) : execute(input)
+    await assert.rejects(f.call('rabi-schedule-delete', { botId: 'bot', expectedRoleId: 'fixture', id: 'daily', revision: 'r1', operationId: 'error-code' }), error => error.code === code)
+  }
+})
+
+test('schedule templates are returned, edited explicitly and preserved when omitted', async () => {
+  const f = scheduleFixture()
+  assert.equal((await f.call('rabi-bot-view', { botId: 'bot', resource: 'schedules' })).items[0].template, 'retained')
+  const body = { botId: 'bot', expectedRoleId: 'fixture', id: 'daily', revision: 'r1', operationId: 'template', title: 'Daily', message: 'Message', enabled: true, schedule: { type: 'daily_time', timeOfDay: '10:00' } }
+  const view = await f.call('rabi-schedule-save', { ...body, template: 'Updated instructions' })
+  assert.equal(view.items[0].template, 'Updated instructions')
+  assert.equal(f.data.config.automationRules[0].action.message, 'Message')
+  const omitted = scheduleFixture()
+  await omitted.call('rabi-schedule-save', body)
+  assert.equal(omitted.data.config.automationRules[0].action.template, 'retained')
+  const script = scheduleFixture()
+  script.data.config.automationRules[0].action = { type: 'run_script', scriptPath: 'fixture.js', template: 'script-owned' }
+  await script.call('rabi-schedule-save', { ...body, template: 'Ignore this', message: 'Ignore this too' })
+  assert.deepEqual(script.data.config.automationRules[0].action, { type: 'run_script', scriptPath: 'fixture.js', template: 'script-owned' })
 })

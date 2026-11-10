@@ -4,11 +4,12 @@ export function createRabiWorkspaceStore(request, { capacity = 64, maxBytes = 4 
   let active = 0
   const keyOf = scope => JSON.stringify([scope.botId, scope.roleId, scope.resource, scope.kind ?? '', scope.itemId ?? ''])
   const notify = entry => { for (const listener of entry.listeners) listener() }
+  const notifyWrites = scope => { const entry = entryOf({ ...scope, itemId: undefined }); entry.snapshot = { ...entry.snapshot }; notify(entry) }
   const prune = () => {
     let bytes = [...entries.values()].reduce((sum, entry) => sum + entry.bytes, 0)
     for (const [key, entry] of entries) {
       if (entries.size <= capacity && bytes <= maxBytes) break
-      if (entry.promise || entry.listeners.size) continue
+      if (entry.promise || entry.listeners.size || entry.write) continue
       bytes -= entry.bytes; entries.delete(key)
     }
   }
@@ -75,6 +76,27 @@ export function createRabiWorkspaceStore(request, { capacity = 64, maxBytes = 4 
       return () => { entry.listeners.delete(listener); prune() }
     },
     visit: scope => load(scope), more: scope => load(scope, true),
+    write: scope => entryOf(scope).write ?? null,
+    retainWrite(scope, write) { const entry = entryOf(scope); entry.write ??= write; notifyWrites(scope); return entry.write },
+    clearWrite(scope) { delete entryOf(scope).write; notifyWrites(scope) },
+    writes(scope) { return [...entries.values()].filter(entry => entry.write && entry.scope.botId === scope.botId && entry.scope.roleId === scope.roleId).map(entry => ({ scope: entry.scope, operation: entry.write })) },
+    accept(scope, value) {
+      if (value.roleId !== scope.roleId) throw new Error('Rabi persona binding changed. Check the Bot in Rabi connection before continuing.')
+      const entry = entryOf(scope)
+      entry.epoch = (entry.epoch ?? 0) + 1
+      entry.pages = [value]; entry.bytes = JSON.stringify(value).length * 2
+      entry.snapshot = { value, pending: false, error: null, updatedAt: Date.now() }
+      notify(entry); prune()
+    },
+    async refresh(scope) {
+      const entry = entryOf(scope)
+      entry.epoch = (entry.epoch ?? 0) + 1
+      entry.pages = []
+      await entry.promise
+      await load(scope)
+      if (entry.snapshot.error) throw entry.snapshot.error
+      return entry.snapshot.value
+    },
     invalidateBot(botId) {
       for (const entry of entries.values()) if (entry.scope.botId === botId) {
         entry.epoch = (entry.epoch ?? 0) + 1

@@ -24,7 +24,11 @@ export function rabiClient(ctx, timeoutMs = 8000) {
     if (result.isError) rabiRefuse(result.error?.kind === 'host_stopped' ? 'Rabi is not running. Start Rabi, then send your message again.' : result.error?.message ?? 'Rabi request failed')
     const receipt = result.value
     if (receipt?.error?.kind === 'host_stopped') rabiRefuse('Rabi is not running. Start Rabi, then send your message again.')
-    if (receipt?.uncertain) rabiRefuse('Rabi operation outcome is uncertain. Read back the original operation before retrying; it was not replayed.')
+    let responseOutcome
+    if (method !== 'GET' && typeof receipt?.body === 'string') {
+      try { responseOutcome = JSON.parse(receipt.body) } catch { /* The JSON reader reports malformed successful responses below. */ }
+    }
+    if (receipt?.uncertain || responseOutcome?.uncertain === true || responseOutcome?.mutationOutcome === 'unknown') rabiRefuse('Rabi operation outcome is uncertain. Read back the original operation before retrying; it was not replayed.', 'bot/rabi-uncertain')
     if (method === 'GET' && !receipt?.ok && receipt?.statusCode >= 500) {
       let failure
       try { failure = JSON.parse(receipt.body) } catch { /* Invalid remote bodies use the adapter's existing error below. */ }
@@ -32,7 +36,8 @@ export function rabiClient(ctx, timeoutMs = 8000) {
         rabiRefuse('Rabi could not finish reading this persona folder. Check its storage in Rabi, then refresh.', 'bot/rabi-read-timeout')
       }
     }
-    if (!receipt?.ok) rabiRefuse(receipt?.error?.message ?? `Rabi HTTP ${receipt?.statusCode ?? 0}`)
+    if (!receipt?.ok) rabiRefuse(receipt?.error?.message ?? `Rabi HTTP ${receipt?.statusCode ?? 0}`,
+      receipt?.statusCode === 412 ? 'bot/rabi-revision-conflict' : receipt?.statusCode === 400 ? 'bot/rabi-validation' : 'bot/refused')
     return receipt
   }
   const json = async (...args) => {

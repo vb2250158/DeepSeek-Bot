@@ -6,6 +6,37 @@ const scope = { botId: 'bot', roleId: 'fixture', resource: 'memory', kind: 'rece
 const page = (ids, nextCursor = null) => ({ roleId: 'fixture', items: ids.map(id => ({ id })), nextCursor })
 const deferred = () => { let resolve, reject; const promise = new Promise((ok, fail) => { resolve = ok; reject = fail }); return { promise, resolve, reject } }
 
+test('confirmed writes replace a stale read and pending requests survive observer remounts', async () => {
+  const pending = deferred()
+  const store = createRabiWorkspaceStore(() => pending.promise)
+  const reading = store.visit(scope)
+  const writeScope = { ...scope, itemId: 'new' }
+  const operation = { endpoint: 'save', body: { operationId: 'original' } }
+  assert.equal(store.retainWrite(writeScope, operation), operation)
+  assert.equal(store.retainWrite(writeScope, { endpoint: 'save', body: { operationId: 'new' } }), operation)
+  store.accept(scope, page(['confirmed']))
+  pending.resolve(page(['stale']))
+  await reading
+  assert.deepEqual(store.snapshot(scope).value.items, [{ id: 'confirmed' }])
+  assert.equal(store.write(writeScope), operation)
+  store.clearWrite(writeScope)
+  assert.equal(store.write(writeScope), null)
+  store.dispose()
+})
+
+test('refresh waits for a stale read and rejects a failed reread while retaining data', async () => {
+  const pending = deferred()
+  let requests = 0
+  const store = createRabiWorkspaceStore(() => ++requests === 1 ? pending.promise : Promise.reject(new Error('offline')))
+  const reading = store.visit(scope)
+  const refreshed = store.refresh(scope)
+  pending.resolve(page(['old']))
+  await reading
+  await assert.rejects(refreshed, /offline/)
+  assert.equal(requests, 2)
+  store.dispose()
+})
+
 test('A to B to A shares the pending read and keeps the completed result after the observer leaves', async () => {
   const pending = deferred(), calls = []
   const store = createRabiWorkspaceStore((query, signal) => { calls.push({ query, signal }); return pending.promise })

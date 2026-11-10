@@ -1,9 +1,10 @@
 // Scheduled tasks: Settings → Scheduled tasks, a Bot's card in its settings, and the
 // line in its details panel. DSH runs the tasks (see src/host/schedules.js); a task
 // sends its prompt to the Bot's chat when it is due.
-import { createElement as h, Fragment, useEffect, useState } from 'react'
+import { createElement as h, Fragment, useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { Button, Input, InlineEditor, Menu, Modal, Switch } from '@deepseek-ai/dsh-client-ui-primitives'
 import { BotAvatar, RoomAvatar } from './mark.js'
-import { ClockIcon, PlusIcon, TrashIcon } from './icons.js'
+import { ClockIcon, PencilIcon, PlusIcon, TrashIcon } from './icons.js'
 import { Segmented } from './motion.js'
 import { dateLocale, hostText, t } from './i18n.js'
 
@@ -51,6 +52,12 @@ function everyText(seconds) {
 
 // How often a task runs, in the user's words.
 export function timingText(task) {
+  if (task.kind === 'rabi') {
+    const schedule = task.schedule
+    const text = schedule.type === 'daily_time' ? t('Every day at {time}', { time: clock(schedule.timeOfDay) })
+      : schedule.type === 'once_at' ? t('Once, {time}', { time: dayAndTime(Date.parse(schedule.onceAt)) }) : everyText(schedule.intervalSeconds)
+    return schedule.windowStartTime && schedule.windowEndTime ? `${text} · ${schedule.windowStartTime}–${schedule.windowEndTime}` : text
+  }
   const zone = task.timeZone && task.timeZone !== localZone() ? ` (${task.timeZone})` : ''
   switch (task.kind) {
     case 'after':
@@ -71,6 +78,7 @@ export function timingText(task) {
   }
 }
 const nextText = (task) => {
+  if (task.source === 'rabi') return task.status === 'paused' ? t('Paused in Rabi') : t('Enabled in Rabi')
   if (task.status === 'paused') return t('Paused')
   if (task.state === 'overdue' || (task.state === undefined && task.status === 'active' && Date.parse(task.scheduledAt) <= Date.now())) return t('Overdue: {time}', { time: dayAndTime(Date.parse(task.scheduledAt)) })
   if (task.status === 'paused') return t('Paused')
@@ -99,10 +107,184 @@ function TaskRow({ task, actions, onView, showBot, roster }) {
       h('span', { className: 'bt-set-hint' }, [timingText(task), room ? t('in {name}', { name: room.name }) : ''].filter(Boolean).join(' · ')),
       task.prompt && task.prompt !== task.title ? h('span', { className: 'bt-task-prompt', 'data-open': expanded || undefined }, task.prompt) : null),
     h('span', { className: 'bt-task-next', 'data-state': task.state === 'overdue' ? 'overdue' : undefined }, nextText(task)),
-    h('button', {
+    task.source === 'rabi' ? null : h('button', {
       type: 'button', className: 'bt-mini bt-task-remove', 'data-confirm': confirming || undefined, disabled: busy,
       'aria-label': confirming ? t('Click again to delete') : t('Delete task'), title: confirming ? undefined : t('Delete task'), onClick: remove,
     }, confirming ? t('Delete') : h(TrashIcon)))
+}
+
+/** Shares persona-scoped reads with the library without copying Rabi tasks into DSH. */
+export function RabiSchedules({ bot, actions, tasks = [], roster, summary = false }) {
+  const store = actions.rabiWorkspace
+  const roleId = bot.rabiPersona.roleId
+  const scope = { botId: bot.id, roleId, resource: 'schedules' }
+  const subscribe = useCallback(listener => store.subscribe(scope, listener), [store, bot.id, roleId])
+  const snapshot = useCallback(() => store.snapshot(scope), [store, bot.id, roleId])
+  const { value, pending, error } = useSyncExternalStore(subscribe, snapshot)
+  const [editing, setEditing] = useState(null)
+  const refresh = () => store.refresh(scope)
+  useEffect(() => {
+    let stopped = false, timer
+    const load = () => void store.visit(scope).finally(() => { if (!stopped) timer = setTimeout(load, POLL_MS) })
+    load()
+    return () => { stopped = true; clearTimeout(timer) }
+  }, [store, bot.id, roleId])
+  const all = [...tasks, ...(value?.items ?? [])]
+  const pendingWrites = store.writes(scope).filter(entry => !value?.items.some(item => item.id === entry.scope.itemId))
+  return h('section', { className: 'bt-set-section', 'aria-busy': pending },
+    h('div', { className: 'bt-rabi-task-heading' },
+      h('div', { className: 'bt-section-title' }, summary ? t('Scheduled tasks · {count}', { count: all.length }) : `${bot.name} · Rabi`),
+      h(Button, { variant: 'ghost', disabled: !value || pending, onClick: () => setEditing({ revision: value.revision }) }, h(PlusIcon), t('New task'))),
+    !value && !error ? h('div', { className: 'bt-mem-skel', 'aria-label': t('Loading…') }, h('span'), h('span')) : null,
+    error ? h('div', { role: 'alert', className: 'bt-error' }, hostText(error.message), ' ', h('button', { type: 'button', className: 'bt-more', disabled: pending, onClick: () => void store.visit(scope) }, t('Retry'))) : null,
+    value?.warnings?.length ? h('p', { className: 'bt-set-hint' }, t('Some Rabi schedules could not be read. Check them in Rabi.')) : null,
+    ...pendingWrites.map(entry => h(RabiPendingWrite, { key: entry.operation.body.operationId, entry, actions })),
+    value && all.length === 0 ? h('p', { className: 'bt-set-hint' }, t('No scheduled tasks yet.')) : null,
+    editing ? h(RabiScheduleForm, { key: `${bot.id}:${roleId}:${editing.task?.id ?? 'new'}`, bot, actions, ...editing,
+      onDone: () => setEditing(null), onCancel: () => setEditing(null) }) : null,
+    h('div', { className: summary ? 'bt-task-list' : 'bt-set-card' }, all.map(task => task.source === 'rabi'
+      ? h(RabiScheduleRow, { key: `rabi:${task.id}`, task, bot, actions, revision: value.revision, summary, onView: refresh, onEdit: () => setEditing({ task, revision: value.revision }) }) : summary
+      ? h('button', { key: `${task.source ?? 'dsh'}:${task.id}`, type: 'button', className: 'bt-task-line', onClick: () => actions.openSettings('schedules', `bot:${bot.id}`) },
+          h(ClockIcon), h('span', { className: 'bt-task-line-title' }, task.title), h('span', { className: 'bt-task-line-when' }, task.source === 'rabi' ? `${timingText(task)} · ${nextText(task)}` : timingText(task)))
+      : h(TaskRow, { key: task.id, task, actions, roster, onView: publish }))))
+}
+
+export function RabiPendingWrite({ entry, actions }) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const retry = async () => {
+    if (busy) return
+    setBusy(true); setError('')
+    try {
+      const result = await actions.rabiConnection(entry.operation.endpoint, entry.operation.body)
+      actions.rabiWorkspace.accept({ ...entry.scope, itemId: undefined }, result)
+      actions.rabiWorkspace.clearWrite(entry.scope)
+    } catch (failure) { setError(hostText(failure.message)) }
+    finally { setBusy(false) }
+  }
+  return h('div', { className: 'bt-set-card bt-rabi-pending', role: 'alert' },
+    h('span', null, entry.operation.body.title ?? t('Scheduled task')),
+    h('span', { className: 'bt-set-hint' }, error || t('This operation needs confirmation. Retry the original request.')),
+    h(Button, { disabled: busy, onClick: () => void retry() }, t('Retry')))
+}
+
+export function RabiScheduleRow({ task, bot, actions, revision, onView, onEdit, summary }) {
+  const [busy, setBusy] = useState(false)
+  const [confirming, setConfirming] = useState(false)
+  const [error, setError] = useState('')
+  const scope = { botId: bot.id, roleId: bot.rabiPersona.roleId, resource: 'schedules', itemId: task.id }
+  const operation = useRef(actions.rabiWorkspace.write(scope))
+  const run = async (endpoint, extra) => {
+    if (busy) return
+    operation.current ??= actions.rabiWorkspace.retainWrite(scope, { endpoint, body: { botId: bot.id, expectedRoleId: scope.roleId, id: task.id, revision, operationId: crypto.randomUUID(), ...extra } })
+    setBusy(true); setError('')
+    try {
+      const result = await actions.rabiConnection(operation.current.endpoint, operation.current.body)
+      actions.rabiWorkspace.accept({ botId: bot.id, roleId: scope.roleId, resource: 'schedules' }, result)
+      actions.rabiWorkspace.clearWrite(scope)
+      operation.current = null
+      setConfirming(false)
+    } catch (failure) {
+      if (['bot/rabi-revision-conflict', 'bot/rabi-validation', 'bot/rabi-binding-conflict'].includes(failure.code)) {
+        actions.rabiWorkspace.clearWrite(scope); operation.current = null
+        await onView().catch(() => {})
+      }
+      setError(hostText(failure.message))
+    }
+    finally { setBusy(false) }
+  }
+  return h('div', { className: 'bt-rabi-task' },
+    h('div', { className: summary ? 'bt-task-line' : 'bt-set-row bt-task' },
+      h(ClockIcon),
+      h(Button, { variant: 'ghost', className: 'bt-rabi-task-copy', onClick: onEdit, disabled: busy || Boolean(operation.current) },
+        h('span', { className: 'bt-task-title' }, task.title),
+        h('span', { className: 'bt-set-hint' }, `${timingText(task)} · ${nextText(task)}`)),
+      h(Switch, { checked: task.status === 'active', disabled: busy || Boolean(operation.current), label: t('Activate {name}', { name: task.title }), onChange: enabled => void run('rabi-schedule-toggle', { enabled }) }),
+      !summary ? h(Button, { variant: 'ghost', disabled: busy || Boolean(operation.current), onClick: onEdit, 'aria-label': t('Edit task') }, h(PencilIcon)) : null,
+      !summary ? h(Button, { variant: 'ghost', disabled: busy || Boolean(operation.current), onClick: () => confirming ? void run('rabi-schedule-delete') : setConfirming(true), 'aria-label': t('Delete task') }, confirming ? t('Click again to delete') : h(TrashIcon)) : null),
+    error || operation.current ? h('div', { role: 'alert', className: 'bt-error' }, error || t('This operation needs confirmation. Retry the original request.'), operation.current ? h(Button, { disabled: busy, onClick: () => void run() }, t('Retry')) : null) : null)
+}
+
+/** Saves the original request key on retries; timing remains interpreted by Rabi. */
+export function RabiScheduleForm({ bot, actions, task, revision, onDone, onCancel, roster, onTarget }) {
+  const scope = { botId: bot.id, roleId: bot.rabiPersona.roleId, resource: 'schedules', itemId: task?.id ?? 'new' }
+  const held = actions.rabiWorkspace.write(scope)
+  const schedule = held?.body.schedule ?? task?.schedule
+  const [title, setTitle] = useState(held?.body.title ?? task?.title ?? '')
+  const [message, setMessage] = useState(held?.body.message ?? task?.message ?? '')
+  const [template, setTemplate] = useState(held?.body.template ?? task?.template ?? '')
+  const [kind, setKind] = useState(schedule?.type ?? 'daily_time')
+  const [time, setTime] = useState(schedule?.timeOfDay ?? '09:00')
+  const [at, setAt] = useState(schedule?.onceAt ?? inAnHour())
+  const [seconds, setSeconds] = useState(schedule?.intervalSeconds ?? 600)
+  const [windowStart, setWindowStart] = useState(schedule?.windowStartTime ?? '')
+  const [windowEnd, setWindowEnd] = useState(schedule?.windowEndTime ?? '')
+  const [enabled, setEnabled] = useState(held?.body.enabled ?? task?.status !== 'paused')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [choosing, setChoosing] = useState(false)
+  const [expectedRevision, setExpectedRevision] = useState(revision)
+  const [conflict, setConflict] = useState(null)
+  const operation = useRef(held)
+  const locked = busy || Boolean(operation.current)
+  const submit = async event => {
+    event?.preventDefault()
+    if (busy) return
+    operation.current ??= actions.rabiWorkspace.retainWrite(scope, { endpoint: 'rabi-schedule-save', body: { botId: bot.id, expectedRoleId: scope.roleId, ...(task ? { id: task.id } : {}), ...(task?.template ? { template } : {}), revision: expectedRevision, operationId: crypto.randomUUID(), title, message, enabled,
+      schedule: { type: kind, ...(kind === 'daily_time' ? { timeOfDay: time } : kind === 'once_at' ? { onceAt: at } : { intervalSeconds: Number(seconds), windowStartTime: windowStart, windowEndTime: windowEnd }) } } })
+    setBusy(true); setError('')
+    try {
+      const result = await actions.rabiConnection(operation.current.endpoint, operation.current.body)
+      actions.rabiWorkspace.accept({ botId: bot.id, roleId: scope.roleId, resource: 'schedules' }, result)
+      actions.rabiWorkspace.clearWrite(scope); operation.current = null
+      await onDone()
+    }
+    catch (failure) {
+      if (['bot/rabi-revision-conflict', 'bot/rabi-validation', 'bot/rabi-binding-conflict'].includes(failure.code)) {
+        actions.rabiWorkspace.clearWrite(scope); operation.current = null
+      }
+      if (failure.code === 'bot/rabi-revision-conflict') {
+        const latest = await actions.rabiWorkspace.refresh({ botId: bot.id, roleId: scope.roleId, resource: 'schedules' }).catch(() => null)
+        if (latest) { setExpectedRevision(latest.revision); setConflict(latest.items.find(item => item.id === task?.id) ?? { title: t('No such task') }) }
+      }
+      setError(hostText(failure.message))
+    }
+    finally { setBusy(false) }
+  }
+  const input = (label, value, change, extra = {}) => h('label', { className: 'bt-rabi-task-field' }, h('span', null, t(label)), h(Input, { value, disabled: locked, onChange: event => change(event.target.value), ...extra }))
+  return h(Modal, { open: true, title: `${bot.name} · ${t(task ? 'Edit task' : 'New task')} · Rabi`, closeLabel: t('Close'), onClose: busy ? () => {} : onCancel, className: 'bt-rabi-task-dialog' },
+    h('form', { className: 'bt-rabi-task-form', onSubmit: event => void submit(event) },
+      onTarget ? h(Menu, { open: choosing, portal: true, onClose: () => setChoosing(false), selectedId: bot.id,
+        anchor: h(Button, { type: 'button', disabled: locked, onClick: () => setChoosing(true) }, t('Send to'), ' · ', bot.name),
+        items: [...roster.bots, ...roster.rooms].map(item => ({ id: item.id, label: item.name })), onSelect: id => { setChoosing(false); onTarget(id) } }) : null,
+      input('Name', title, setTitle, { required: true, maxLength: 120, autoFocus: true }),
+      task?.actionType === 'run_script' ? h('p', { className: 'bt-set-hint' }, t('This task runs a script. Its action stays in Rabi.')) : h('div', { className: 'bt-rabi-task-field' }, h('span', null, t('What to do')),
+        locked ? h('div', { className: 'bt-rabi-document' }, message) : h(InlineEditor, { value: message, label: t('What to do'), onChange: setMessage, onSave: () => void submit(), onCancel })),
+      task?.template && task.actionType !== 'run_script' ? h('div', { className: 'bt-rabi-task-field' }, h('span', null, t('Instructions template')),
+        locked ? h('div', { className: 'bt-rabi-document' }, template) : h(InlineEditor, { value: template, label: t('Instructions template'), onChange: setTemplate, onSave: () => void submit(), onCancel })) : null,
+      h('div', { className: 'bt-rabi-task-kinds' }, [['daily_time', 'Daily'], ['interval', 'Repeat'], ['once_at', 'Once']].map(([value, label]) => h(Button, { key: value, type: 'button', disabled: locked, 'aria-pressed': kind === value, onClick: () => setKind(value) }, t(label)))),
+      kind === 'daily_time' ? input('Time', time, setTime, { placeholder: '09:00', pattern: '(?:[01][0-9]|2[0-3]):[0-5][0-9]', required: true }) : null,
+      kind === 'once_at' ? input('Date and time', at, setAt, { placeholder: '2030-01-01T09:00:00', required: true }) : null,
+      kind === 'interval' ? h(Fragment, null, input('Interval in seconds', seconds, setSeconds, { type: 'number', min: 1, required: true }), input('Window start', windowStart, setWindowStart, { placeholder: '09:00' }), input('Window end', windowEnd, setWindowEnd, { placeholder: '20:30' })) : null,
+      h('label', { className: 'bt-rabi-task-enabled' }, t('Enabled in Rabi'), h(Switch, { checked: enabled, label: t('Enabled in Rabi'), disabled: locked, onChange: setEnabled })),
+      h('p', { className: 'bt-set-hint' }, t('Times use the Rabi host time zone.')),
+      conflict ? h('div', { className: 'bt-set-card' }, t('Current rule in Rabi. Review before saving your edits.'), h('p', null, conflict.title), h('p', null, conflict.message), h('p', null, conflict.template), conflict.schedule ? timingText(conflict) : null) : null,
+      error || operation.current ? h('p', { role: 'alert', className: 'bt-error' }, error || t('This operation needs confirmation. Retry the original request.')) : null,
+      h('div', { className: 'bt-actions' }, h(Button, { type: 'button', disabled: busy, onClick: onCancel }, t('Cancel')), h(Button, { type: 'submit', disabled: busy || !title.trim(), variant: 'primary' }, t(operation.current && error ? 'Retry' : 'Save')))))
+}
+
+function NewRabiSchedule({ bot, roster, actions, onTarget, onCancel }) {
+  const store = actions.rabiWorkspace
+  const roleId = bot.rabiPersona.roleId
+  const scope = { botId: bot.id, roleId, resource: 'schedules' }
+  const subscribe = useCallback(listener => store.subscribe(scope, listener), [store, bot.id, roleId])
+  const snapshot = useCallback(() => store.snapshot(scope), [store, bot.id, roleId])
+  const { value, error } = useSyncExternalStore(subscribe, snapshot)
+  useEffect(() => { void store.visit(scope) }, [store, bot.id, roleId])
+  if (!value) return h('div', { role: error ? 'alert' : 'status', className: error ? 'bt-error' : 'bt-set-hint' },
+    error ? hostText(error.message) : t('Loading…'), h(Button, { onClick: onCancel }, t('Cancel')))
+  return h(RabiScheduleForm, { bot, roster, actions, revision: value.revision, onTarget, onCancel,
+    onDone: onCancel })
 }
 
 const pad = number => String(number).padStart(2, '0')
@@ -114,7 +296,7 @@ function inAnHour() {
 const KINDS = [['at', 'Once'], ['daily', 'Every day'], ['weekly', 'Every week'], ['every', 'Repeat']]
 const UNITS = [['minutes', 1, 'minutes'], ['hours', 60, 'hours'], ['days', 1440, 'days']]
 
-function TaskForm({ roster, actions, start, onDone, onCancel }) {
+export function TaskForm({ roster, actions, start, onDone, onCancel }) {
   // A task goes to a Bot's chat or to a group chat, where it reads as your message.
   const [target, setTarget] = useState(start ?? roster.bots[0]?.id ?? '')
   const [title, setTitle] = useState('')
@@ -143,6 +325,8 @@ function TaskForm({ roster, actions, start, onDone, onCancel }) {
       .then(onDone, (failure) => { setError(hostText(failure?.message ?? String(failure))); setBusy(false) })
   }
   const toggleDay = day => setWeekdays(days => (days.includes(day) ? days.filter(item => item !== day) : [...days, day].sort()))
+  const rabiBot = roster.bots.find(bot => bot.id === target && bot.rabiPersona?.roleId && bot.rabiPersona.enabled !== false)
+  if (rabiBot) return h(NewRabiSchedule, { key: `${rabiBot.id}:${rabiBot.rabiPersona.roleId}`, bot: rabiBot, roster, actions, onTarget: setTarget, onDone, onCancel })
   return h('form', { className: 'bt-set-card bt-task-form', onSubmit: submit },
     h('label', { className: 'bt-set-row bt-bs-row' },
       h('span', { className: 'bt-set-copy' }, h('span', { className: 'bt-bs-label' }, t('Send to'))),
@@ -192,23 +376,27 @@ export function SchedulesPage({ roster, actions, start }) {
   const owner = start?.startsWith('bot:') ? start.slice(4) : start?.startsWith('room:') ? start.slice(5) : null
   const [adding, setAdding] = useState(Boolean(start) && owner === null)
   if (view === null) return h('div', { className: 'bt-set-hint' }, t('Loading…'))
-  if (!view.available) return h(AutomationOff, { actions })
   const shown = next => { publish(next); setAdding(false) }
   const byChat = [
     ...roster.bots.map(bot => [bot.id, h(BotAvatar, { bot, size: 18, badge: false, live: false }), bot.name, view.tasks.filter(task => task.botId === bot.id)]),
     ...roster.rooms.map(room => [room.id, h(RoomAvatar, { room, roster, size: 18 }), room.name, view.tasks.filter(task => task.botId === undefined && task.roomId === room.id)]),
   ].filter(([id, , , tasks]) => tasks.length > 0 && (owner === null || id === owner))
   return [
+    ...roster.bots.filter(bot => bot.rabiPersona?.enabled !== false && bot.rabiPersona?.roleId && (owner === null || owner === bot.id))
+      .map(bot => h(RabiSchedules, { key: `rabi:${bot.id}:${bot.rabiPersona.roleId}`, bot, actions, roster })),
+    !view.available ? h(AutomationOff, { key: 'off', actions }) : null,
+    !view.available ? null : h(Fragment, { key: 'local' },
     adding
       ? h(TaskForm, { key: 'form', roster, actions, start: owner ?? start, onDone: shown, onCancel: () => setAdding(false) })
       : h('div', { key: 'add', className: 'bt-actions' },
           h('button', { type: 'button', className: 'bt-soft bt-soft-sm bt-with-icon', onClick: () => setAdding(true) }, h(PlusIcon), t('New task')),
           owner !== null ? h('button', { type: 'button', className: 'bt-soft bt-soft-sm', onClick: () => actions.openSettings('schedules') }, t('Show all')) : null),
-    byChat.length === 0 && !adding
+    byChat.length > 0 ? h('h3', null, t('DSH tasks')) : null,
+    byChat.length === 0 && !adding && !roster.bots.some(bot => bot.rabiPersona?.roleId && bot.rabiPersona.enabled !== false)
       ? h('div', { key: 'none', className: 'bt-set-card' }, h('div', { className: 'bt-set-row' }, h('span', { className: 'bt-set-hint' }, t('No scheduled tasks yet.'))))
       : byChat.map(([id, avatar, name, tasks]) => h('section', { key: id, className: 'bt-set-section' },
           h('h3', { className: 'bt-task-head' }, avatar, name),
-          h('div', { className: 'bt-set-card' }, tasks.map(task => h(TaskRow, { key: task.id, task, actions, roster, onView: publish }))))),
+          h('div', { className: 'bt-set-card' }, tasks.map(task => h(TaskRow, { key: task.id, task, actions, roster, onView: publish })))))),
   ]
 }
 
@@ -219,6 +407,7 @@ export function BotSchedules({ bot, roster, actions }) {
   const tasks = view.available ? view.tasks.filter(task => task.botId === bot.id) : []
   return h('section', { className: 'bt-set-section' },
     h('h3', null, t('Scheduled tasks')),
+    bot.rabiPersona?.roleId && bot.rabiPersona.enabled !== false ? h(RabiSchedules, { key: `${bot.id}:${bot.rabiPersona.roleId}`, bot, actions, roster }) : null,
     h('div', { className: 'bt-set-card' },
       !view.available
         ? h('div', { className: 'bt-set-row bt-bs-row' },
@@ -234,6 +423,7 @@ export function BotSchedules({ bot, roster, actions }) {
 export function ScheduleSummary({ bot, actions }) {
   const view = useSchedules(actions)
   const tasks = view?.available ? view.tasks.filter(task => task.botId === bot.id && task.status === 'active') : []
+  if (bot.rabiPersona?.roleId && bot.rabiPersona.enabled !== false) return h(RabiSchedules, { key: `${bot.id}:${bot.rabiPersona.roleId}`, bot, actions, tasks, summary: true })
   return h('div', null,
     h('div', { className: 'bt-section-title' }, tasks.length === 0 ? t('Scheduled tasks') : t('Scheduled tasks · {count}', { count: tasks.length })),
     tasks.length === 0
@@ -282,6 +472,15 @@ export const SCHEDULE_CSS = `
 .bt-task-line svg{flex:none;color:var(--bt-ink-3)}
 .bt-task-line-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bt-task-line-when{flex:none;font-size:12px;color:var(--bt-ink-3)}
+.bt-rabi-task-heading{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.bt-rabi-task-heading .bt-section-title{margin:0}
+.bt-rabi-task-copy{display:flex!important;flex:1;min-width:0;flex-direction:column;align-items:flex-start!important;text-align:left;white-space:normal!important}
+.bt-rabi-task-copy .bt-set-hint{font-size:12px;overflow-wrap:anywhere}
+.bt-rabi-task-form{display:flex;flex-direction:column;gap:12px}
+.bt-rabi-task-field{display:flex;flex-direction:column;gap:6px;min-width:0;font-size:13px}
+.bt-rabi-task-kinds,.bt-rabi-task-enabled{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.bt-rabi-task-dialog{width:min(480px,calc(100vw - 32px))}
+.bt-rabi-pending{display:flex;flex-direction:column;gap:6px;padding:8px;font-size:13px}
 @media (prefers-reduced-motion:reduce){.bt-task-form{animation:none}}
 /* Phone-width viewports: the form's fixed minimums would overflow; let the
    fields wrap and share the row. */

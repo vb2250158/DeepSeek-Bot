@@ -222,6 +222,9 @@ export function install(rt) {
           await rt.load()
           return ok(await rt.groupLibraryEndpoint(endpoint, body))
         case 'rabi-bot-view':
+        case 'rabi-schedule-save':
+        case 'rabi-schedule-delete':
+        case 'rabi-schedule-toggle':
         case 'rabi-personas-list':
         case 'rabi-persona-import':
         case 'rabi-personas-import-all':

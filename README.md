@@ -117,6 +117,8 @@ Manage plugins through the native **Plugins** entry. The team footer opens **Bot
 
 The right panel centers the avatar, name and role above Details and Library. Details starts with the full-width single-line model selector, followed by schedules; Rabi resources live in Library. A window-local cache separates Bot, persona, resource and item reads, keeps in-flight requests alive across navigation, and refreshes retained content in the background on return. Duplicate reads share one request. Pages append and resume; memory categories appear together without nested menus or manual refresh. The cache retains up to 64 views and about 4 MiB of inactive content, never enters browser storage, and never supplies Agent context.
 
+For a Bot bound to a Rabi persona, Details and Scheduled tasks include that persona's Rabi schedules with enable switches. Create, edit and delete personal schedules here; new tasks default to Rabi and keep their original Rabi identity. Daily, interval and one-time schedules use the Rabi host's time zone. Existing action targets, scripts and unrelated rules stay in Rabi. Changes check the persona and configuration revision; uncertain operations retain their original request in this window for retry. Group chat schedules continue using DSH.
+
 Drag either column divider to resize the conversation list or details. Widths stay on this browser; double-click resets a column, and the focused divider accepts arrow keys. Narrow panels hide details and then compact the list to keep the chat usable.
 
 Every Bot can create and change Bots and manage every group chat. Right-click a chat to pin or unpin it, or drag it to the pin region above the list. Pinned tiles are saved independently of permissions.
