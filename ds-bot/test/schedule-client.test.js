@@ -142,6 +142,19 @@ test('personal creation chooses Rabi and group creation keeps the DSH form', () 
   assert.equal(group.type, 'form')
 })
 
+test('a Rabi read failure still lets the user select a group and create its DSH task', () => {
+  const bot = { id: 'bot', name: 'Persona', rabiPersona: { roleId: 'fixture' } }
+  const roster = { bots: [bot], rooms: [{ id: 'room', name: 'Group' }] }
+  const actions = { rabiWorkspace: { snapshot: () => ({ value: null, error: new Error('offline') }), subscribe() {} } }
+  const draw = render(TaskForm, { roster, actions, start: bot.id })
+  const personal = draw()
+  const loading = personal.type(personal.props)
+  const picker = nodes(loading).find(node => node.type === 'menu')
+  assert.ok(picker.props.items.some(item => item.id === 'room'))
+  picker.props.onSelect('room')
+  assert.equal(draw().type, 'form')
+})
+
 test('a revision conflict preserves form edits and lets the user retry against the reread revision', async () => {
   const bot = { id: 'bot', name: 'Persona', rabiPersona: { roleId: 'fixture' } }
   const task = { id: 'one', title: 'Check', message: 'Original message', status: 'active', kind: 'rabi', schedule: { type: 'daily_time', timeOfDay: '09:00' } }

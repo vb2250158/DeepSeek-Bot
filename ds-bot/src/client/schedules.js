@@ -200,8 +200,8 @@ export function RabiScheduleRow({ task, bot, actions, revision, onView, onEdit, 
         h('span', { className: 'bt-task-title' }, task.title),
         h('span', { className: 'bt-set-hint' }, `${timingText(task)} · ${nextText(task)}`)),
       h(Switch, { checked: task.status === 'active', disabled: busy || Boolean(operation.current), label: t('Activate {name}', { name: task.title }), onChange: enabled => void run('rabi-schedule-toggle', { enabled }) }),
-      !summary ? h(Button, { variant: 'ghost', disabled: busy || Boolean(operation.current), onClick: onEdit, 'aria-label': t('Edit task') }, h(PencilIcon)) : null,
-      !summary ? h(Button, { variant: 'ghost', disabled: busy || Boolean(operation.current), onClick: () => confirming ? void run('rabi-schedule-delete') : setConfirming(true), 'aria-label': t('Delete task') }, confirming ? t('Click again to delete') : h(TrashIcon)) : null),
+      !summary ? h(Button, { variant: 'ghost', size: 'sm', disabled: busy || Boolean(operation.current), onClick: onEdit, 'aria-label': t('Edit task') }, h(PencilIcon)) : null,
+      !summary ? h(Button, { variant: 'ghost', size: 'sm', disabled: busy || Boolean(operation.current), onClick: () => confirming ? void run('rabi-schedule-delete') : setConfirming(true), 'aria-label': t('Delete task') }, confirming ? t('Click again to delete') : h(TrashIcon)) : null),
     error || operation.current ? h('div', { role: 'alert', className: 'bt-error' }, error || t('This operation needs confirmation. Retry the original request.'), operation.current ? h(Button, { disabled: busy, onClick: () => void run() }, t('Retry')) : null) : null)
 }
 
@@ -280,9 +280,15 @@ function NewRabiSchedule({ bot, roster, actions, onTarget, onCancel }) {
   const subscribe = useCallback(listener => store.subscribe(scope, listener), [store, bot.id, roleId])
   const snapshot = useCallback(() => store.snapshot(scope), [store, bot.id, roleId])
   const { value, error } = useSyncExternalStore(subscribe, snapshot)
+  const [choosing, setChoosing] = useState(false)
   useEffect(() => { void store.visit(scope) }, [store, bot.id, roleId])
   if (!value) return h('div', { role: error ? 'alert' : 'status', className: error ? 'bt-error' : 'bt-set-hint' },
-    error ? hostText(error.message) : t('Loading…'), h(Button, { onClick: onCancel }, t('Cancel')))
+    h(Menu, { open: choosing, portal: true, onClose: () => setChoosing(false), selectedId: bot.id,
+      anchor: h(Button, { onClick: () => setChoosing(true) }, t('Send to'), ' · ', bot.name),
+      items: [...roster.bots, ...roster.rooms].map(item => ({ id: item.id, label: item.name })), onSelect: id => { setChoosing(false); onTarget(id) } }),
+    error ? hostText(error.message) : t('Loading…'),
+    error ? h(Button, { onClick: () => void store.visit(scope) }, t('Retry')) : null,
+    h(Button, { onClick: onCancel }, t('Cancel')))
   return h(RabiScheduleForm, { bot, roster, actions, revision: value.revision, onTarget, onCancel,
     onDone: onCancel })
 }
@@ -474,7 +480,7 @@ export const SCHEDULE_CSS = `
 .bt-task-line-when{flex:none;font-size:12px;color:var(--bt-ink-3)}
 .bt-rabi-task-heading{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .bt-rabi-task-heading .bt-section-title{margin:0}
-.bt-rabi-task-copy{display:flex!important;flex:1;min-width:0;flex-direction:column;align-items:flex-start!important;text-align:left;white-space:normal!important}
+.bt-rabi-task-copy{display:flex!important;flex:1;min-width:0;height:auto!important;min-height:36px;flex-direction:column;align-items:flex-start!important;text-align:left;white-space:normal!important;padding-block:4px!important}
 .bt-rabi-task-copy .bt-set-hint{font-size:12px;overflow-wrap:anywhere}
 .bt-rabi-task-form{display:flex;flex-direction:column;gap:12px}
 .bt-rabi-task-field{display:flex;flex-direction:column;gap:6px;min-width:0;font-size:13px}
