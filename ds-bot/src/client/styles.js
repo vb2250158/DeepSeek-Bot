@@ -190,6 +190,12 @@ body[data-bt-motion=quiet] .bt-mark[data-poke]{cursor:default}
 body{--bt-msg-w:.8;--bt-flat-w:1}
 .bt-astack{display:flex;flex-direction:column;align-items:flex-start;gap:2px;margin:0}
 .bt-bubble{max-width:min(calc(var(--bt-msg-w) * 100%),calc(100% - 82px));background:var(--bt-bubble);color:var(--bt-ink);border-radius:18px;padding:7px 12px;font-size:var(--dsh-content-font-size,14px);line-height:calc(var(--dsh-content-font-size,14px) + 10px);box-sizing:border-box;overflow-wrap:anywhere;text-wrap:pretty;text-autospace:normal}
+/* One Bot chat has exactly one speaker, so any two assistant steps that sit side by
+   side are the same speaker's consecutive replies: close them to 2px and square the
+   facing corners, without touching a step that has a card in between. */
+[data-chat-flow-kind=assistant-step]+[data-chat-flow-kind=assistant-step]{margin-top:2px!important}
+[data-chat-flow-kind=assistant-step]:has(+[data-chat-flow-kind=assistant-step]) .bt-msg:last-child>.bt-msg-line>.bt-bubble{border-end-start-radius:4px}
+[data-chat-flow-kind=assistant-step]+[data-chat-flow-kind=assistant-step] .bt-msg:first-child>.bt-msg-line>.bt-bubble{border-start-start-radius:4px}
 /* Two bubbles of one speaker meet flat: the facing corners square off so the pair
    reads as one block instead of two separate cards. */
 .bt-msg:not(:first-child)>.bt-msg-line>.bt-bubble{border-start-start-radius:4px}
