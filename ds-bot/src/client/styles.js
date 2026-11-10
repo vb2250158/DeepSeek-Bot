@@ -202,13 +202,13 @@ body{--bt-msg-w:.8;--bt-flat-w:1}
 .bt-bubble :is(img,video),.bt-ububble :is(img,video),[data-chat-flow] [class*="_bubble"] :is(img,video){max-width:100%;height:auto}
 .bt-bubble a[href^="${MENTION_ORIGIN}"]{text-decoration:none;font-weight:400;cursor:pointer;white-space:nowrap}
 .bt-bubble a[href^="${MENTION_ORIGIN}"]::before{content:"";display:inline-block;width:16px;height:16px;margin-right:3px;vertical-align:-3px;background:currentColor;-webkit-mask:${DEFAULT_MASK} center/contain no-repeat;mask:${DEFAULT_MASK} center/contain no-repeat}
-.bt-group-msg{display:flex;flex-direction:column;gap:4px;margin:16px 0 0}
+.bt-group-msg{display:flex;flex-direction:column;gap:0;margin:16px 0 0}
 .bt-group-msg:first-child{margin-top:0}
-.bt-group-msg[data-chain-prev]{margin-top:2px}
+.bt-group-msg[data-chain-prev]{margin-top:0}
 .bt-group-msg[data-chain-prev]>.bt-group-name{display:none}
 body:not([data-bt-layout=flat]) .bt-group-msg[data-chain-next] .bt-lead{visibility:hidden}
 [data-chat-flow]>[data-chat-group-key][data-bt-chain-next]{padding-bottom:2px!important;margin-bottom:0!important}
-[data-chat-flow]>[data-chat-group-key][data-bt-chain-prev]{padding-top:2px!important;margin-top:0!important}
+[data-chat-flow]>[data-chat-group-key][data-bt-chain-prev]{padding-top:0!important;margin-top:0!important}
 .bt-lead{flex:none;display:flex;margin-bottom:1px}
 button.bt-lead{border:0;background:none;padding:0;cursor:pointer}
 /* The speaker's avatar sits in the head above the bubbles, so every row of the turn
