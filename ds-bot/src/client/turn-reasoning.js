@@ -1,4 +1,28 @@
-// Settled and live reasoning of every loaded step in a Turn, shown once on the last
+// Human steering splits a Turn into independent replies. Settled steps use their
+// log seq; the current live step keeps its Chat anchor until settlement.
+export function replySegment(steps, current, steering = [], anchorSeq) {
+  // Only the last admitted step can still be live. When another cell renders,
+  // it belongs after every admitted steering input, without needing its DOM anchor.
+  const seqOf = step => step.finalNode?.seq ?? (step.step === current.step ? anchorSeq : Infinity)
+  const seq = seqOf(current)
+  let afterSeq
+  let beforeSeq
+  for (const input of steering) {
+    if (input.seq < seq && (afterSeq === undefined || input.seq > afterSeq)) afterSeq = input.seq
+    if (input.seq > seq && (beforeSeq === undefined || input.seq < beforeSeq)) beforeSeq = input.seq
+  }
+  const members = steps.length ? steps : [current]
+  return {
+    steps: afterSeq === undefined && beforeSeq === undefined ? members : members.filter(step => {
+      const at = seqOf(step)
+      return (afterSeq === undefined || at > afterSeq) && (beforeSeq === undefined || at < beforeSeq)
+    }),
+    afterSeq,
+    beforeSeq,
+  }
+}
+
+// Settled and live reasoning of every loaded step in a reply, shown once on the last
 // step that has reasoning: only steps with reasoning get a reasoning part to render
 // it. Sitting under the Turn's tool lines keeps the row directly above the reply.
 export function turnReasoning(steps, current) {

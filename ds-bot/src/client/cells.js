@@ -17,7 +17,7 @@ import { AppAccessCall, ComputerCallRow, ComputerHandoffCall } from './computer.
 import { t } from './i18n.js'
 import { call } from './api.js'
 import { failureLabel } from './diagnostics.js'
-import { turnReasoning, thinkingStep, opensReply, stepActivity } from './turn-reasoning.js'
+import { turnReasoning, thinkingStep, opensReply, stepActivity, replySegment } from './turn-reasoning.js'
 import { UserHead } from './user-identity.js'
 import { parseReplies, stackReplies } from '../shared/group-replies.js'
 import { FOLD_AT, FOLD_HUGE, stripLongNote, useFold } from './fold.js'
@@ -188,13 +188,13 @@ function MessageTools({ text, name, sessionId, react, actions, open: tapped }) {
 // A Turn's settled thinking time, fetched per count of settled steps: while a turn
 // runs each new settled step refetches; scrolling back to a loaded turn reuses it.
 const thinkingTimes = new Map()
-function useThinkingMs({ sessionId, turn, settledSteps, skip }) {
-  const key = `${sessionId}:${turn}:${settledSteps}`
+function useThinkingMs({ sessionId, turn, settledSteps, skip, afterSeq, beforeSeq }) {
+  const key = `${sessionId}:${turn}:${settledSteps}:${afterSeq ?? ''}:${beforeSeq ?? ''}`
   const [ms, setMs] = useState(() => thinkingTimes.get(key))
   useEffect(() => {
     if (skip || thinkingTimes.has(key)) { setMs(thinkingTimes.get(key)); return undefined }
     const control = new AbortController()
-    call('thinking', { sessionId, turn }, control.signal)
+    call('thinking', { sessionId, turn, afterSeq, beforeSeq }, control.signal)
       .then(value => { thinkingTimes.set(key, value?.ms); setMs(value?.ms) })
       .catch(() => {})
     return () => control.abort()
@@ -260,10 +260,13 @@ function useFileMentions({ node, openFile, fileMentions, useTurnData }) {
   }, [fileMentions, openFile, seq, tail, turn])
 }
 
-export function AssistantCell({ node, groupPart, sessionId, openFile, fileMentions, useTurnData, useRoster, useUi, useTurnSteps, useTurnContext, actions }) {
+export function AssistantCell({ node, groupPart, sessionId, openFile, fileMentions, useTurnData, useRoster, useUi, useTurnSteps, useTurnContext, useTurnSteering, actions }) {
   const roster = useRoster(value => value)
   const data = node.data
-  const steps = useTurnSteps(String(data.turn))
+  const turnSteps = useTurnSteps(String(data.turn))
+  const steering = useTurnSteering?.(String(data.turn)) ?? []
+  const segment = replySegment(turnSteps, data, steering, node.anchorSeq)
+  const steps = segment.steps
   const contexts = useTurnContext(String(data.turn))
   const mentions = useFileMentions({ node, openFile, fileMentions, useTurnData })
   const hidden = Boolean(roster.roomsById[sessionId]) || isHiddenTurn(roster, sessionId, data.turn)
@@ -275,7 +278,7 @@ export function AssistantCell({ node, groupPart, sessionId, openFile, fileMentio
   // A live step of the same Turn keeps the row ticking even when it sits on an
   // earlier step's cell.
   const thinking = groupPart === 'response' || !shown ? undefined : thinkingStep(members)
-  const ms = useThinkingMs({ sessionId, turn: data.turn, settledSteps: members.filter(step => step.status !== 'running').length, skip: hidden || reasoning === '' })
+  const ms = useThinkingMs({ sessionId, turn: data.turn, settledSteps: members.filter(step => step.status !== 'running').length, skip: hidden || reasoning === '', afterSeq: segment.afterSeq, beforeSeq: segment.beforeSeq })
   // Steps are redrawn as a Turn streams; re-mark their seams after each commit so the
   // spacing and squared corners follow the final order.
   useLayoutEffect(() => {
@@ -288,7 +291,7 @@ export function AssistantCell({ node, groupPart, sessionId, openFile, fileMentio
   // A relay spliced mid-turn is a 'context' node, hidden from the chat flow on
   // DSH 0.2; the step that answers it shows the event line where it was read,
   // once, in the step's first cell.
-  const relays = relayPart(data, groupPart) ? relaysBefore(contexts, steps, data) : []
+  const relays = relayPart(data, groupPart) ? relaysBefore(contexts, turnSteps, data) : []
   const activity = groupPart === 'response' ? [] : stepActivity(data)
   if (texts.length === 0 && !reasoning && relays.length === 0 && activity.length === 0) return h(CellEmpty)
   const selfId = roster.byId[sessionId]?.id ?? sessionId
@@ -313,7 +316,7 @@ export function AssistantCell({ node, groupPart, sessionId, openFile, fileMentio
     head ? h(SpeakerHead, { bot: speaker }) : null,
     activity.length ? h('div', { className: 'bt-agent-activity' }, activity.map((line, index) => h('div', { key: index, className: 'bt-agent-act', title: line }, h('span', { className: 'bt-agent-act-mark', 'aria-hidden': true }), h('span', { className: 'bt-agent-act-text' }, activityParts(line))))) : null,
     reasoning ? h(ThinkingRow, {
-      text: reasoning, live: thinking !== undefined, viewKey: `${sessionId}:${data.turn}`,
+      text: reasoning, live: thinking !== undefined, viewKey: `${sessionId}:${data.turn}:${segment.afterSeq ?? 'start'}`,
       // The live clock counts the settled steps too: backing `at` by the settled
       // time makes one Elapsed show settled + running.
       ...(thinking !== undefined ? { at: typeof thinking.time === 'number' ? thinking.time - (ms ?? 0) : undefined } : { ms }),
@@ -350,7 +353,7 @@ function SpeakerHead({ bot }) {
     h('span', { className: 'bt-lead' }, h(BotMark, { bot, size: 36 })), bot.name)
 }
 
-const CHAIN_BREAK_SEL = '.bt-group-msg, [data-chat-flow-kind=assistant-step], .bt-umsg, .bt-urow, [data-chat-flow-kind=user], [data-chat-flow-kind=command-input], .bt-q-inline, .bt-event, .bt-time-sep, .bt-new-sep, .bt-part-line, .bt-btw-card, .bt-learn-card'
+const CHAIN_BREAK_SEL = '.bt-group-msg, [data-chat-flow-kind=assistant-step], .bt-umsg, .bt-urow, [data-chat-flow-kind=user], [data-chat-flow-kind=steering], [data-pending-steering], [data-chat-flow-kind=command-input], .bt-q-inline, .bt-event, .bt-time-sep, .bt-new-sep, .bt-part-line, .bt-btw-card, .bt-learn-card'
 export function syncGroupChains(flow) {
   const items = [...flow.querySelectorAll(CHAIN_BREAK_SEL)]
   for (let i = 0; i < items.length; i += 1) {

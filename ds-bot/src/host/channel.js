@@ -263,7 +263,10 @@ export function install(rt) {
           const turn = Number(body.turn)
           if (!Number.isFinite(turn) || rt.selfOf(sessionId) === undefined) return ok(null)
           await rt.load()
-          const ms = await rt.thinkingOf(sessionId, turn)
+          const { afterSeq, beforeSeq } = body
+          if ([afterSeq, beforeSeq].some(seq => seq !== undefined && (!Number.isSafeInteger(seq) || seq < 0))
+            || (afterSeq !== undefined && beforeSeq !== undefined && beforeSeq <= afterSeq)) throw invalid('Invalid thinking sequence range')
+          const ms = await rt.thinkingOf(sessionId, turn, { afterSeq, beforeSeq })
           return ok(ms === undefined ? {} : { ms })
         }
         // Model providers and their keys, for a window without DSH's own Models page.

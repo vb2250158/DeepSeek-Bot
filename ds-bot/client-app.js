@@ -19896,6 +19896,25 @@ var GOAL_CSS = `
 `;
 
 // src/client/turn-reasoning.js
+function replySegment(steps, current, steering = [], anchorSeq) {
+  const seqOf = (step) => step.finalNode?.seq ?? (step.step === current.step ? anchorSeq : Infinity);
+  const seq = seqOf(current);
+  let afterSeq;
+  let beforeSeq;
+  for (const input of steering) {
+    if (input.seq < seq && (afterSeq === void 0 || input.seq > afterSeq)) afterSeq = input.seq;
+    if (input.seq > seq && (beforeSeq === void 0 || input.seq < beforeSeq)) beforeSeq = input.seq;
+  }
+  const members = steps.length ? steps : [current];
+  return {
+    steps: afterSeq === void 0 && beforeSeq === void 0 ? members : members.filter((step) => {
+      const at = seqOf(step);
+      return (afterSeq === void 0 || at > afterSeq) && (beforeSeq === void 0 || at < beforeSeq);
+    }),
+    afterSeq,
+    beforeSeq
+  };
+}
 function turnReasoning(steps, current) {
   const members = steps.length ? steps : [current];
   if (members.findLast((step) => stepReasoning(step) !== "")?.step !== current.step) return "";
@@ -20815,8 +20834,8 @@ function MessageTools({ text, name, sessionId, react, actions, open: tapped }) {
   );
 }
 var thinkingTimes = /* @__PURE__ */ new Map();
-function useThinkingMs({ sessionId, turn, settledSteps, skip }) {
-  const key = `${sessionId}:${turn}:${settledSteps}`;
+function useThinkingMs({ sessionId, turn, settledSteps, skip, afterSeq, beforeSeq }) {
+  const key = `${sessionId}:${turn}:${settledSteps}:${afterSeq ?? ""}:${beforeSeq ?? ""}`;
   const [ms, setMs] = (0, import_react52.useState)(() => thinkingTimes.get(key));
   (0, import_react52.useEffect)(() => {
     if (skip || thinkingTimes.has(key)) {
@@ -20824,7 +20843,7 @@ function useThinkingMs({ sessionId, turn, settledSteps, skip }) {
       return void 0;
     }
     const control = new AbortController();
-    call("thinking", { sessionId, turn }, control.signal).then((value) => {
+    call("thinking", { sessionId, turn, afterSeq, beforeSeq }, control.signal).then((value) => {
       thinkingTimes.set(key, value?.ms);
       setMs(value?.ms);
     }).catch(() => {
@@ -20889,10 +20908,13 @@ function useFileMentions({ node, openFile, fileMentions, useTurnData }) {
     return tail?.closing?.finalNode.seq === seq ? fileMentions({ turn, seq, openFile }) : void 0;
   }, [fileMentions, openFile, seq, tail, turn]);
 }
-function AssistantCell({ node, groupPart, sessionId, openFile, fileMentions, useTurnData, useRoster, useUi, useTurnSteps, useTurnContext, actions }) {
+function AssistantCell({ node, groupPart, sessionId, openFile, fileMentions, useTurnData, useRoster, useUi, useTurnSteps, useTurnContext, useTurnSteering, actions }) {
   const roster = useRoster((value) => value);
   const data = node.data;
-  const steps = useTurnSteps(String(data.turn));
+  const turnSteps = useTurnSteps(String(data.turn));
+  const steering = useTurnSteering?.(String(data.turn)) ?? [];
+  const segment = replySegment(turnSteps, data, steering, node.anchorSeq);
+  const steps = segment.steps;
   const contexts = useTurnContext(String(data.turn));
   const mentions = useFileMentions({ node, openFile, fileMentions, useTurnData });
   const hidden = Boolean(roster.roomsById[sessionId]) || isHiddenTurn(roster, sessionId, data.turn);
@@ -20902,14 +20924,14 @@ function AssistantCell({ node, groupPart, sessionId, openFile, fileMentions, use
   const shown = thinkingShown(roster.prefs);
   const reasoning = groupPart === "response" || !shown ? "" : turnReasoning(steps, data);
   const thinking = groupPart === "response" || !shown ? void 0 : thinkingStep(members);
-  const ms = useThinkingMs({ sessionId, turn: data.turn, settledSteps: members.filter((step) => step.status !== "running").length, skip: hidden || reasoning === "" });
+  const ms = useThinkingMs({ sessionId, turn: data.turn, settledSteps: members.filter((step) => step.status !== "running").length, skip: hidden || reasoning === "", afterSeq: segment.afterSeq, beforeSeq: segment.beforeSeq });
   (0, import_react52.useLayoutEffect)(() => {
     const flow = document.querySelector(".bt-chat-column [data-chat-flow]");
     if (flow) scheduleGroupChains(flow);
   }, [sessionId, data.turn, node.key]);
   useLiveNote(actions, sessionId, `text:${node.key ?? data.seq}`, !hidden && running && texts2.length > 0 ? { text: true } : null);
   if (hidden) return (0, import_react52.createElement)(CellEmpty);
-  const relays = relayPart(data, groupPart) ? relaysBefore(contexts, steps, data) : [];
+  const relays = relayPart(data, groupPart) ? relaysBefore(contexts, turnSteps, data) : [];
   const activity = groupPart === "response" ? [] : stepActivity(data);
   if (texts2.length === 0 && !reasoning && relays.length === 0 && activity.length === 0) return (0, import_react52.createElement)(CellEmpty);
   const selfId = roster.byId[sessionId]?.id ?? sessionId;
@@ -20936,7 +20958,7 @@ function AssistantCell({ node, groupPart, sessionId, openFile, fileMentions, use
     reasoning ? (0, import_react52.createElement)(ThinkingRow, {
       text: reasoning,
       live: thinking !== void 0,
-      viewKey: `${sessionId}:${data.turn}`,
+      viewKey: `${sessionId}:${data.turn}:${segment.afterSeq ?? "start"}`,
       // The live clock counts the settled steps too: backing `at` by the settled
       // time makes one Elapsed show settled + running.
       ...thinking !== void 0 ? { at: typeof thinking.time === "number" ? thinking.time - (ms ?? 0) : void 0 } : { ms }
@@ -20982,7 +21004,7 @@ function SpeakerHead({ bot }) {
     bot.name
   );
 }
-var CHAIN_BREAK_SEL = ".bt-group-msg, [data-chat-flow-kind=assistant-step], .bt-umsg, .bt-urow, [data-chat-flow-kind=user], [data-chat-flow-kind=command-input], .bt-q-inline, .bt-event, .bt-time-sep, .bt-new-sep, .bt-part-line, .bt-btw-card, .bt-learn-card";
+var CHAIN_BREAK_SEL = ".bt-group-msg, [data-chat-flow-kind=assistant-step], .bt-umsg, .bt-urow, [data-chat-flow-kind=user], [data-chat-flow-kind=steering], [data-pending-steering], [data-chat-flow-kind=command-input], .bt-q-inline, .bt-event, .bt-time-sep, .bt-new-sep, .bt-part-line, .bt-btw-card, .bt-learn-card";
 function syncGroupChains(flow) {
   const items = [...flow.querySelectorAll(CHAIN_BREAK_SEL)];
   for (let i = 0; i < items.length; i += 1) {
@@ -30916,6 +30938,11 @@ function apply(ctx) {
         const snapshot = chat.getSnapshot();
         if (snapshot === void 0) throw new Error("ds-bot: Chat target is unavailable");
         return snapshot.nodes.turnDataSource(Number(turn), "context");
+      },
+      turnSteering: (turn) => {
+        const snapshot = chat.getSnapshot();
+        if (snapshot === void 0) throw new Error("ds-bot: Chat target is unavailable");
+        return snapshot.nodes.turnDataSource(Number(turn), "steering");
       }
     } };
   };

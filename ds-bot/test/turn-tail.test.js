@@ -68,6 +68,32 @@ function cellProps({ closingSeq = 10, turn = finished } = {}) {
 }
 const markdownOf = props => find(expand(AssistantCell(props), ['Bubbles', 'Bubble']), node => node.type === MarkdownText)
 
+test('a steer starts an independent reply and keeps reasoning on its own side', () => {
+  const { props } = cellProps()
+  const steps = [
+    { turn: 3, step: 1, status: 'settled', finalNode: { seq: 10 }, blocks: [{ kind: 'reasoning', text: 'Before thought' }, { kind: 'text', text: 'Before reply' }] },
+    { turn: 3, step: 2, status: 'running', blocks: [{ kind: 'reasoning', text: 'After thought' }] },
+  ]
+  const render = (current, anchorSeq, prefs) => AssistantCell({ ...props,
+    node: { ...props.node, anchorSeq, data: current },
+    useTurnSteps: () => steps,
+    useTurnSteering: () => [{ seq: 12 }],
+    useRoster: select => select({ ...roster, prefs }),
+  })
+  const before = render(steps[0], 8, { thinking: true })
+  const after = render(steps[1], 15, { thinking: true })
+  assert.equal(find(before, node => node.type === ThinkingRow)[0]?.props.text, 'Before thought')
+  assert.equal(find(after, node => node.type === ThinkingRow)[0]?.props.text, 'After thought')
+  assert.equal(find(after, node => node.type?.name === 'SpeakerHead').length, 1)
+  assert.equal(find(before, node => node.type === ThinkingRow)[0]?.props.live, false)
+  assert.notEqual(find(before, node => node.type === ThinkingRow)[0]?.props.viewKey,
+    find(after, node => node.type === ThinkingRow)[0]?.props.viewKey)
+  steps[1].blocks.push({ kind: 'text', text: 'After reply' })
+  for (const prefs of [{}, { thinking: true }]) {
+    assert.equal(find(render(steps[1], 15, prefs), node => node.type?.name === 'SpeakerHead').length, 1)
+  }
+})
+
 test('a reply that closes its turn links the files the turn changed or delivered', () => {
   const { props, asked, links } = cellProps()
   const [markdown] = markdownOf(props)

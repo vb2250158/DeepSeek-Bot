@@ -163,6 +163,8 @@ DS Bot selects its `auto` search provider for the whole profile. If you disable 
 
 ### Bot
 
+Messages sent while a Bot is working separate the surrounding replies. Each reply keeps its own speaker heading, reasoning disclosure and thinking time, including after reloading the chat.
+
 You can do all your talking and work with one bot, in one window. You don't need to worry about the context behind it. The bot's details page shows its info, and there you can pick the model and thinking level you want it to use. You can switch models at any time, but I still recommend that you keep one model for a bot for a long time, and switch only when you really need to.
 
 Bots also have memory. A bot remembers what you like and uses it in later work. You can manage its memory on the bot's details page, or just tell the bot.

@@ -4,11 +4,13 @@
 // purpose — a failed or retried attempt's thinking never reached the reply.
 import { HISTORY_TIMEOUT_MS } from './constants.js'
 
-export function thinkingMs(events, turn) {
+export function thinkingMs(events, turn, { afterSeq, beforeSeq } = {}) {
   let total = 0
   let timed = false
   for (const event of events) {
     if (event.type !== 'assistant/message' || event.data.turn !== turn) continue
+    if (afterSeq !== undefined && !(event.seq > afterSeq)) continue
+    if (beforeSeq !== undefined && !(event.seq < beforeSeq)) continue
     const span = streamReasoningMs(event.data.stream)
     if (span === undefined) continue
     timed = true
@@ -35,15 +37,19 @@ const streamReasoningMs = (stream) => {
 export function install(rt) {
   // A closed turn's events do not change; cache its answer once turn/end exists.
   const settled = new Map()
-  rt.thinkingOf = async (sessionId, turn) => {
+  rt.thinkingOf = async (sessionId, turn, range = {}) => {
+    const segmented = range.afterSeq !== undefined || range.beforeSeq !== undefined
     const key = `${sessionId}:${turn}`
-    if (settled.has(key)) return settled.get(key)
+    if (!segmented && settled.has(key)) return settled.get(key)
     const events = []
     // Newest first; events older than the turn close the read.
     for await (const event of rt.eventsBackwards(sessionId, AbortSignal.timeout(HISTORY_TIMEOUT_MS))) {
       events.push(event)
       if (typeof event.data?.turn === 'number' && event.data.turn < turn) break
     }
+    // A steering segment can still grow while its turn runs; keep it out of the
+    // whole-turn cache, including when the whole turn is already cached.
+    if (segmented) return thinkingMs(events, turn, range)
     // The read went through every newer turn whole, so each closed one is answered too.
     for (const event of events) {
       if (event.type === 'turn/end' && typeof event.data?.turn === 'number' && event.data.turn >= turn) {

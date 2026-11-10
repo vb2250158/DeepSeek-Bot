@@ -111,6 +111,8 @@ test('consecutive group messages from the same Bot chain together, and cards or 
     dataset: botId ? { botId } : {},
     classList: { contains: name => classes.includes(name) },
     closest: sel => (sel === '[data-chat-group-key]' ? turn : null),
+    getAttribute: () => null,
+    querySelector: () => null,
   })
   const t1 = { dataset: {} }, t2 = { dataset: {} }, t3 = { dataset: {} }, t4 = { dataset: {} }
   const m1 = node(['bt-group-msg'], 'a', t1)
@@ -129,4 +131,22 @@ test('consecutive group messages from the same Bot chain together, and cards or 
   assert.equal(m3.dataset.chainPrev, undefined)
   assert.equal(m3.dataset.chainNext, undefined)
   assert.equal(m4.dataset.chainPrev, undefined)
+})
+
+test('native and pending steering rows break assistant bubble seams', () => {
+  const assistant = () => ({
+    dataset: { seamPrev: '', seamNext: '' },
+    getAttribute: name => name === 'data-chat-flow-kind' ? 'assistant-step' : null,
+    querySelector: () => null,
+  })
+  for (const selector of ['[data-chat-flow-kind=steering]', '[data-pending-steering]']) {
+    const before = assistant(), after = assistant()
+    const input = { dataset: {}, getAttribute: () => null, classList: { contains: () => false } }
+    syncGroupChains({ querySelectorAll: selected => selected.includes(selector) ? [before, input, after] : [before, after] })
+    assert.equal(before.dataset.seamNext, undefined, selector)
+    assert.equal(after.dataset.seamPrev, undefined, selector)
+    syncGroupChains({ querySelectorAll: () => [before, after] })
+    assert.equal(before.dataset.seamNext, '')
+    assert.equal(after.dataset.seamPrev, '')
+  }
 })

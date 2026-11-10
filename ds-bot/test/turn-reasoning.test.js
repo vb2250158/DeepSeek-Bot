@@ -1,10 +1,54 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { opensReply, thinkingStep, turnReasoning } from '../src/client/turn-reasoning.js'
+import { opensReply, thinkingStep, turnReasoning, replySegment } from '../src/client/turn-reasoning.js'
 
 const step = (n, blocks, status = 'settled') => ({ turn: 1, step: n, status, blocks })
 const think = text => ({ kind: 'reasoning', text })
 const tool = { kind: 'tool-call', name: 'read' }
+
+test('multiple steering boundaries split loaded steps by log order, including a live anchor', () => {
+  const steps = [
+    { ...step(1, [think('A')]), finalNode: { seq: 8 } },
+    { ...step(2, [think('B')]), finalNode: { seq: 18 } },
+    step(3, [think('C')], 'running'),
+  ]
+  const steering = [{ seq: 10 }, { seq: 20 }, { seq: 21 }]
+  const before = replySegment(steps, steps[0], steering, 4.1)
+  const middle = replySegment(steps, steps[1], steering, 14.1)
+  const live = replySegment(steps, steps[2], steering, 24.1)
+  assert.deepEqual(before.steps, [steps[0]])
+  assert.deepEqual(middle.steps, [steps[1]])
+  assert.deepEqual(live.steps, [steps[2]])
+  assert.equal(before.beforeSeq, 10)
+  assert.equal(middle.afterSeq, 10)
+  assert.equal(middle.beforeSeq, 20)
+  assert.equal(live.afterSeq, 21)
+  steps[2].status = 'settled'
+  steps[2].finalNode = { seq: 28 }
+  assert.deepEqual(replySegment(steps, steps[2], steering, 24.1), live)
+})
+
+test('a segment keeps all tool steps together and a partially loaded reply still renders', () => {
+  const steps = [1, 2, 3].map(n => ({ ...step(n, [think(String(n)), tool]), finalNode: { seq: n * 10 } }))
+  assert.deepEqual(replySegment(steps, steps[1], [{ seq: 15 }], 19).steps, steps.slice(1))
+  assert.deepEqual(replySegment([], steps[1], [{ seq: 15 }], 19).steps, [steps[1]])
+  assert.equal(replySegment(steps, steps[1], [], 19).steps, steps)
+})
+
+test('an earlier cell sees the live step in its reply segment without duplicating reasoning', () => {
+  const steps = [
+    { ...step(1, [think('Before')]), finalNode: { seq: 8 } },
+    { ...step(2, [think('Tool thought'), tool]), finalNode: { seq: 12 } },
+    step(3, [think('Live thought')], 'running'),
+  ]
+  const steering = [{ seq: 10 }]
+  const earlier = replySegment(steps, steps[1], steering, 11)
+  const live = replySegment(steps, steps[2], steering, 15)
+  assert.deepEqual(earlier.steps, steps.slice(1))
+  assert.deepEqual(earlier.steps, live.steps)
+  assert.equal(turnReasoning(earlier.steps, steps[1]), '')
+  assert.equal(turnReasoning(live.steps, steps[2]), 'Tool thought\n\nLive thought')
+})
 
 test('a long tool Turn shows its reasoning once, on the last step, in order', () => {
   const steps = Array.from({ length: 24 }, (_, i) => step(i + 1, [think(`Reasoning ${i + 1}`), tool]))
