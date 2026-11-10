@@ -1,4 +1,4 @@
-import { createElement as h, Fragment, useEffect } from 'react'
+import { createElement as h, Fragment, useEffect, useRef } from 'react'
 import { TeamSidebar, BotSettingsLauncher } from './sidebar.js'
 import { DetailsDrawer } from './details-drawer.js'
 import { ActivityIndicator } from './activity-row.js'
@@ -32,6 +32,18 @@ export function BotConversation(props) {
   const roster = useRoster(value => value)
   const ui = useUi(value => value)
   const [width, onChange] = useColumnWidth('details')
+  // The column's own width, published as a token: a renderer inside it can then cap
+  // itself against the column instead of against an ancestor it just widened.
+  const chatRef = useRef(null)
+  useEffect(() => {
+    const element = chatRef.current
+    if (element === null || typeof ResizeObserver === 'undefined') return undefined
+    const apply = () => document.documentElement.style.setProperty('--bt-chat-w', `${Math.round(element.clientWidth)}px`)
+    apply()
+    const observer = new ResizeObserver(apply)
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
   const owner = roster.byId[sessionId] ?? Object.values(roster.byId).find(bot => bot.sessionId === sessionId)
   const room = roster.roomsById[owner?.id ?? sessionId]
   const id = owner?.id ?? room?.id ?? sessionId
@@ -49,7 +61,7 @@ export function BotConversation(props) {
     return () => actions.endVisit(sessionId)
   }, [sessionId, actions])
   return h(Fragment, null,
-    h('section', { className: 'bt-chat-column', 'aria-label': t('Message'), style: { '--bt-placeholder': JSON.stringify(name ? t('Message {name}', { name }) : t('Message')) } },
+    h('section', { ref: chatRef, className: 'bt-chat-column', 'aria-label': t('Message'), style: { '--bt-placeholder': JSON.stringify(name ? t('Message {name}', { name }) : t('Message')) } },
       ...(showGoal ? [h(GoalIsland, { key: `goal:${room.id}`, room, goal, view, open: ui.goalOpen === id, composing, roomWork, roster, actions })] : []),
       h(Fragment, { key: 'conversation' }, renderFactorySlot('conversation.content', { variant: 'embedded', phase: 'active', hero: false, ...(known ? { busyEnterOverride: 'steer' } : {}) })),
       known ? h(ActivityIndicator, { ...props, key: `activity:${sessionId}`, sessionId }) : null),
@@ -85,6 +97,15 @@ export const WORKBENCH_CSS = `
 .bt-column-resizer:hover,.bt-column-resizer:focus-visible{background:var(--bt-accent)}
 .bt-info-column>.bt-drawer-top{min-height:32px;box-sizing:border-box}
 .bt-workbench [data-slot="conversation.input.permission"],.bt-workbench [data-slot="conversation.input.model"]{display:none}
+/* A message row follows the chat column, never its own content: a long reply used to
+   widen its ancestors and slide under the detail panel on the right. Each level is
+   pinned to the column so a renderer cannot grow the chain from the inside. */
+.bt-chat-column [data-conversation-scroll],.bt-chat-column [data-conversation-scroll]>*{max-width:100%;min-width:0}
+.bt-chat-column [data-chat-flow],.bt-chat-column [data-chat-flow]>*{width:100%;max-width:100%;min-width:0;box-sizing:border-box}
+[data-rabi-message]{width:100%;max-width:var(--bt-chat-w,100%)}
+/* Absolute caps against the column, for bubbles whose ancestors grew first. */
+.bt-bubble{max-width:min(calc(var(--bt-msg-w) * 100%),calc(var(--bt-chat-w,100vw) - 46px))}
+
 @container(max-width:760px){.bt-info-column{display:none}}
 @container(max-width:600px){.bt-team-column{flex:0 0 72px;min-width:72px}.bt-chat-column{min-width:0}.bt-team-column .bt-row-body,.bt-team-column .bt-tile-name,.bt-team-column .bt-side-top,.bt-team-footer,.bt-column-resizer{display:none}.bt-team-column .bt-row{justify-content:center;padding:8px 0}.bt-team-column .bt-tile{width:48px;padding:6px 0}.bt-team-column>.bt-side{padding:8px 4px}}
 `
