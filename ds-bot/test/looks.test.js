@@ -44,4 +44,5 @@ test('Bot settings is the only settings entry; nothing is called Team settings',
   // A group chat's entries open its own settings the same way.
   assert.match(text('context-menu.js'), /\[t\('Group settings'\), GearIcon, \(\) => actions\.openSettings\('groups', room\.id\)\]/)
   assert.ok(!text('mark.js').includes('WhaleLogo'))
+  assert.ok(!text('dsh-mark.js').includes('favicon.svg'))
 })
