@@ -137,6 +137,7 @@ test('apply registers listeners and effects in a fixed order', (t) => {
     'on agent/status',
     'effect ds-bot: memory review',
     'effect ds-bot: memory tidy',
+    'effect ds-bot: Rabi automation',
     'effect ds-bot: Rabi persona context',
     'context ds-bot:rabi-persona 630',
     'on system-prompt/assemble (prepend)',
