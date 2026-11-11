@@ -157,3 +157,19 @@ test('disposal includes callers still loading and a failed reconciliation flush'
   assert.equal(finished, true)
   assert.equal(f.calls.length, 1)
 })
+
+
+test('long Unicode-role automation IDs enter the native queue unchanged and reconcile without duplicate delivery', async t => {
+  const f = await fixture(t)
+  const roleId = '合法角色'.repeat(40)
+  const deliveryId = `automation:${Buffer.from(roleId).toString('base64url')}:daily-rule:${'a'.repeat(64)}`
+  assert.ok(deliveryId.length > 200)
+  const body = { ...f.body, deliveryId }
+  const accepted = await f.call('deliver', body)
+  assert.equal(accepted.state, 'accepted')
+  assert.equal(accepted.requestId, deliveryId)
+  assert.equal(f.calls[0].requestId, deliveryId)
+  assert.deepEqual(await f.call('reconcile', body), accepted)
+  assert.deepEqual(await f.call('deliver', body), accepted)
+  assert.equal(f.calls.length, 1)
+})

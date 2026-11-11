@@ -42,6 +42,8 @@ Local agents settings read the request data directly. A failed settings page sta
 
 ## Tested host and environment
 
+Release `0.3.2-rabi.24` fixes native delivery of long stable task IDs generated from Unicode role identifiers. The complete original ID remains intact for queue receipts and deduplication.
+
 Release `0.3.2-rabi.23` adds explicit Rabi → DSH → DS Bot destinations and daily schedules with multiple times under one rule. Task lists follow the exact destination across storage roles. Editing retains source-role revisions, native queue receipts survive conversation parts and restarts, and plugin unload waits for accepted deliveries. Personal task creation no longer requires a primary-role session; group tasks retain DSH behavior.
 
 Release `0.3.2-rabi.22` confines Bot layout overrides to its own chat column so ordinary Sessions retain their controls. Rabi user messages use the same avatar-column spacing and bounded bubble width as Bot messages. The published fixture corrections and upstream sponsor documentation are included.

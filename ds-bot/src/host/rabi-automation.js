@@ -25,7 +25,7 @@ export function install(rt) {
     if (body.botScopeId !== botScopeId) invalid('This automation belongs to a different DS Bot workspace')
     const bot = typeof body.botId === 'string' ? rt.botOf(body.botId) : undefined
     if (!bot || bot.id !== body.botId) invalid('Select an existing personal Bot; groups are not supported')
-    if (typeof body.deliveryId !== 'string' || !body.deliveryId || body.deliveryId.length > 200 || /[\x00-\x1f]/.test(body.deliveryId)) invalid('Provide a stable delivery ID')
+    if (typeof body.deliveryId !== 'string' || !body.deliveryId || /[\x00-\x1f]/.test(body.deliveryId)) invalid('Provide a stable delivery ID')
     if (typeof body.message !== 'string' || !body.message.trim()) invalid('Provide the automation message')
     return { bot, botScopeId, botId: bot.id, deliveryId: body.deliveryId, requestId: requestIdOf(body.deliveryId) }
   }
