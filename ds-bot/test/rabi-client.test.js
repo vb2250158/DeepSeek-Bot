@@ -71,3 +71,16 @@ test('the installed tool runtime retains one uncertain Manager write and its hea
   assert.equal(calls.length, 1)
   assert.deepEqual(calls[0].args, { method: 'PATCH', path: '/api/fixture', bodyJson: JSON.stringify({ enabled: true }), requestHeadersJson: JSON.stringify({ 'If-Match': '"fixture-revision"' }) })
 })
+
+test('HTTP 405 preserves explicit unknown outcomes', async () => {
+  let calls = 0
+  const client = rabiClient({ tools: { get: () => ({}), execute: async () => { calls++; return { isError: false, value: { ok: false, uncertain: true, statusCode: 405, body: '{}' } } } } })
+  await assert.rejects(client.json('/api/fixture', 'PATCH', {}), { code: 'bot/rabi-uncertain' })
+  assert.equal(calls, 1)
+})
+
+
+test('a confirmed HTTP 405 rejects the original request without uncertainty', async () => {
+  const client = rabiClient({ tools: { get: () => ({}), execute: async () => ({ isError: false, value: { ok: false, statusCode: 405, body: '{}' } }) } })
+  await assert.rejects(client.json('/api/fixture', 'PUT', {}), { code: 'bot/rabi-method-not-allowed' })
+})

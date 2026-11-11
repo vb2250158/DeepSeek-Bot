@@ -144,7 +144,7 @@ export function install(rt) {
   }
   // What a host that only reads the team may still answer.
   // Updates change the dsh profile, not the team, so a reading host may run them too.
-  const READS = new Set(['group-library-list', 'group-library-read', 'state', 'models', 'efforts', 'providers', 'provider-models', 'chat', 'run-stats', 'thinking', 'earlier', 'room-progress', 'exchange', 'exchange-text', 'file-text', 'usage', 'schedules', 'memory-view', 'browser-wait', 'browser-result', 'diagnostics', 'diagnostics-log', 'diagnostics-clear', 'update-check', 'update-install', 'dsh-update-install', 'repo-stars', 'approval-answer', 'rabi-connection-status', 'rabi-connect', 'rabi-personas-list', 'rabi-bot-view', 'rabi-computers-status', 'rabi-computers-list', 'avatar-library', 'computer-system-status', 'computer-shot', 'local-agents', 'local-agent-models'])
+  const READS = new Set(['rabi-schedule-read', 'rabi-automation-catalog', 'rabi-automation-reconcile', 'group-library-list', 'group-library-read', 'state', 'models', 'efforts', 'providers', 'provider-models', 'chat', 'run-stats', 'thinking', 'earlier', 'room-progress', 'exchange', 'exchange-text', 'file-text', 'usage', 'schedules', 'memory-view', 'browser-wait', 'browser-result', 'diagnostics', 'diagnostics-log', 'diagnostics-clear', 'update-check', 'update-install', 'dsh-update-install', 'repo-stars', 'approval-answer', 'rabi-connection-status', 'rabi-connect', 'rabi-personas-list', 'rabi-bot-view', 'rabi-computers-status', 'rabi-computers-list', 'avatar-library', 'computer-system-status', 'computer-shot', 'local-agents', 'local-agent-models'])
 
   async function setPrefs(body) {
     if (body.rabiRemoteControl !== undefined) {
@@ -221,6 +221,11 @@ export function install(rt) {
         case 'group-library-add':
           await rt.load()
           return ok(await rt.groupLibraryEndpoint(endpoint, body))
+        case 'rabi-automation-catalog':
+        case 'rabi-automation-deliver':
+        case 'rabi-automation-reconcile':
+          return ok(await rt.rabiAutomationEndpoint(endpoint, body, signal))
+        case 'rabi-schedule-read':
         case 'rabi-bot-view':
         case 'rabi-schedule-save':
         case 'rabi-schedule-delete':
@@ -761,6 +766,7 @@ export function install(rt) {
       mode: 'queue',
       content,
     }, AbortSignal.timeout(30_000))
+    return { sessionId, requestId }
   }
 
   // The user's answer to an ask_user card, from the web or an IM chat. A Bot id or an

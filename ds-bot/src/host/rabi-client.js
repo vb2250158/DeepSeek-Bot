@@ -28,7 +28,8 @@ export function rabiClient(ctx, timeoutMs = 8000) {
     if (method !== 'GET' && typeof receipt?.body === 'string') {
       try { responseOutcome = JSON.parse(receipt.body) } catch { /* The JSON reader reports malformed successful responses below. */ }
     }
-    if (receipt?.uncertain || responseOutcome?.uncertain === true || responseOutcome?.mutationOutcome === 'unknown') rabiRefuse('Rabi operation outcome is uncertain. Read back the original operation before retrying; it was not replayed.', 'bot/rabi-uncertain')
+    if (receipt?.uncertain || receipt?.mutationOutcome === 'unknown' || responseOutcome?.uncertain === true || responseOutcome?.mutationOutcome === 'unknown') rabiRefuse('Rabi operation outcome is uncertain. Read back the original operation before retrying; it was not replayed.', 'bot/rabi-uncertain')
+    if (receipt?.statusCode === 405) rabiRefuse('Rabi rejected this request method before saving. Update the integration, then save again.', 'bot/rabi-method-not-allowed')
     if (method === 'GET' && !receipt?.ok && receipt?.statusCode >= 500) {
       let failure
       try { failure = JSON.parse(receipt.body) } catch { /* Invalid remote bodies use the adapter's existing error below. */ }

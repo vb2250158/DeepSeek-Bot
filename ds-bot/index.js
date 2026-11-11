@@ -45,6 +45,7 @@ import * as dshUpdate from './src/host/dsh-update.js'
 import * as thinking from './src/host/thinking.js'
 import * as channel from './src/host/channel.js'
 import * as rabiComputers from './src/host/rabi-computers.js'
+import * as rabiAutomation from './src/host/rabi-automation.js'
 import * as rabiPersonas from './src/host/rabi-personas.js'
 import * as rabiSetup from './src/host/rabi-setup.js'
 import * as feed from './src/host/feed.js'
@@ -63,7 +64,7 @@ export const inject = ['llm', 'tools', 'systemPrompt', 'sessionController', 'ses
 // install. Listeners run and tools are listed in registration order, so this order holds:
 // usage meters model requests after every listener that rewrites them. privacy checks a
 // call before tool hooks, so a refused call never reaches a card they show.
-const MODULES = [diagnostics, store, models, providers, permissions, turns, steer, handoffs, requests, delivery, roster, folders, privacy, agents, prompt, timeContext, tools, chatIndex, groups, groupLibrary, groupLog, goals, approvals, resume, memory, rabiPersonas, rabiSetup, parts, images, avatarLibrary, secrets, connectors, capabilities, learning, schedules, browser, browserPlugins, computer, usage, update, dshUpdate, thinking, feed, im, rabiComputers, channel, officeSkills, goalSkills, localAgents]
+const MODULES = [diagnostics, store, models, providers, permissions, turns, steer, handoffs, requests, delivery, roster, folders, privacy, agents, prompt, timeContext, tools, chatIndex, groups, groupLibrary, groupLog, goals, approvals, resume, memory, rabiAutomation, rabiPersonas, rabiSetup, parts, images, avatarLibrary, secrets, connectors, capabilities, learning, schedules, browser, browserPlugins, computer, usage, update, dshUpdate, thinking, feed, im, rabiComputers, channel, officeSkills, goalSkills, localAgents]
 
 
 export function apply(ctx, config = {}) {

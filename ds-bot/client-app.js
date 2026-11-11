@@ -2178,6 +2178,18 @@ var ZH = {
   "Edit task": "编辑任务",
   "Instructions template": "任务指令模板",
   "Interval in seconds": "间隔秒数",
+  "Rabi rejected this request method before saving. Update the integration, then save again.": "Rabi 在保存前拒绝了此请求方法，请更新集成后重新保存",
+  "Configure this DS Bot destination in Rabi, then retry. Its DSH owner could not be confirmed.": "未能确认此 Bot 的 DSH 实例，请在 Rabi 配置目的地后重试",
+  "This rule does not deliver to this DS Bot": "此规则的投递目的地不是当前 Bot",
+  "Store rule in Rabi role": "规则保存在 Rabi 人格中",
+  "Choose a role": "选择人格",
+  "Choose a Rabi role to store this rule.": "请选择保存此规则的 Rabi 人格",
+  "Add time": "添加时间",
+  "Remove time": "移除时间",
+  "Time {number}": "时间 {number}",
+  "Remove time {number}": "移除时间 {number}",
+  "Duplicate times are combined when saved.": "保存时会合并重复时间",
+  "Enter each time as HH:mm or HH:mm:ss.": "请将每个时间填写为 HH:mm 或 HH:mm:ss",
   "Window start": "时段开始",
   "Window end": "时段结束",
   "Times use the Rabi host time zone.": "时间使用 Rabi 所在电脑的时区",
@@ -4782,6 +4794,20 @@ var FOLDER_CSS = `
 @media (prefers-reduced-motion:reduce){.bt-folder-view{animation:none}}
 `;
 
+// src/shared/rabi-daily-times.js
+function rabiDailyTimes(schedule) {
+  const values = Object.hasOwn(schedule, "timeOfDays") ? schedule.timeOfDays : [schedule.timeOfDay];
+  if (!Array.isArray(values) || !values.length) return null;
+  const times = [];
+  for (const value of values) {
+    if (typeof value !== "string") return null;
+    const match = /^(\d|[01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/.exec(value.trim());
+    if (!match) return null;
+    times.push(`${match[1].padStart(2, "0")}:${match[2]}${match[3] && match[3] !== "00" ? `:${match[3]}` : ""}`);
+  }
+  return [...new Set(times)].sort();
+}
+
 // src/client/schedules.js
 var import_react12 = require("react");
 var import_dsh_client_ui_primitives = require("@deepseek-ai/dsh-client-ui-primitives");
@@ -4832,7 +4858,7 @@ function everyText(seconds) {
 function timingText(task) {
   if (task.kind === "rabi") {
     const schedule = task.schedule;
-    const text = schedule.type === "daily_time" ? t("Every day at {time}", { time: clock2(schedule.timeOfDay) }) : schedule.type === "once_at" ? t("Once, {time}", { time: dayAndTime(Date.parse(schedule.onceAt)) }) : everyText(schedule.intervalSeconds);
+    const text = schedule.type === "daily_time" ? t("Every day at {time}", { time: (rabiDailyTimes(schedule) ?? []).join(dateLocale().startsWith("zh") ? "、" : ", ") }) : schedule.type === "once_at" ? t("Once, {time}", { time: dayAndTime(Date.parse(schedule.onceAt)) }) : everyText(schedule.intervalSeconds);
     return schedule.windowStartTime && schedule.windowEndTime ? `${text} · ${schedule.windowStartTime}–${schedule.windowEndTime}` : text;
   }
   const zone = task.timeZone && task.timeZone !== localZone() ? ` (${task.timeZone})` : "";
@@ -4907,12 +4933,28 @@ function TaskRow({ task, actions, onView, showBot, roster }) {
 }
 function RabiSchedules({ bot, actions, tasks = [], roster, summary = false }) {
   const store = actions.rabiWorkspace;
-  const roleId = bot.rabiPersona.roleId;
+  const roleId = "";
   const scope = { botId: bot.id, roleId, resource: "schedules" };
   const subscribe = (0, import_react12.useCallback)((listener) => store.subscribe(scope, listener), [store, bot.id, roleId]);
   const snapshot = (0, import_react12.useCallback)(() => store.snapshot(scope), [store, bot.id, roleId]);
   const { value, pending, error } = (0, import_react12.useSyncExternalStore)(subscribe, snapshot);
   const [editing, setEditing] = (0, import_react12.useState)(null);
+  const [opening, setOpening] = (0, import_react12.useState)(false);
+  const [editError, setEditError] = (0, import_react12.useState)("");
+  const openEditor = async (task) => {
+    setOpening(true);
+    setEditError("");
+    try {
+      const detail = await actions.rabiConnection("rabi-schedule-read", { botId: bot.id, ...task ? { sourceRoleId: task.sourceRoleId, id: task.rawRuleId } : {} });
+      const current = task ? detail.items.find((item) => item.rawRuleId === task.rawRuleId) : void 0;
+      if (task && !current) throw new Error(t("No such task"));
+      setEditing({ task: current, revision: task ? detail.revision : void 0, roles: detail.roles ?? [] });
+    } catch (failure) {
+      setEditError(hostText(failure.message));
+    } finally {
+      setOpening(false);
+    }
+  };
   const refresh = () => store.refresh(scope);
   (0, import_react12.useEffect)(() => {
     let stopped = false, timer;
@@ -4933,11 +4975,12 @@ function RabiSchedules({ bot, actions, tasks = [], roster, summary = false }) {
     (0, import_react12.createElement)(
       "div",
       { className: "bt-rabi-task-heading" },
-      (0, import_react12.createElement)("div", { className: "bt-section-title" }, summary ? t("Scheduled tasks · {count}", { count: all.length }) : `${bot.name} · Rabi`),
-      (0, import_react12.createElement)(import_dsh_client_ui_primitives.Button, { variant: "ghost", disabled: !value || pending, onClick: () => setEditing({ revision: value.revision }) }, (0, import_react12.createElement)(PlusIcon), t("New task"))
+      (0, import_react12.createElement)("div", { className: "bt-section-title" }, summary ? t("Scheduled tasks · {count}", { count: tasks.length + (value?.total ?? value?.items.length ?? 0) }) : `${bot.name} · Rabi`),
+      (0, import_react12.createElement)(import_dsh_client_ui_primitives.Button, { variant: "ghost", disabled: !value || pending || opening, onClick: () => void openEditor() }, (0, import_react12.createElement)(PlusIcon), t("New task"))
     ),
     !value && !error ? (0, import_react12.createElement)("div", { className: "bt-mem-skel", "aria-label": t("Loading…") }, (0, import_react12.createElement)("span"), (0, import_react12.createElement)("span")) : null,
     error ? (0, import_react12.createElement)("div", { role: "alert", className: "bt-error" }, hostText(error.message), " ", (0, import_react12.createElement)("button", { type: "button", className: "bt-more", disabled: pending, onClick: () => void store.visit(scope) }, t("Retry"))) : null,
+    editError ? (0, import_react12.createElement)("p", { role: "alert", className: "bt-error" }, editError) : null,
     value?.warnings?.length ? (0, import_react12.createElement)("p", { className: "bt-set-hint" }, t("Some Rabi schedules could not be read. Check them in Rabi.")) : null,
     ...pendingWrites.map((entry) => (0, import_react12.createElement)(RabiPendingWrite, { key: entry.operation.body.operationId, entry, actions })),
     value && all.length === 0 ? (0, import_react12.createElement)("p", { className: "bt-set-hint" }, t("No scheduled tasks yet.")) : null,
@@ -4949,7 +4992,8 @@ function RabiSchedules({ bot, actions, tasks = [], roster, summary = false }) {
       onDone: () => setEditing(null),
       onCancel: () => setEditing(null)
     }) : null,
-    (0, import_react12.createElement)("div", { className: summary ? "bt-task-list" : "bt-set-card" }, all.map((task) => task.source === "rabi" ? (0, import_react12.createElement)(RabiScheduleRow, { key: `rabi:${task.id}`, task, bot, actions, revision: value.revision, summary, onView: refresh, onEdit: () => setEditing({ task, revision: value.revision }) }) : summary ? (0, import_react12.createElement)(
+    value?.nextCursor ? (0, import_react12.createElement)(import_dsh_client_ui_primitives.Button, { variant: "ghost", disabled: pending, onClick: () => void store.more(scope) }, t("Load more")) : null,
+    (0, import_react12.createElement)("div", { className: summary ? "bt-task-list" : "bt-set-card" }, all.map((task) => task.source === "rabi" ? (0, import_react12.createElement)(RabiScheduleRow, { key: `rabi:${task.id}`, task, bot, actions, revision: value.revision, summary, onView: refresh, onEdit: () => void openEditor(task) }) : summary ? (0, import_react12.createElement)(
       "button",
       { key: `${task.source ?? "dsh"}:${task.id}`, type: "button", className: "bt-task-line", onClick: () => actions.openSettings("schedules", `bot:${bot.id}`) },
       (0, import_react12.createElement)(ClockIcon),
@@ -4983,25 +5027,28 @@ function RabiPendingWrite({ entry, actions }) {
     (0, import_react12.createElement)(import_dsh_client_ui_primitives.Button, { disabled: busy, onClick: () => void retry() }, t("Retry"))
   );
 }
-function RabiScheduleRow({ task, bot, actions, revision, onView, onEdit, summary }) {
+function RabiScheduleRow({ task, bot, actions, onView, onEdit, summary }) {
   const [busy, setBusy] = (0, import_react12.useState)(false);
   const [confirming, setConfirming] = (0, import_react12.useState)(false);
   const [error, setError] = (0, import_react12.useState)("");
-  const scope = { botId: bot.id, roleId: bot.rabiPersona.roleId, resource: "schedules", itemId: task.id };
+  const scope = { botId: bot.id, roleId: "", resource: "schedules", itemId: task.id };
   const operation = (0, import_react12.useRef)(actions.rabiWorkspace.write(scope));
   const run2 = async (endpoint, extra) => {
     if (busy) return;
-    operation.current ??= actions.rabiWorkspace.retainWrite(scope, { endpoint, body: { botId: bot.id, expectedRoleId: scope.roleId, id: task.id, revision, operationId: crypto.randomUUID(), ...extra } });
     setBusy(true);
     setError("");
     try {
+      if (!operation.current) {
+        const detail = await actions.rabiConnection("rabi-schedule-read", { botId: bot.id, sourceRoleId: task.sourceRoleId, id: task.rawRuleId });
+        operation.current = actions.rabiWorkspace.retainWrite(scope, { endpoint, body: { botId: bot.id, sourceRoleId: task.sourceRoleId, expectedRoleId: task.sourceRoleId, id: task.rawRuleId, revision: detail.revision, operationId: crypto.randomUUID(), ...extra } });
+      }
       const result = await actions.rabiConnection(operation.current.endpoint, operation.current.body);
       actions.rabiWorkspace.accept({ botId: bot.id, roleId: scope.roleId, resource: "schedules" }, result);
       actions.rabiWorkspace.clearWrite(scope);
       operation.current = null;
       setConfirming(false);
     } catch (failure) {
-      if (["bot/rabi-revision-conflict", "bot/rabi-validation", "bot/rabi-binding-conflict"].includes(failure.code)) {
+      if (["bot/rabi-revision-conflict", "bot/rabi-validation", "bot/rabi-binding-conflict", "bot/rabi-method-not-allowed"].includes(failure.code)) {
         actions.rabiWorkspace.clearWrite(scope);
         operation.current = null;
         await onView().catch(() => {
@@ -5017,7 +5064,7 @@ function RabiScheduleRow({ task, bot, actions, revision, onView, onEdit, summary
     { className: "bt-rabi-task" },
     (0, import_react12.createElement)(
       "div",
-      { className: summary ? "bt-task-line" : "bt-set-row bt-task" },
+      { className: summary ? "bt-task-line" : "bt-set-row bt-task bt-rabi-task-row" },
       (0, import_react12.createElement)(ClockIcon),
       (0, import_react12.createElement)(
         import_dsh_client_ui_primitives.Button,
@@ -5025,22 +5072,28 @@ function RabiScheduleRow({ task, bot, actions, revision, onView, onEdit, summary
         (0, import_react12.createElement)("span", { className: "bt-task-title" }, task.title),
         (0, import_react12.createElement)("span", { className: "bt-set-hint" }, `${timingText(task)} · ${nextText(task)}`)
       ),
-      (0, import_react12.createElement)(import_dsh_client_ui_primitives.Switch, { checked: task.status === "active", disabled: busy || Boolean(operation.current), label: t("Activate {name}", { name: task.title }), onChange: (enabled) => void run2("rabi-schedule-toggle", { enabled }) }),
-      !summary ? (0, import_react12.createElement)(import_dsh_client_ui_primitives.Button, { variant: "ghost", size: "sm", disabled: busy || Boolean(operation.current), onClick: onEdit, "aria-label": t("Edit task") }, (0, import_react12.createElement)(PencilIcon)) : null,
-      !summary ? (0, import_react12.createElement)(import_dsh_client_ui_primitives.Button, { variant: "ghost", size: "sm", disabled: busy || Boolean(operation.current), onClick: () => confirming ? void run2("rabi-schedule-delete") : setConfirming(true), "aria-label": t("Delete task") }, confirming ? t("Click again to delete") : (0, import_react12.createElement)(TrashIcon)) : null
+      (0, import_react12.createElement)(
+        "div",
+        { className: "bt-rabi-task-actions" },
+        (0, import_react12.createElement)(import_dsh_client_ui_primitives.Switch, { checked: task.status === "active", disabled: busy || Boolean(operation.current), label: t("Activate {name}", { name: task.title }), onChange: (enabled) => void run2("rabi-schedule-toggle", { enabled }) }),
+        !summary ? (0, import_react12.createElement)(import_dsh_client_ui_primitives.Button, { variant: "ghost", size: "sm", disabled: busy || Boolean(operation.current), onClick: onEdit, "aria-label": t("Edit task") }, (0, import_react12.createElement)(PencilIcon)) : null,
+        !summary ? (0, import_react12.createElement)(import_dsh_client_ui_primitives.Button, { variant: "ghost", size: "sm", className: "bt-rabi-task-delete", disabled: busy || Boolean(operation.current), onClick: () => confirming ? void run2("rabi-schedule-delete") : setConfirming(true), "aria-label": t("Delete task") }, confirming ? t("Click again to delete") : (0, import_react12.createElement)(TrashIcon)) : null
+      )
     ),
     error || operation.current ? (0, import_react12.createElement)("div", { role: "alert", className: "bt-error" }, error || t("This operation needs confirmation. Retry the original request."), operation.current ? (0, import_react12.createElement)(import_dsh_client_ui_primitives.Button, { disabled: busy, onClick: () => void run2() }, t("Retry")) : null) : null
   );
 }
-function RabiScheduleForm({ bot, actions, task, revision, onDone, onCancel, roster, onTarget }) {
-  const scope = { botId: bot.id, roleId: bot.rabiPersona.roleId, resource: "schedules", itemId: task?.id ?? "new" };
+function RabiScheduleForm({ bot, actions, task, revision, roles = [], onDone, onCancel, roster, onTarget }) {
+  const scope = { botId: bot.id, roleId: "", resource: "schedules", itemId: task?.id ?? "new" };
   const held = actions.rabiWorkspace.write(scope);
   const schedule = held?.body.schedule ?? task?.schedule;
+  const [sourceRoleId, setSourceRoleId] = (0, import_react12.useState)(held?.body.sourceRoleId ?? task?.sourceRoleId ?? bot.rabiPersona?.roleId ?? "");
+  const [choosingRole, setChoosingRole] = (0, import_react12.useState)(false);
   const [title, setTitle] = (0, import_react12.useState)(held?.body.title ?? task?.title ?? "");
   const [message, setMessage] = (0, import_react12.useState)(held?.body.message ?? task?.message ?? "");
   const [template, setTemplate] = (0, import_react12.useState)(held?.body.template ?? task?.template ?? "");
   const [kind, setKind] = (0, import_react12.useState)(schedule?.type ?? "daily_time");
-  const [time, setTime] = (0, import_react12.useState)(schedule?.timeOfDay ?? "09:00");
+  const [times, setTimes] = (0, import_react12.useState)(() => schedule?.type === "daily_time" ? rabiDailyTimes(schedule) ?? [""] : ["09:00"]);
   const [at, setAt] = (0, import_react12.useState)(schedule?.onceAt ?? inAnHour());
   const [seconds, setSeconds] = (0, import_react12.useState)(schedule?.intervalSeconds ?? 600);
   const [windowStart, setWindowStart] = (0, import_react12.useState)(schedule?.windowStartTime ?? "");
@@ -5056,36 +5109,55 @@ function RabiScheduleForm({ bot, actions, task, revision, onDone, onCancel, rost
   const submit = async (event) => {
     event?.preventDefault();
     if (busy) return;
-    operation.current ??= actions.rabiWorkspace.retainWrite(scope, { endpoint: "rabi-schedule-save", body: {
+    const retrying = Boolean(operation.current);
+    const dailyTimes = kind === "daily_time" ? rabiDailyTimes({ timeOfDays: times }) : null;
+    if (!operation.current && kind === "daily_time" && !dailyTimes) {
+      setError(t("Enter each time as HH:mm or HH:mm:ss."));
+      return;
+    }
+    if (!operation.current && !sourceRoleId) {
+      setError(t("Choose a Rabi role to store this rule."));
+      return;
+    }
+    const capture = (roleRevision) => actions.rabiWorkspace.retainWrite(scope, { endpoint: "rabi-schedule-save", body: {
       botId: bot.id,
-      expectedRoleId: scope.roleId,
-      ...task ? { id: task.id } : {},
+      sourceRoleId,
+      expectedRoleId: sourceRoleId,
+      ...task ? { id: task.rawRuleId ?? task.id } : {},
       ...task?.template ? { template } : {},
-      revision: expectedRevision,
+      revision: roleRevision,
       operationId: crypto.randomUUID(),
       title,
       message,
       enabled,
-      schedule: { type: kind, ...kind === "daily_time" ? { timeOfDay: time } : kind === "once_at" ? { onceAt: at } : { intervalSeconds: Number(seconds), windowStartTime: windowStart, windowEndTime: windowEnd } }
+      schedule: { type: kind, ...kind === "daily_time" ? { timeOfDays: dailyTimes } : kind === "once_at" ? { onceAt: at } : { intervalSeconds: Number(seconds), windowStartTime: windowStart, windowEndTime: windowEnd } }
     } });
     setBusy(true);
     setError("");
     try {
+      if (!operation.current) {
+        const detail = expectedRevision ? null : await actions.rabiConnection("rabi-schedule-read", { botId: bot.id, sourceRoleId, ...task ? { id: task.rawRuleId ?? task.id } : {} });
+        operation.current = capture(expectedRevision ?? detail.revision);
+      }
       const result = await actions.rabiConnection(operation.current.endpoint, operation.current.body);
       actions.rabiWorkspace.accept({ botId: bot.id, roleId: scope.roleId, resource: "schedules" }, result);
       actions.rabiWorkspace.clearWrite(scope);
       operation.current = null;
       await onDone();
     } catch (failure) {
-      if (["bot/rabi-revision-conflict", "bot/rabi-validation", "bot/rabi-binding-conflict"].includes(failure.code)) {
+      if (["bot/rabi-revision-conflict", "bot/rabi-validation", "bot/rabi-binding-conflict", "bot/rabi-method-not-allowed"].includes(failure.code)) {
+        actions.rabiWorkspace.clearWrite(scope);
+        operation.current = null;
+      }
+      if (failure.code === "bot/rabi-destination-unavailable" && !retrying) {
         actions.rabiWorkspace.clearWrite(scope);
         operation.current = null;
       }
       if (failure.code === "bot/rabi-revision-conflict") {
-        const latest = await actions.rabiWorkspace.refresh({ botId: bot.id, roleId: scope.roleId, resource: "schedules" }).catch(() => null);
+        const latest = await actions.rabiConnection("rabi-schedule-read", { botId: bot.id, sourceRoleId, ...task ? { id: task.rawRuleId ?? task.id } : {} }).catch(() => null);
         if (latest) {
           setExpectedRevision(latest.revision);
-          setConflict(latest.items.find((item) => item.id === task?.id) ?? { title: t("No such task") });
+          setConflict(latest.items.find((item) => item.rawRuleId === (task?.rawRuleId ?? task?.id)) ?? { title: t("No such task") });
         }
       }
       setError(hostText(failure.message));
@@ -5097,7 +5169,7 @@ function RabiScheduleForm({ bot, actions, task, revision, onDone, onCancel, rost
   return (0, import_react12.createElement)(
     import_dsh_client_ui_primitives.Modal,
     { open: true, title: `${bot.name} · ${t(task ? "Edit task" : "New task")} · Rabi`, closeLabel: t("Close"), onClose: busy ? () => {
-    } : onCancel, className: "bt-rabi-task-dialog" },
+    } : onCancel, className: "bt-rabi-task-dialog", contentClassName: "bt-rabi-task-content" },
     (0, import_react12.createElement)(
       "form",
       { className: "bt-rabi-task-form", onSubmit: (event) => void submit(event) },
@@ -5113,7 +5185,12 @@ function RabiScheduleForm({ bot, actions, task, revision, onDone, onCancel, rost
           onTarget(id);
         }
       }) : null,
-      input("Name", title, setTitle, { required: true, maxLength: 120, autoFocus: true }),
+      !task ? (0, import_react12.createElement)(import_dsh_client_ui_primitives.Menu, { open: choosingRole, portal: true, onClose: () => setChoosingRole(false), selectedId: sourceRoleId, anchor: (0, import_react12.createElement)(import_dsh_client_ui_primitives.Button, { type: "button", disabled: locked, onClick: () => setChoosingRole(true) }, t("Store rule in Rabi role"), " · ", roles.find((role) => role.id === sourceRoleId)?.name ?? (sourceRoleId || t("Choose a role"))), items: roles.map((role) => ({ id: role.id, label: role.name })), onSelect: (id) => {
+        setSourceRoleId(id);
+        setExpectedRevision(void 0);
+        setChoosingRole(false);
+      } }) : (0, import_react12.createElement)("p", { className: "bt-set-hint" }, t("Store rule in Rabi role"), " · ", sourceRoleId),
+      input("Name", title, setTitle, { required: true, maxLength: 120, "data-modal-autofocus": true }),
       task?.actionType === "run_script" ? (0, import_react12.createElement)("p", { className: "bt-set-hint" }, t("This task runs a script. Its action stays in Rabi.")) : (0, import_react12.createElement)(
         "div",
         { className: "bt-rabi-task-field" },
@@ -5126,8 +5203,19 @@ function RabiScheduleForm({ bot, actions, task, revision, onDone, onCancel, rost
         (0, import_react12.createElement)("span", null, t("Instructions template")),
         locked ? (0, import_react12.createElement)("div", { className: "bt-rabi-document" }, template) : (0, import_react12.createElement)(import_dsh_client_ui_primitives.InlineEditor, { value: template, label: t("Instructions template"), onChange: setTemplate, onSave: () => void submit(), onCancel })
       ) : null,
-      (0, import_react12.createElement)("div", { className: "bt-rabi-task-kinds" }, [["daily_time", "Daily"], ["interval", "Repeat"], ["once_at", "Once"]].map(([value, label]) => (0, import_react12.createElement)(import_dsh_client_ui_primitives.Button, { key: value, type: "button", disabled: locked, "aria-pressed": kind === value, onClick: () => setKind(value) }, t(label)))),
-      kind === "daily_time" ? input("Time", time, setTime, { placeholder: "09:00", pattern: "(?:[01][0-9]|2[0-3]):[0-5][0-9]", required: true }) : null,
+      (0, import_react12.createElement)("div", { className: "bt-rabi-task-kinds" }, [["daily_time", "Every day"], ["interval", "Repeat"], ["once_at", "Once"]].map(([value, label]) => (0, import_react12.createElement)(import_dsh_client_ui_primitives.Button, { key: value, type: "button", disabled: locked, "aria-pressed": kind === value, onClick: () => setKind(value) }, t(label)))),
+      kind === "daily_time" ? (0, import_react12.createElement)(
+        "div",
+        { className: "bt-rabi-task-field" },
+        ...times.map((time, index) => (0, import_react12.createElement)(
+          "div",
+          { key: index, className: "bt-rabi-task-field" },
+          input("Time", time, (value) => setTimes((current) => current.map((item, position) => position === index ? value : item)), { placeholder: "09:00", "aria-label": t("Time {number}", { number: index + 1 }), required: true }),
+          times.length > 1 ? (0, import_react12.createElement)(import_dsh_client_ui_primitives.Button, { type: "button", variant: "ghost", disabled: locked, onClick: () => setTimes((current) => current.filter((_, position) => position !== index)), "aria-label": t("Remove time {number}", { number: index + 1 }) }, t("Remove time")) : null
+        )),
+        (0, import_react12.createElement)(import_dsh_client_ui_primitives.Button, { type: "button", variant: "ghost", disabled: locked, onClick: () => setTimes((current) => [...current, "09:00"]) }, (0, import_react12.createElement)(PlusIcon), t("Add time")),
+        (0, import_react12.createElement)("span", { className: "bt-set-hint" }, t("Duplicate times are combined when saved."))
+      ) : null,
       kind === "once_at" ? input("Date and time", at, setAt, { placeholder: "2030-01-01T09:00:00", required: true }) : null,
       kind === "interval" ? (0, import_react12.createElement)(import_react12.Fragment, null, input("Interval in seconds", seconds, setSeconds, { type: "number", min: 1, required: true }), input("Window start", windowStart, setWindowStart, { placeholder: "09:00" }), input("Window end", windowEnd, setWindowEnd, { placeholder: "20:30" })) : null,
       (0, import_react12.createElement)("label", { className: "bt-rabi-task-enabled" }, t("Enabled in Rabi"), (0, import_react12.createElement)(import_dsh_client_ui_primitives.Switch, { checked: enabled, label: t("Enabled in Rabi"), disabled: locked, onChange: setEnabled })),
@@ -5139,17 +5227,17 @@ function RabiScheduleForm({ bot, actions, task, revision, onDone, onCancel, rost
   );
 }
 function NewRabiSchedule({ bot, roster, actions, onTarget, onCancel }) {
-  const store = actions.rabiWorkspace;
-  const roleId = bot.rabiPersona.roleId;
-  const scope = { botId: bot.id, roleId, resource: "schedules" };
-  const subscribe = (0, import_react12.useCallback)((listener) => store.subscribe(scope, listener), [store, bot.id, roleId]);
-  const snapshot = (0, import_react12.useCallback)(() => store.snapshot(scope), [store, bot.id, roleId]);
-  const { value, error } = (0, import_react12.useSyncExternalStore)(subscribe, snapshot);
+  const [setup, setSetup] = (0, import_react12.useState)(() => null);
+  const [error, setError] = (0, import_react12.useState)("");
   const [choosing, setChoosing] = (0, import_react12.useState)(false);
+  const load = () => {
+    setError("");
+    return actions.rabiConnection("rabi-schedule-read", { botId: bot.id }).then(setSetup, (failure) => setError(hostText(failure.message)));
+  };
   (0, import_react12.useEffect)(() => {
-    void store.visit(scope);
-  }, [store, bot.id, roleId]);
-  if (!value) return (0, import_react12.createElement)(
+    void load();
+  }, [bot.id]);
+  if (!setup) return (0, import_react12.createElement)(
     "div",
     { role: error ? "alert" : "status", className: error ? "bt-error" : "bt-set-hint" },
     (0, import_react12.createElement)(import_dsh_client_ui_primitives.Menu, {
@@ -5157,26 +5245,18 @@ function NewRabiSchedule({ bot, roster, actions, onTarget, onCancel }) {
       portal: true,
       onClose: () => setChoosing(false),
       selectedId: bot.id,
-      anchor: (0, import_react12.createElement)(import_dsh_client_ui_primitives.Button, { onClick: () => setChoosing(true) }, t("Send to"), " · ", bot.name),
+      anchor: (0, import_react12.createElement)(import_dsh_client_ui_primitives.Button, { type: "button", onClick: () => setChoosing(true) }, t("Send to"), " · ", bot.name),
       items: [...roster.bots, ...roster.rooms].map((item) => ({ id: item.id, label: item.name })),
       onSelect: (id) => {
         setChoosing(false);
         onTarget(id);
       }
     }),
-    error ? hostText(error.message) : t("Loading…"),
-    error ? (0, import_react12.createElement)(import_dsh_client_ui_primitives.Button, { onClick: () => void store.visit(scope) }, t("Retry")) : null,
+    error || t("Loading…"),
+    error ? (0, import_react12.createElement)(import_dsh_client_ui_primitives.Button, { onClick: () => void load() }, t("Retry")) : null,
     (0, import_react12.createElement)(import_dsh_client_ui_primitives.Button, { onClick: onCancel }, t("Cancel"))
   );
-  return (0, import_react12.createElement)(RabiScheduleForm, {
-    bot,
-    roster,
-    actions,
-    revision: value.revision,
-    onTarget,
-    onCancel,
-    onDone: onCancel
-  });
+  return (0, import_react12.createElement)(RabiScheduleForm, { bot, roster, actions, roles: setup.roles, onTarget, onCancel, onDone: onCancel });
 }
 var pad = (number) => String(number).padStart(2, "0");
 function inAnHour() {
@@ -5222,8 +5302,8 @@ function TaskForm({ roster, actions, start, onDone, onCancel }) {
     });
   };
   const toggleDay = (day) => setWeekdays((days) => days.includes(day) ? days.filter((item) => item !== day) : [...days, day].sort());
-  const rabiBot = roster.bots.find((bot) => bot.id === target && bot.rabiPersona?.roleId && bot.rabiPersona.enabled !== false);
-  if (rabiBot) return (0, import_react12.createElement)(NewRabiSchedule, { key: `${rabiBot.id}:${rabiBot.rabiPersona.roleId}`, bot: rabiBot, roster, actions, onTarget: setTarget, onDone, onCancel });
+  const rabiBot = roster.bots.find((bot) => bot.id === target);
+  if (rabiBot) return (0, import_react12.createElement)(NewRabiSchedule, { key: rabiBot.id, bot: rabiBot, roster, actions, onTarget: setTarget, onDone, onCancel });
   return (0, import_react12.createElement)(
     "form",
     { className: "bt-set-card bt-task-form", onSubmit: submit },
@@ -5313,9 +5393,9 @@ function SchedulesPage({ roster, actions, start }) {
     ...roster.rooms.map((room2) => [room2.id, (0, import_react12.createElement)(RoomAvatar, { room: room2, roster, size: 18 }), room2.name, view.tasks.filter((task) => task.botId === void 0 && task.roomId === room2.id)])
   ].filter(([id, , , tasks]) => tasks.length > 0 && (owner === null || id === owner));
   return [
-    ...roster.bots.filter((bot) => bot.rabiPersona?.enabled !== false && bot.rabiPersona?.roleId && (owner === null || owner === bot.id)).map((bot) => (0, import_react12.createElement)(RabiSchedules, { key: `rabi:${bot.id}:${bot.rabiPersona.roleId}`, bot, actions, roster })),
+    ...roster.bots.filter((bot) => owner === null || owner === bot.id).map((bot) => (0, import_react12.createElement)(RabiSchedules, { key: `rabi:${bot.id}`, bot, actions, roster })),
     !view.available ? (0, import_react12.createElement)(AutomationOff, { key: "off", actions }) : null,
-    !view.available ? null : (0, import_react12.createElement)(
+    !view.available && !(adding && roster.bots.some((bot) => bot.id === (owner ?? start))) ? null : (0, import_react12.createElement)(
       import_react12.Fragment,
       { key: "local" },
       adding ? (0, import_react12.createElement)(TaskForm, { key: "form", roster, actions, start: owner ?? start, onDone: shown, onCancel: () => setAdding(false) }) : (0, import_react12.createElement)(
@@ -5325,7 +5405,7 @@ function SchedulesPage({ roster, actions, start }) {
         owner !== null ? (0, import_react12.createElement)("button", { type: "button", className: "bt-soft bt-soft-sm", onClick: () => actions.openSettings("schedules") }, t("Show all")) : null
       ),
       byChat.length > 0 ? (0, import_react12.createElement)("h3", null, t("DSH tasks")) : null,
-      byChat.length === 0 && !adding && !roster.bots.some((bot) => bot.rabiPersona?.roleId && bot.rabiPersona.enabled !== false) ? (0, import_react12.createElement)("div", { key: "none", className: "bt-set-card" }, (0, import_react12.createElement)("div", { className: "bt-set-row" }, (0, import_react12.createElement)("span", { className: "bt-set-hint" }, t("No scheduled tasks yet.")))) : byChat.map(([id, avatar, name, tasks]) => (0, import_react12.createElement)(
+      byChat.length === 0 && !adding && roster.bots.length === 0 ? (0, import_react12.createElement)("div", { key: "none", className: "bt-set-card" }, (0, import_react12.createElement)("div", { className: "bt-set-row" }, (0, import_react12.createElement)("span", { className: "bt-set-hint" }, t("No scheduled tasks yet.")))) : byChat.map(([id, avatar, name, tasks]) => (0, import_react12.createElement)(
         "section",
         { key: id, className: "bt-set-section" },
         (0, import_react12.createElement)("h3", { className: "bt-task-head" }, avatar, name),
@@ -5342,7 +5422,7 @@ function BotSchedules({ bot, roster, actions }) {
     "section",
     { className: "bt-set-section" },
     (0, import_react12.createElement)("h3", null, t("Scheduled tasks")),
-    bot.rabiPersona?.roleId && bot.rabiPersona.enabled !== false ? (0, import_react12.createElement)(RabiSchedules, { key: `${bot.id}:${bot.rabiPersona.roleId}`, bot, actions, roster }) : null,
+    actions.rabiWorkspace ? (0, import_react12.createElement)(RabiSchedules, { key: bot.id, bot, actions, roster }) : null,
     (0, import_react12.createElement)(
       "div",
       { className: "bt-set-card" },
@@ -5361,7 +5441,7 @@ function BotSchedules({ bot, roster, actions }) {
 function ScheduleSummary({ bot, actions }) {
   const view = useSchedules(actions);
   const tasks = view?.available ? view.tasks.filter((task) => task.botId === bot.id && task.status === "active") : [];
-  if (bot.rabiPersona?.roleId && bot.rabiPersona.enabled !== false) return (0, import_react12.createElement)(RabiSchedules, { key: `${bot.id}:${bot.rabiPersona.roleId}`, bot, actions, tasks, summary: true });
+  if (actions.rabiWorkspace) return (0, import_react12.createElement)(RabiSchedules, { key: bot.id, bot, actions, tasks, summary: true });
   return (0, import_react12.createElement)(
     "div",
     null,
@@ -5416,17 +5496,23 @@ var SCHEDULE_CSS = `
 .bt-task-line-when{flex:none;font-size:12px;color:var(--bt-ink-3)}
 .bt-rabi-task-heading{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .bt-rabi-task-heading .bt-section-title{margin:0}
+.bt-rabi-task-row,.bt-rabi-task>.bt-task-line{display:grid;grid-template-columns:16px minmax(0,1fr) auto;align-items:start;gap:8px}
+.bt-rabi-task-row>svg,.bt-rabi-task>.bt-task-line>svg{width:16px;height:16px;margin-top:6px}
+.bt-rabi-task-actions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:6px;min-width:0;max-width:100%}
+.bt-rabi-task-delete{height:auto!important;min-height:28px;min-width:0;max-width:100%;white-space:normal!important;overflow-wrap:anywhere}
 .bt-rabi-task-copy{display:flex!important;flex:1;min-width:0;height:auto!important;min-height:36px;flex-direction:column;align-items:flex-start!important;text-align:left;white-space:normal!important;padding-block:4px!important}
 .bt-rabi-task-copy .bt-set-hint{font-size:12px;overflow-wrap:anywhere}
 .bt-rabi-task-form{display:flex;flex-direction:column;gap:12px}
 .bt-rabi-task-field{display:flex;flex-direction:column;gap:6px;min-width:0;font-size:13px}
 .bt-rabi-task-kinds,.bt-rabi-task-enabled{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
-.bt-rabi-task-dialog{width:min(480px,calc(100vw - 32px))}
+.bt-rabi-task-dialog{width:min(480px,100%);max-height:100%}
+.bt-rabi-task-content{min-height:0;overflow-y:auto;overscroll-behavior:contain}
 .bt-rabi-pending{display:flex;flex-direction:column;gap:6px;padding:8px;font-size:13px}
 @media (prefers-reduced-motion:reduce){.bt-task-form{animation:none}}
 /* Phone-width viewports: the form's fixed minimums would overflow; let the
    fields wrap and share the row. */
 @media (max-width:640px){
+  .bt-rabi-task-row>.bt-rabi-task-actions{grid-column:2/-1;justify-content:flex-start}
   .bt-task-bot{min-width:0;width:100%}
   .bt-task-time{min-width:0;flex:1 1 110px}
   .bt-task-count{width:auto!important;flex:1 1 72px}

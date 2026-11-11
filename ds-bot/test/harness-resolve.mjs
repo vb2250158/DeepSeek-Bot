@@ -43,6 +43,7 @@ registerHooks({
     if (specifier.startsWith('@deepseek-ai/') && context.parentURL?.startsWith(pluginUrl)) {
       // These test-only protocol imports are outside the base bundle's dependencies.
       const testOwners = {
+        '@deepseek-ai/dsh-anonymous-user-id': 'packages/identity/anonymous-user-id',
         '@deepseek-ai/dsh-workspace': 'packages/workspace/workspace',
         '@deepseek-ai/dsh-agent-loop-testkit': 'packages/test-support/agent-loop-testkit',
       }
