@@ -1,6 +1,7 @@
 import { rabiDailyTimes } from '../shared/rabi-daily-times.js'
 import { rabiClient, rabiRefuse as refuse, rabiSegment as segment } from './rabi-client.js'
 import { splitRef } from './text.js'
+import { createRabiAvatarCache, rabiAvatarImage } from './rabi-avatar-cache.js'
 
 /** Rabi owns persona documents and bindings; Bots keep only the imported persona reference. */
 export function install(rt) {
@@ -55,23 +56,22 @@ export function install(rt) {
   }
   // The roster renders a Bot under its Session id, which is not a key in the
   // Bot table. Both the avatar route and the bound Bot resolve to the same
-  // persona id, so read the image by roleId and keep the Bot path as a check.
+  // persona id, so both display paths share the role image cache.
   const roleAvatar = async (roleId, signal) => {
     const image = await client.json(`/api/roles/${segment(roleId)}/avatar`, 'GET', undefined, signal)
-    if (!/^image\/(png|jpeg|webp|gif)$/.test(image.contentType) || typeof image.contentBase64 !== 'string' || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(image.contentBase64)) refuse('Rabi returned an invalid avatar')
-    const bytes = Buffer.from(image.contentBase64, 'base64')
-    if (bytes.length > 5 * 1024 * 1024) refuse('Rabi avatar exceeds the image size limit')
-    return { bytes, contentType: image.contentType }
+    return rabiAvatarImage(image)
   }
+  const avatars = createRabiAvatarCache({ home: rt.home, fetchImage: roleAvatar, signal: shutdown.signal, warn: rt.warn })
   rt.rabiRoleAvatar = async (roleId, callerSignal) => {
     await rt.load()
-    return roleAvatar(roleId, signalOf(callerSignal))
+    segment(roleId)
+    return avatars.get(roleId, signalOf(callerSignal))
   }
   rt.rabiAvatar = async (botId, callerSignal) => {
     await rt.load()
-    const signal = signalOf(callerSignal)
-    const { roleId } = await linkedBot(botId, signal)
-    return roleAvatar(roleId, signal)
+    const roleId = roleOf(rt.botOf(botId))
+    if (!roleId) refuse('This Bot has no Rabi persona link')
+    return rt.rabiRoleAvatar(roleId, callerSignal)
   }
   const imported = roleId => Object.values(state.bots).find(bot => bot.rabiPersona?.roleId === roleId)
   const uniqueName = name => {
@@ -396,5 +396,5 @@ export function install(rt) {
     }
     return next()
   }, { prepend: true })
-  ctx.effect(() => () => { shutdown.abort(); for (const entry of requirements.values()) entry.dispose(); requirements.clear() }, 'ds-bot: Rabi connection lifetime')
+  ctx.effect(() => async () => { shutdown.abort(); for (const entry of requirements.values()) entry.dispose(); requirements.clear(); await avatars.dispose() }, 'ds-bot: Rabi connection lifetime')
 }

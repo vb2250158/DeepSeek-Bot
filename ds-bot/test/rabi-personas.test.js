@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { test } from 'node:test'
 import { install } from '../src/host/rabi-personas.js'
 import { fakeContext } from './fake-ctx.js'
 
-function fixture({ state = { bots: {}, rooms: {} }, installed = true, config = {}, bindings = new Map(), personas = [{ personaId: 'fixture', name: 'Fixture', routes: [{ token: 'private' }] }] } = {}) {
+function fixture({ home, state = { bots: {}, rooms: {} }, installed = true, config = {}, bindings = new Map(), personas = [{ personaId: 'fixture', name: 'Fixture', routes: [{ token: 'private' }] }] } = {}) {
   const requirements = new Map()
   const hooks = { requireBinding(id, roleId) { requirements.set(id, roleId); return () => requirements.delete(id) } }
   const ctx = fakeContext({ services: { rabiAgentHooks: hooks } })
@@ -12,6 +15,7 @@ function fixture({ state = { bots: {}, rooms: {} }, installed = true, config = {
   const requests = []
   const created = []
   const saves = []
+  const warnings = []
   let document = '# Fixture persona\n\nBe concise and answer from evidence.'
   let failure
   ctx.tools.get = () => installed ? {} : undefined
@@ -48,7 +52,7 @@ function fixture({ state = { bots: {}, rooms: {} }, installed = true, config = {
   }
   const rt = {
     rabiAutomationIdentity: () => ({ botScopeId: 'scope', runtimeId: 'runtime' }),
-    ctx, config, state, load: async () => {}, save: async () => { saves.push(JSON.parse(JSON.stringify(state))) },
+    warn: (...args) => warnings.push(args), home, ctx, config, state, load: async () => {}, save: async () => { saves.push(JSON.parse(JSON.stringify(state))) },
     findBot: name => Object.values(state.bots).find(bot => bot.name === name), botOf: id => state.bots[id],
     selfOf: id => state.bots[id] ? id : Object.values(state.bots).find(bot => bot.sessionId === id)?.id ?? Object.values(state.rooms).find(room => Object.values(room.sessions ?? {}).includes(id))?.members?.[0],
     workView: () => ({}),
@@ -67,7 +71,7 @@ function fixture({ state = { bots: {}, rooms: {} }, installed = true, config = {
   }
   const step = async id => { await assemble(id); return { kind: 'enter' } }
   const context = id => ctx.contexts.get('ds-bot:rabi-persona').text({ agent: { id } })
-  return { rt, ctx, hooks, requirements, responses, call, step, assemble, context, requests, created, saves, bindings, setDocument: value => { document = value }, fail: fn => { failure = fn } }
+  return { warnings, rt, ctx, hooks, requirements, responses, call, step, assemble, context, requests, created, saves, bindings, setDocument: value => { document = value }, fail: fn => { failure = fn } }
 }
 
 test('activation and local connection status never discover Manager or read persona files', async () => {
@@ -638,4 +642,177 @@ test('confirmed connection fields are preserved and distinguish other DSH origin
     assert.deepEqual(f.data.config.automationRules.at(-1).action.target, target)
     assert.equal(saved.items.some(item => item.rawRuleId === 'other-connection'), false)
   }
+})
+
+async function avatarFixture(t) {
+  const home = await mkdtemp(join(tmpdir(), 'dsbot-rabi-avatar-'))
+  const hosts = []
+  const start = () => {
+    const f = fixture({ home, state: { bots: { bot: { id: 'bot', name: 'Saved name', rabiPersona: { roleId: 'fixture' } } }, rooms: {} } })
+    hosts.push(f)
+    return f
+  }
+  const saved = async () => {
+    const root = join(home, 'rabi-avatars')
+    const files = await readdir(root)
+    return Promise.all(files.filter(name => name.endsWith('.json')).map(async name => ({ path: join(root, name), value: JSON.parse(await readFile(join(root, name), 'utf8')) })))
+  }
+  t.after(async () => {
+    for (const f of hosts) await f.ctx.dispose()
+    await rm(home, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 })
+  })
+  return { home, start, saved }
+}
+
+async function waitForAvatar(check) {
+  const signal = AbortSignal.timeout(10_000)
+  while (!await check()) {
+    signal.throwIfAborted()
+    await new Promise(resolve => setTimeout(resolve, 10))
+  }
+}
+
+const avatarReceipt = text => ({ contentType: 'image/png', contentBase64: Buffer.from(text).toString('base64') })
+
+test('Rabi avatars persist once per role and survive a fresh offline Host without a binding request', async t => {
+  const disk = await avatarFixture(t), online = disk.start()
+  online.responses.set('/api/roles/fixture/avatar', avatarReceipt('saved-image'))
+  const results = await Promise.all([online.rt.rabiRoleAvatar('fixture'), online.rt.rabiAvatar('bot'), online.rt.rabiRoleAvatar('fixture')])
+  assert.ok(results.every(image => image.bytes.toString() === 'saved-image'))
+  assert.equal(online.requests.length, 1)
+  const [saved] = await disk.saved()
+  assert.deepEqual(saved.value, { version: 1, roleId: 'fixture', ...avatarReceipt('saved-image'), updatedAt: saved.value.updatedAt })
+  assert.equal(Number.isFinite(saved.value.updatedAt), true)
+  await online.ctx.dispose()
+  const offline = disk.start()
+  offline.fail(() => true)
+  assert.equal((await offline.rt.rabiAvatar('bot')).bytes.toString(), 'saved-image')
+  assert.equal(offline.requests.length, 0)
+  assert.equal(offline.rt.state.bots.bot.name, 'Saved name')
+  assert.equal(offline.rt.state.bots.bot.avatar, undefined)
+  await assert.rejects(offline.step('bot'), /Rabi HTTP/)
+  await assert.rejects(offline.rt.rabiRoleAvatar(''), /identity/)
+})
+
+test('stale avatars display while refresh is blocked and save the refreshed image for the next Host', async t => {
+  let now = Date.now()
+  t.mock.method(Date, 'now', () => now)
+  const release = Promise.withResolvers()
+  t.after(() => release.resolve())
+  const disk = await avatarFixture(t), first = disk.start()
+  first.responses.set('/api/roles/fixture/avatar', avatarReceipt('old-image'))
+  await first.rt.rabiRoleAvatar('fixture')
+  await first.ctx.dispose()
+  now += 61_000
+  const next = disk.start(), started = Promise.withResolvers()
+  const execute = next.ctx.tools.execute
+  next.ctx.tools.execute = async input => {
+    started.resolve()
+    await release.promise
+    return execute(input)
+  }
+  next.responses.set('/api/roles/fixture/avatar', avatarReceipt('new-image'))
+  const cached = await next.rt.rabiRoleAvatar('fixture')
+  assert.equal(cached.bytes.toString(), 'old-image')
+  await started.promise
+  assert.equal((await next.rt.rabiRoleAvatar('fixture')).bytes.toString(), 'old-image')
+  release.resolve()
+  await waitForAvatar(async () => (await disk.saved())[0].value.contentBase64 === avatarReceipt('new-image').contentBase64)
+  assert.equal(next.requests.length, 1)
+  const restarted = disk.start()
+  restarted.fail(() => true)
+  assert.equal((await restarted.rt.rabiRoleAvatar('fixture')).bytes.toString(), 'new-image')
+})
+
+test('invalid background receipts retain the last disk image and throttle subsequent refreshes', async t => {
+  let now = Date.now()
+  t.mock.method(Date, 'now', () => now)
+  const disk = await avatarFixture(t), first = disk.start()
+  first.responses.set('/api/roles/fixture/avatar', avatarReceipt('good-image'))
+  await first.rt.rabiRoleAvatar('fixture')
+  await first.ctx.dispose()
+  const original = (await disk.saved())[0].value
+  now += 61_000
+  const next = disk.start()
+  next.responses.set('/api/roles/fixture/avatar', { contentType: 'text/html', contentBase64: 'aW1n' })
+  assert.equal((await next.rt.rabiRoleAvatar('fixture')).bytes.toString(), 'good-image')
+  await waitForAvatar(() => next.warnings.length > 0)
+  assert.equal((await next.rt.rabiRoleAvatar('fixture')).bytes.toString(), 'good-image')
+  assert.equal(next.requests.length, 1)
+  assert.deepEqual((await disk.saved())[0].value, original)
+  now += 61_000
+  next.fail(() => true)
+  assert.equal((await next.rt.rabiRoleAvatar('fixture')).bytes.toString(), 'good-image')
+  await waitForAvatar(() => next.warnings.length === 2)
+  assert.deepEqual((await disk.saved())[0].value, original)
+})
+
+test('one damaged cached role rebuilds independently and a failed remote read leaves its file intact', async t => {
+  const disk = await avatarFixture(t), first = disk.start()
+  for (const id of ['fixture', 'other']) {
+    first.responses.set(`/api/roles/${id}/avatar`, avatarReceipt(id))
+    await first.rt.rabiRoleAvatar(id)
+  }
+  await first.ctx.dispose()
+  const broken = (await disk.saved()).find(file => file.value.roleId === 'fixture')
+  await writeFile(broken.path, '{broken')
+  const next = disk.start()
+  next.fail(() => true)
+  assert.equal((await next.rt.rabiRoleAvatar('other')).bytes.toString(), 'other')
+  await assert.rejects(next.rt.rabiRoleAvatar('fixture'), /Rabi HTTP/)
+  assert.equal(await readFile(broken.path, 'utf8'), '{broken')
+  next.fail(() => false)
+  next.responses.set('/api/roles/fixture/avatar', avatarReceipt('repaired'))
+  assert.equal((await next.rt.rabiRoleAvatar('fixture')).bytes.toString(), 'repaired')
+  assert.equal((await disk.saved()).find(file => file.value.roleId === 'fixture').value.contentBase64, avatarReceipt('repaired').contentBase64)
+})
+
+test('a cache write failure keeps the successful remote image usable in memory', async t => {
+  const home = await mkdtemp(join(tmpdir(), 'dsbot-rabi-unwritable-'))
+  const blocked = join(home, 'not-a-directory')
+  await writeFile(blocked, 'fixture')
+  const f = fixture({ home: blocked })
+  t.after(async () => { await f.ctx.dispose(); await rm(home, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 }) })
+  f.responses.set('/api/roles/fixture/avatar', avatarReceipt('online-image'))
+  assert.equal((await f.rt.rabiRoleAvatar('fixture')).bytes.toString(), 'online-image')
+  f.fail(() => true)
+  assert.equal((await f.rt.rabiRoleAvatar('fixture')).bytes.toString(), 'online-image')
+  assert.equal(f.requests.length, 1)
+})
+
+test('Host disposal aborts an in-flight avatar refresh and preserves the previous disk image', async t => {
+  let now = Date.now()
+  t.mock.method(Date, 'now', () => now)
+  const disk = await avatarFixture(t), first = disk.start()
+  first.responses.set('/api/roles/fixture/avatar', avatarReceipt('before-stop'))
+  await first.rt.rabiRoleAvatar('fixture')
+  await first.ctx.dispose()
+  const original = (await disk.saved())[0].value
+  now += 61_000
+  const next = disk.start(), started = Promise.withResolvers()
+  let aborted = false
+  next.ctx.tools.execute = input => new Promise((_resolve, reject) => {
+    const stop = () => { aborted = true; reject(input.signal.reason) }
+    input.signal.addEventListener('abort', stop, { once: true })
+    if (input.signal.aborted) stop()
+    started.resolve()
+  })
+  assert.equal((await next.rt.rabiRoleAvatar('fixture')).bytes.toString(), 'before-stop')
+  await started.promise
+  await next.ctx.dispose()
+  assert.equal(aborted, true)
+  assert.deepEqual((await disk.saved())[0].value, original)
+  await assert.rejects(next.rt.rabiRoleAvatar('fixture'), { name: 'AbortError' })
+})
+
+test('unlinking a cached Bot disables its display lookup and role changes use a separate cache entry', async t => {
+  const disk = await avatarFixture(t), f = disk.start()
+  f.responses.set('/api/roles/fixture/avatar', avatarReceipt('first-role'))
+  await f.rt.rabiAvatar('bot')
+  f.rt.state.bots.bot.rabiPersona.enabled = false
+  await assert.rejects(f.rt.rabiAvatar('bot'), /no Rabi persona link/)
+  f.rt.state.bots.bot.rabiPersona = { roleId: 'other' }
+  f.responses.set('/api/roles/other/avatar', avatarReceipt('other-role'))
+  assert.equal((await f.rt.rabiAvatar('bot')).bytes.toString(), 'other-role')
+  assert.deepEqual((await disk.saved()).map(file => file.value.roleId).sort(), ['fixture', 'other'])
 })
