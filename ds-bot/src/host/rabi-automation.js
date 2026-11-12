@@ -1,4 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto'
+import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import { ScheduleId, renderReminderFraming } from '@deepseek-ai/dsh-schedule'
 import { getOrCreateAnonymousUserId } from '@deepseek-ai/dsh-anonymous-user-id'
 
 const invalid = message => { throw Object.assign(new Error(message), { code: 'bot/rabi-validation' }) }
@@ -26,6 +28,14 @@ export function install(rt) {
     const bot = typeof body.botId === 'string' ? rt.botOf(body.botId) : undefined
     if (!bot || bot.id !== body.botId) invalid('Select an existing personal Bot; groups are not supported')
     if (typeof body.deliveryId !== 'string' || !body.deliveryId || /[\x00-\x1f]/.test(body.deliveryId)) invalid('Provide a stable delivery ID')
+    if (body.scheduledAt !== undefined) {
+      const scheduledAt = body.scheduledAt
+      const utcFormat = typeof scheduledAt === 'string'
+        && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/.test(scheduledAt)
+      const validInstant = utcFormat && Number.isFinite(Date.parse(scheduledAt))
+        && new Date(scheduledAt).toISOString().slice(0, 19) === scheduledAt.slice(0, 19)
+      if (!validInstant) invalid('Provide scheduledAt as a valid UTC instant')
+    }
     if (typeof body.message !== 'string' || !body.message.trim()) invalid('Provide the automation message')
     return { bot, botScopeId, botId: bot.id, deliveryId: body.deliveryId, requestId: requestIdOf(body.deliveryId) }
   }
@@ -42,9 +52,20 @@ export function install(rt) {
           if (Number(event.seq) < Number(session.inheritedEventCount ?? 0)) continue
           const messages = event.type === 'agent/inbox/spliced' ? event.data.inserted : event.type === 'user/message' ? [event.data] : []
           for (const message of messages) {
-            if (!['user', 'retry'].includes(message.source?.kind) || message.source.rpcId !== target.requestId) continue
-            const outcome = textOf(message) === body.message ? 'accepted' : 'conflict'
-            if (outcome === 'accepted') await ctx.sessions.flush(session)
+            let prompt
+            if (message.source?.kind === 'schedule') {
+              const text = textOf(message) ?? ''
+              if (!text.startsWith('[SCHEDULE REMINDER]\n')) continue
+              const idLine = /^schedule_id_json: (.*)$/m.exec(text)
+              if (!idLine || JSON.parse(idLine[1]) !== target.deliveryId) continue
+              const promptLine = /^reminder_prompt_json: (.*)$/m.exec(text)
+              prompt = promptLine ? JSON.parse(promptLine[1]) : undefined
+            } else {
+              if (!['user', 'retry'].includes(message.source?.kind) || message.source.rpcId !== target.requestId) continue
+              prompt = textOf(message)
+            }
+            const outcome = prompt === body.message ? 'accepted' : 'conflict'
+            if (outcome === 'accepted' && !await ctx.sessions.flush(session)) throw new Error('Session persistence did not acknowledge the reminder')
             return { schemaVersion: 1, state: outcome, botScopeId: target.botScopeId, botId: target.botId, deliveryId: target.deliveryId, requestId: target.requestId, sessionId, runtimeId }
           }
         }
@@ -73,10 +94,13 @@ export function install(rt) {
       if (previous.state !== 'not_found') return previous
       signal?.throwIfAborted()
       try {
-        const accepted = await rt.sendUser({ sessionId: target.botId, requestId: target.requestId, content: [{ type: 'text', text: body.message }] })
-        const agent = await rt.resolveAgent(accepted.sessionId)
-        await ctx.sessions.flush(agent.session)
-        return { schemaVersion: 1, state: 'accepted', botScopeId: target.botScopeId, botId: target.botId, deliveryId: target.deliveryId, requestId: target.requestId, sessionId: accepted.sessionId, runtimeId }
+        const sessionId = rt.chatOf(target.botId)
+        await rt.ensureCapabilities(sessionId)
+        const agent = await rt.resolveAgent(sessionId)
+        const text = renderReminderFraming({ id: ScheduleId(target.deliveryId), prompt: body.message, scheduledAt: body.scheduledAt ?? new Date().toISOString() })
+        agent.followup(createUserMessage({ content: [{ type: 'text', text }], source: { kind: 'schedule' } }))
+        if (!await ctx.sessions.flush(agent.session)) throw new Error('Session persistence did not acknowledge the reminder')
+        return { schemaVersion: 1, state: 'accepted', botScopeId: target.botScopeId, botId: target.botId, deliveryId: target.deliveryId, requestId: target.requestId, sessionId, runtimeId }
       } catch {
         // Failed outcomes remain fenced for this runtime; accepted ticks add no team-state receipts.
         uncertain.set(key, body.message)

@@ -11,9 +11,24 @@ async function fixture(t) {
   const bot = { id: 'bot', name: 'Personal', sessionId: 'part2', segments: [{ sessionId: 'bot' }] }
   const logs = new Map([['bot', []], ['part2', []]])
   const calls = [], disposers = []
-  const rt = { dshHome: home, state: { workspaceId: 'workspace', bots: { bot }, rooms: { room: { id: 'room' } } }, ctx: { effect(execute) { const dispose = execute(); disposers.push(dispose); return dispose }, sessions: { flush: async () => {} } }, load: async () => {}, readOnly: () => undefined,
+  const rt = { dshHome: home, state: { workspaceId: 'workspace', bots: { bot }, rooms: { room: { id: 'room' } } }, ctx: { effect(execute) { const dispose = execute(); disposers.push(dispose); return dispose }, sessions: { flush: async () => true } }, load: async () => {}, readOnly: () => undefined,
     botOf: id => id === bot.id ? bot : undefined, chatOf: () => bot.sessionId,
-    resolveAgent: async id => { if (!logs.has(id)) throw new Error('missing'); return { session: { inheritedEventCount: 0, snapshotEvents: () => logs.get(id) } } },
+    ensureCapabilities: async () => {},
+    resolveAgent: async id => {
+      if (!logs.has(id)) throw new Error('missing')
+      return {
+        session: { inheritedEventCount: 0, snapshotEvents: () => logs.get(id) },
+        followup(message) {
+          const idLine = /^schedule_id_json: (.*)$/m.exec(message.content[0].text)
+          calls.push({ sessionId: id, requestId: JSON.parse(idLine[1]) })
+          logs.get(id).push({
+            seq: logs.get(id).length,
+            type: 'agent/inbox/spliced',
+            data: { inserted: [message] },
+          })
+        },
+      }
+    },
     sendUser: async request => {
       calls.push(request)
       const sessionId = bot.sessionId
@@ -46,7 +61,7 @@ test('delivery follows stable Bot identity and reconciles the original receipt a
   assert.equal(accepted.state, 'accepted')
   assert.equal(accepted.sessionId, 'part2')
   assert.equal(accepted.requestId, f.body.deliveryId)
-  assert.equal(f.calls[0].sessionId, 'bot')
+  assert.equal(f.calls[0].sessionId, 'part2')
   f.bot.segments.push({ sessionId: 'part2' }); f.bot.sessionId = 'part3'; f.logs.set('part3', [])
   assert.deepEqual(await f.call('deliver'), accepted)
   assert.deepEqual(await f.call('reconcile'), accepted)
@@ -67,7 +82,7 @@ test('unreadable historical parts and uncertain sends never trigger an automatic
   assert.equal((await f.call('deliver')).state, 'uncertain')
   assert.equal(f.calls.length, 0)
   f.logs.set('bot', [])
-  f.rt.sendUser = async () => { f.calls.push('failed'); throw new Error('unknown') }
+  f.rt.ensureCapabilities = async () => { f.calls.push('failed'); throw new Error('unknown') }
   assert.equal((await f.call('deliver')).state, 'uncertain')
   assert.equal((await f.call('reconcile')).state, 'uncertain')
   assert.equal((await f.call('deliver')).state, 'uncertain')
@@ -97,7 +112,7 @@ test('an accepted queue whose durable flush fails stays uncertain without anothe
   assert.equal((await f.call('deliver')).state, 'uncertain')
   assert.equal((await f.call('reconcile')).state, 'uncertain')
   assert.equal(f.calls.length, 1)
-  f.rt.ctx.sessions.flush = async () => {}
+  f.rt.ctx.sessions.flush = async () => true
   assert.equal((await f.call('reconcile')).state, 'accepted')
   assert.equal(f.calls.length, 1)
 })
@@ -106,8 +121,8 @@ test('an accepted queue whose durable flush fails stays uncertain without anothe
 test('disposal closes native admission and waits for a deferred delivery before replacement', async t => {
   const f = await fixture(t)
   const entered = Promise.withResolvers(), release = Promise.withResolvers()
-  const send = f.rt.sendUser
-  f.rt.sendUser = async request => { entered.resolve(); await release.promise; return send(request) }
+  const prepare = f.rt.ensureCapabilities
+  f.rt.ensureCapabilities = async id => { entered.resolve(); await release.promise; return prepare(id) }
   const oldEndpoint = f.rt.rabiAutomationEndpoint
   const delivery = f.call('deliver')
   await entered.promise
@@ -172,4 +187,61 @@ test('long Unicode-role automation IDs enter the native queue unchanged and reco
   assert.deepEqual(await f.call('reconcile', body), accepted)
   assert.deepEqual(await f.call('deliver', body), accepted)
   assert.equal(f.calls.length, 1)
+})
+
+
+test('Rabi reminders enter with native schedule source and public reminder framing', async t => {
+  const f = await fixture(t)
+  await f.call('deliver')
+  const message = f.logs.get('part2')[0].data.inserted[0]
+  assert.deepEqual(message.source, { kind: 'schedule' })
+  assert.match(message.content[0].text, /^\[SCHEDULE REMINDER\]/)
+  assert.match(message.content[0].text, /schedule_id_json: "delivery"/)
+  assert.match(message.content[0].text, /reminder_prompt_json: "Check the report"/)
+})
+
+
+test('schedule framing retains escaped IDs, original prompts and supplied occurrence time', async t => {
+  const f = await fixture(t)
+  const body = { ...f.body, deliveryId: 'id:"quoted"\\path', message: 'Line one\nLine "two"', scheduledAt: '2030-01-01T09:30:00.000Z' }
+  assert.equal((await f.call('deliver', body)).state, 'accepted')
+  const text = f.logs.get('part2')[0].data.inserted[0].content[0].text
+  assert.match(text, /occurrence_at: 2030-01-01T09:30:00.000Z/)
+  assert.equal((await f.call('reconcile', body)).state, 'accepted')
+  assert.equal((await f.call('reconcile', { ...body, message: 'Other' })).state, 'conflict')
+  for (const scheduledAt of ['bad', '2030-02-30T09:30:00Z', '2030-01-01T09:30:00+08:00', 1]) await assert.rejects(f.call('deliver', { ...body, scheduledAt }), { code: 'bot/rabi-validation' })
+})
+
+test('old user receipts reconcile without another reminder and false flush remains uncertain', async t => {
+  const f = await fixture(t)
+  f.logs.get('bot').push({ seq: 0, type: 'agent/inbox/spliced', data: { inserted: [{ source: { kind: 'user', rpcId: f.body.deliveryId }, content: [{ type: 'text', text: f.body.message }] }] } })
+  const timedBody = { ...f.body, scheduledAt: '2020-01-01T09:30:00.000Z' }
+  assert.equal((await f.call('reconcile', timedBody)).state, 'accepted')
+  assert.equal((await f.call('deliver', timedBody)).state, 'accepted')
+  assert.equal(f.calls.length, 0)
+  f.rt.ctx.sessions.flush = async () => false
+  assert.equal((await f.call('reconcile')).state, 'uncertain')
+  const fresh = await fixture(t)
+  fresh.rt.ctx.sessions.flush = async () => false
+  assert.equal((await fresh.call('deliver')).state, 'uncertain')
+  assert.equal((await fresh.call('reconcile')).state, 'uncertain')
+  assert.equal(fresh.calls.length, 1)
+})
+
+test('broken schedule JSON cannot acknowledge or repeat an unknown reminder', async t => {
+  const f = await fixture(t)
+  f.logs.get('part2').push({ seq: 0, type: 'agent/inbox/spliced', data: { inserted: [{ source: { kind: 'schedule' }, content: [{ type: 'text', text: '[SCHEDULE REMINDER]\nschedule_id_json: broken\nreminder_prompt_json: "Check"' }] }] } })
+  assert.equal((await f.call('deliver')).state, 'uncertain')
+  assert.equal(f.calls.length, 0)
+})
+
+
+test('native admission-time receipts accept a later request carrying the original earlier occurrence', async t => {
+  const f = await fixture(t)
+  await f.call('deliver')
+  const originalCalls = f.calls.length
+  const timedBody = { ...f.body, scheduledAt: '2020-01-01T09:30:00.000Z' }
+  assert.equal((await f.call('reconcile', timedBody)).state, 'accepted')
+  assert.equal((await f.call('deliver', timedBody)).state, 'accepted')
+  assert.equal(f.calls.length, originalCalls)
 })
