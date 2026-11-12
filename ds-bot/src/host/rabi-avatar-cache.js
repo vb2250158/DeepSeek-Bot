@@ -9,6 +9,18 @@ const MAX_BYTES = 5 * 1024 * 1024
 const REFRESH_MS = 60_000
 const MAX_ENTRIES = 64
 
+async function waitForCaller(pending, signal) {
+  if (!signal) return pending
+  signal.throwIfAborted()
+  let onAbort
+  const aborted = new Promise((_, reject) => {
+    onAbort = () => reject(signal.reason)
+    signal.addEventListener('abort', onAbort, { once: true })
+  })
+  try { return await Promise.race([pending, aborted]) }
+  finally { signal.removeEventListener('abort', onAbort) }
+}
+
 /** Validates the remote receipt and the same fields read back from disk. */
 export function rabiAvatarImage(image) {
   if (!/^image\/(png|jpeg|webp|gif)$/.test(image?.contentType) || typeof image?.contentBase64 !== 'string' || image.contentBase64.length === 0 || image.contentBase64.length % 4 !== 0 || image.contentBase64.length > Math.ceil(MAX_BYTES / 3) * 4 || !/^[A-Za-z0-9+/]*={0,2}$/.test(image.contentBase64)) rabiRefuse('Rabi returned an invalid avatar')
@@ -87,11 +99,11 @@ export function createRabiAvatarCache({ home, fetchImage, signal, warn = () => {
       entries.delete(roleId); entries.set(roleId, entry)
       entry.users = (entry.users ?? 0) + 1
       try {
-        await entry.ready
+        await waitForCaller(entry.ready, callerSignal)
         signal.throwIfAborted()
         callerSignal?.throwIfAborted()
         if (!entry.image) {
-          const image = await refresh(roleId, entry)
+          const image = await waitForCaller(refresh(roleId, entry), callerSignal)
           callerSignal?.throwIfAborted()
           return image
         }
