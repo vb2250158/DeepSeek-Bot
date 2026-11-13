@@ -674,10 +674,11 @@ function chatRow(row, key, { sessionId, selfId, roster, actions, useUi, onBtwDel
   }
 }
 
-export function TriggerCell({ node, sessionId, useRoster, useSessions, useTurnClock, useUi, actions }) {
+export function TriggerCell({ node, sessionId, useAssistantChat, useRoster, useSessions, useTurnClock, useUi, actions }) {
   const roster = useRoster(value => value)
   const data = node.data
   const source = data.source !== null && typeof data.source === 'object' ? data.source : {}
+  const assistantMode = assistantChatActive(useAssistantChat?.(value => value), data.seq ?? node.anchorSeq)
   // Team state (exchanges) is keyed by the Bot id; Session state by the part shown.
   const selfId = roster.byId[sessionId]?.id ?? sessionId
   // A resumed handoff keeps the relayed message's source, but it opens a part, not a run.
@@ -774,6 +775,10 @@ export function TriggerCell({ node, sessionId, useRoster, useSessions, useTurnCl
       return h('div', { className: 'bt-event' }, prompts.length > 0 ? t('Scheduled task: {text}', { text: prompts.join(' · ').slice(0, 80) }) : t('Routine started'))
     }
     if (source.kind === 'user-question-reply' || source.kind === 'goal') return null
+    if (assistantMode && (source.kind === 'subagent-settled' || source.kind === 'agent-message')) {
+      return h('details', { className: 'bt-think' }, h('summary', null, t('Details')),
+        h('div', { className: 'bt-think-text', role: 'region', 'aria-label': t('Details'), tabIndex: 0 }, h(MarkdownText, { text: contentText(data.content), labels: mdLabels(), variant: 'compact' })))
+    }
     return h('div', { className: 'bt-event' }, contentText(data.content).slice(0, 80) || t('Update'))
   }
 }

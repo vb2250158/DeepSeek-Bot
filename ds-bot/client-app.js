@@ -33840,10 +33840,11 @@ function chatRow(row, key, { sessionId, selfId, roster, actions, useUi, onBtwDel
       return null;
   }
 }
-function TriggerCell({ node, sessionId, useRoster, useSessions, useTurnClock, useUi, actions }) {
+function TriggerCell({ node, sessionId, useAssistantChat, useRoster, useSessions, useTurnClock, useUi, actions }) {
   const roster = useRoster((value) => value);
   const data = node.data;
   const source = data.source !== null && typeof data.source === "object" ? data.source : {};
+  const assistantMode = assistantChatActive(useAssistantChat?.((value) => value), data.seq ?? node.anchorSeq);
   const selfId = roster.byId[sessionId]?.id ?? sessionId;
   const deferred = source.kind === "bot" && source.deferred === true;
   const relayed = isRelayContext(data);
@@ -33924,6 +33925,14 @@ function TriggerCell({ node, sessionId, useRoster, useSessions, useTurnClock, us
       return (0, import_react53.createElement)("div", { className: "bt-event" }, prompts.length > 0 ? t("Scheduled task: {text}", { text: prompts.join(" · ").slice(0, 80) }) : t("Routine started"));
     }
     if (source.kind === "user-question-reply" || source.kind === "goal") return null;
+    if (assistantMode && (source.kind === "subagent-settled" || source.kind === "agent-message")) {
+      return (0, import_react53.createElement)(
+        "details",
+        { className: "bt-think" },
+        (0, import_react53.createElement)("summary", null, t("Details")),
+        (0, import_react53.createElement)("div", { className: "bt-think-text", role: "region", "aria-label": t("Details"), tabIndex: 0 }, (0, import_react53.createElement)(import_dsh_client_ui_primitives3.MarkdownText, { text: contentText(data.content), labels: mdLabels3(), variant: "compact" }))
+      );
+    }
     return (0, import_react53.createElement)("div", { className: "bt-event" }, contentText(data.content).slice(0, 80) || t("Update"));
   }
 }
