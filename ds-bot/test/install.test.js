@@ -145,6 +145,7 @@ test('apply registers listeners and effects in a fixed order', (t) => {
     'context ds-bot:rabi-persona 630',
     'on system-prompt/assemble (prepend)',
     'effect ds-bot: Rabi connection lifetime',
+    'effect ds-bot: assistant chat cache',
     'effect ds-bot: Bot compaction',
     'on agent/created',
     'effect ds-bot: wake parts that wait for their run mode',
