@@ -8,7 +8,7 @@ English | [中文](README.zh.md)
 
 This fork integrates upstream 0.3.6 (0.3.6-rabi.1) with shared management for public Bots, Rabi assistant presets and deferred client loading. Private Bots require approval before native Bot tools publish their content to the team. Deleted private Bots retain protected folders, memory and chats until you release them in Settings. Rabi-bound Bots keep memory and learned skills under Rabi ownership; project AGENTS.md proposals remain available. Office directory inputs reject internal links, and PNG decoding bounds allocation and rejects truncated image data.
 
-Bot-pair and group history now persists in append-only files under the team's `ledger/` directory, importing existing team history on first use. Group shutdown waits for owned rounds and their final ledger writes. Keep these books with the team when migrating or restoring a snapshot, and use a reader that supports this release's ledger.
+Bot-pair and group history now persists in append-only files under the team's `ledger/` directory, importing existing team history on first use. Group shutdown waits for owned rounds and their final ledger writes. Legacy group prefixes retain their declared length when their `group-lines/` whole-text file and `group-logs/` entry are unavailable, and reads report the missing remainder. Existing legacy source files remain available for recovery. Keep these books with the team when migrating or restoring a snapshot, and use a reader that supports this release's ledger.
 
 **[Download DS Bot for Windows 10/11 (64-bit) / 下载 Windows 10/11（64 位）版](https://github.com/Fei2411/DS-Bot/releases/latest)**, about 212 MB / 约 212 MB. A community project, not an official DeepSeek product. / 社区开源项目，不是 DeepSeek 官方产品。
 

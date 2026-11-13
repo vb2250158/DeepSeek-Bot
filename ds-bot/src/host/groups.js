@@ -215,7 +215,11 @@ export function install(rt) {
       const { length, ...rest } = line
       let text = rest.text
       if (length !== undefined) {
-        try { text = readFileSync(join(rt.home, 'group-lines', roomId, `${line.seq}.txt`), 'utf8') } catch { /* only its start was kept */ }
+        try { text = readFileSync(join(rt.home, 'group-lines', roomId, `${line.seq}.txt`), 'utf8') } catch {
+          // The prefix remains marked when its whole text is unavailable.
+          lines.set(line.seq, { ...line })
+          continue
+        }
       }
       lines.set(line.seq, { ...rest, ...(text === undefined ? {} : { text }) })
     }
@@ -250,7 +254,8 @@ export function install(rt) {
 
   // What a member reads of a line: all of it, up to GROUP_LINE_READ.
   const memberText = room => (line) => {
-    const whole = line.length === undefined ? line.text : rt.ledger.record(bookOf(room.id), line.seq)?.text
+    const kept = line.length === undefined ? line : rt.ledger.record(bookOf(room.id), line.seq)
+    const whole = kept?.length === undefined ? kept?.text : undefined
     if (whole === undefined) return `${line.text}… (cut; ${line.length} characters in all, the rest was not kept)`
     const shown = headOf(whole, GROUP_LINE_READ)
     return whole.length > shown.length ? `${shown}… (cut; ${whole.length} characters in all)` : shown
@@ -1556,7 +1561,7 @@ export function install(rt) {
         const line = room.log.find(entry => entry.seq === Number(args.seq))
         if (line !== undefined) return lineText(line, memberText(room)(line))
         const kept = await rt.groupLine(room.id, Number(args.seq)).catch(() => undefined)
-        return kept === undefined ? `"${room.name}" has no message ${args.seq}.` : lineText(kept, headOf(kept.text ?? '', GROUP_LINE_READ))
+        return kept === undefined ? `"${room.name}" has no message ${args.seq}.` : lineText(kept, memberText(room)(kept))
       }
       if (typeof args.query === 'string' && args.query.trim() !== '') {
         const found = await rt.searchGroupLog(room.id, args.query).catch(() => [])
@@ -1565,6 +1570,7 @@ export function install(rt) {
       // Thirty whole lines could fill the context, so a long one shows its start.
       const short = (line) => {
         if (line.text === undefined) return ''
+        if (line.length !== undefined && rt.ledger.record(bookOf(room.id), line.seq)?.length !== undefined) return memberText(room)(line)
         const length = line.length ?? line.text.length
         return length <= TEXT_KEPT ? line.text : `${headOf(line.text, TEXT_KEPT)}… (cut; ${length} characters in all; read_group_chat with seq ${line.seq} reads it whole)`
       }

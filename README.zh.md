@@ -8,7 +8,7 @@
 
 本 fork 已合并上游 0.3.6（0.3.6-rabi.1），保留公开 Bot 平等管理、Rabi 助手预设和延迟加载。私密 Bot 通过原生 Bot 工具向团队发布内容前需要批准；删除后，其文件夹、记忆和聊天仍受保护，可在设置中解除。Rabi 绑定 Bot 的记忆和学习技能继续由 Rabi 管理，项目 AGENTS.md 提案仍可使用。Office 目录输入拒绝内部链接，PNG 读取限制内存并拒绝截断图像。
 
-Bot 双方与群聊历史保存到团队 `ledger/` 目录中的追加式文件，首次读取时导入已有团队历史。卸载群聊模块会等待其所属轮次及最终账本写入完成。迁移或恢复快照时须连同团队保留这些文件，并使用支持本版账本的读取器。
+Bot 双方与群聊历史保存到团队 `ledger/` 目录中的追加式文件，首次读取时导入已有团队历史。卸载群聊模块会等待其所属轮次及最终账本写入完成。旧群聊的 `group-lines/` 全文文件和 `group-logs/` 旧日志均不可用时，导入保留前缀及其声明长度，读取时说明剩余正文缺失。既有旧数据文件继续保留，供恢复使用。迁移或恢复快照时须连同团队保留这些文件，并使用支持本版账本的读取器。
 
 **[Download DS Bot for Windows 10/11 (64-bit) / 下载 Windows 10/11（64 位）版](https://github.com/Fei2411/DS-Bot/releases/latest)**, about 212 MB / 约 212 MB. A community project, not an official DeepSeek product. / 社区开源项目，不是 DeepSeek 官方产品。
 
