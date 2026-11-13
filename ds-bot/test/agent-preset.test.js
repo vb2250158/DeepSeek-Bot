@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, writeFileSync } from 'node:fs'
+import { rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
@@ -56,8 +57,9 @@ function start({ presets } = {}) {
   const warn = rt.warn
   rt.warn = (...args) => { warnings.push(format(...args)); return warn(...args) }
   const stop = async () => {
-    await ctx.dispose()
-    rmSync(home, { recursive: true, force: true, maxRetries: 5 })
+    const disposed = await ctx.dispose()
+    assert.ok(disposed.every(result => result.status === 'fulfilled'))
+    await rm(home, { recursive: true, force: true, maxRetries: 5 })
   }
   return { rt, created, relay, warnings, stop }
 }

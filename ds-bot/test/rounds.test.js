@@ -1370,12 +1370,27 @@ test('the idle pause survives a restart and the user lifts it', async (t) => {
   await rt.teamTools.find(d => d.name === 'post_to_group').execute({ group: 'R1', message: '暂无待办' }, { agent: { id: rt.chatOf(chief) } })
   const post = sent.find(entry => entry.sessionId === room.id && entry.message.source.role === 'post')
   await emit(room.id, { type: 'user/message', data: { source: post.message.source, content: post.message.content } })
+  const entered = Promise.withResolvers()
+  const release = Promise.withResolvers()
+  const save = rt.save
+  let held = false
+  rt.save = (...args) => {
+    if (!held && [...rt.roomProgress.values()].some(round => round.roomId === room.id && round.starting)) {
+      held = true
+      entered.resolve()
+      return release.promise.then(() => save(...args))
+    }
+    return save(...args)
+  }
+  t.after(() => release.resolve())
   const quiet = relay(room.id, 'relay-1')
-  await settle()
+  await entered.promise
   assert.equal(sent.filter(entry => entry.message.source.role === 'room').length, 0, 'no round starts on its own after a restart')
 
   await emit(room.id, { type: 'user/message', data: { source: { kind: 'user' }, content: [{ type: 'text', text: '@Writer 继续' }] } })
   const resumed = relay(room.id, 'relay-2')
+  await new Promise(resolve => setImmediate(resolve))
+  release.resolve()
   const turn = await turnFor(sent)
   assert.ok(turn, "the user's message opens a round again")
   await answer(turn.sessionId, turn.message.source.exchangeId, '继续核对', 1)

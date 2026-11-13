@@ -46,6 +46,7 @@ export function install(rt) {
   const { ctx, home } = rt
 
   const indexPath = join(home, 'chat-index.sqlite')
+  let disposed = false
   let chatIndex
   let indexOpening
 
@@ -69,6 +70,8 @@ export function install(rt) {
   }
 
   function openIndex() {
+    // Group finalizers may ask for a brief after parallel module disposal has begun.
+    if (disposed) return Promise.resolve(null)
     if (chatIndex !== undefined) return Promise.resolve(chatIndex)
     const opening = indexOpening ??= (async () => {
       let DatabaseSync
@@ -79,6 +82,7 @@ export function install(rt) {
         rt.warn('ds-bot: no chat index, read_own_chat scans the logs: %s', error)
         return null
       }
+      if (disposed) return null
       // A damaged file is rebuilt from the logs once.
       for (const fresh of [false, true]) {
         try {
@@ -91,7 +95,7 @@ export function install(rt) {
       return null
     })().then((index) => {
       // The plugin may have been disposed while the file opened.
-      if (indexOpening !== opening) {
+      if (disposed || indexOpening !== opening) {
         index?.db.close()
         return null
       }
@@ -124,7 +128,9 @@ export function install(rt) {
       throw error
     }
   }
-  ctx.effect(() => () => {
+  ctx.effect(() => async () => {
+    disposed = true
+    await Promise.allSettled([indexOpening, ...catchingUp.values()])
     chatIndex?.db.close()
     chatIndex = undefined
     indexOpening = undefined

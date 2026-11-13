@@ -1016,6 +1016,7 @@ export function install(rt) {
       // The greeting round leaves the user's messages for a round of their own.
       if (turns.size === 0 && !round.slots.some(slot => slot.status === 'waiting') && (round.kickoff || waitingLines(agent).length === 0)) break
     }
+    round.closing = true
     await Promise.allSettled([...turns])
     delete round.nudge
     // The admin was alone with the user's message and passed: the round ends with
@@ -1183,12 +1184,12 @@ export function install(rt) {
     const round = running.starting ? await running.ready : running
     // A starting round can finish before this waiter resumes. Its old slots no longer run.
     const active = runningRound(room.id)
-    if (round === undefined || active !== round) {
+    if (round === undefined || active !== round || round.closing) {
       const agent = await rt.resolveAgent(rt.sessionOfRoom(room))
       if (disposed || rt.roomOf(room.id) !== room) return
       const current = runningRound(room.id)
-      if (current !== undefined) return joinRound(room, current, posts)
-      if (finalizing.has(room.id)) laterPosts.set(room.id, [...(laterPosts.get(room.id) ?? []), ...posts])
+      if (current !== undefined && !current.closing) return joinRound(room, current, posts)
+      if (current?.closing || finalizing.has(room.id)) laterPosts.set(room.id, [...(laterPosts.get(room.id) ?? []), ...posts])
       else {
         const left = laterPosts.get(room.id) ?? []
         laterPosts.delete(room.id)
