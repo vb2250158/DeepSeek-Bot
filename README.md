@@ -4,9 +4,11 @@
 
 English | [中文](README.zh.md)
 
-![version](https://img.shields.io/badge/version-v0.3.0--rabi.3-blue) ![DSH](https://img.shields.io/badge/DSH-0.2.2--rc.1-4D6BFE) ![license](https://img.shields.io/badge/license-Apache_2.0-green)
+![version](https://img.shields.io/badge/version-v0.3.6--rabi.1-blue) ![DSH](https://img.shields.io/badge/DSH-0.2.2--rc.2-4D6BFE) ![license](https://img.shields.io/badge/license-Apache_2.0-green)
 
-This fork integrates upstream 0.3.2 (0.3.2-rabi.1) with shared management for public Bots, Rabi assistant presets and deferred client loading. Private Bots require approval before native Bot tools publish their content to the team. Deleted private Bots retain protected folders, memory and chats until you release them in Settings. Rabi-bound Bots keep memory and learned skills under Rabi ownership; project AGENTS.md proposals remain available. Office directory inputs reject internal links, and PNG decoding bounds allocation and rejects truncated image data.
+This fork integrates upstream 0.3.6 (0.3.6-rabi.1) with shared management for public Bots, Rabi assistant presets and deferred client loading. Private Bots require approval before native Bot tools publish their content to the team. Deleted private Bots retain protected folders, memory and chats until you release them in Settings. Rabi-bound Bots keep memory and learned skills under Rabi ownership; project AGENTS.md proposals remain available. Office directory inputs reject internal links, and PNG decoding bounds allocation and rejects truncated image data.
+
+Bot-pair and group history now persists in append-only files under the team's `ledger/` directory, importing existing team history on first use. Group shutdown waits for owned rounds and their final ledger writes. Keep these books with the team when migrating or restoring a snapshot, and use a reader that supports this release's ledger.
 
 **[Download DS Bot for Windows 10/11 (64-bit) / 下载 Windows 10/11（64 位）版](https://github.com/Fei2411/DS-Bot/releases/latest)**, about 212 MB / 约 212 MB. A community project, not an official DeepSeek product. / 社区开源项目，不是 DeepSeek 官方产品。
 
@@ -42,6 +44,8 @@ Local agents settings read the request data directly. A failed settings page sta
 
 ## Tested host and environment
 
+Release `0.3.6-rabi.1` merges the message ledger, persistent group rounds and batches, auxiliary model retries, lazy mail decoding, current Host APIs, additional languages and the optional phone link. Existing Rabi native scheduled delivery and persistent avatar caching retain their original ownership and caller cancellation. Group and pair message records move to the Bot home ledger while earlier history stays readable. The tested source target is Core rc.2. The last recorded formal Core remains `54931fbd25050ef036e44b1daec931da2bfe7b39` / `0.2.2-rc.1` until environment maintenance records adoption.
+
 Release `0.3.2-rabi.24` fixes native delivery of long stable task IDs generated from Unicode role identifiers. The complete original ID remains intact for queue receipts and deduplication.
 
 Release `0.3.2-rabi.23` adds explicit Rabi → DSH → DS Bot destinations and daily schedules with multiple times under one rule. Task lists follow the exact destination across storage roles. Editing retains source-role revisions, native queue receipts survive conversation parts and restarts, and plugin unload waits for accepted deliveries. Personal task creation no longer requires a primary-role session; group tasks retain DSH behavior.
@@ -50,7 +54,7 @@ Release `0.3.2-rabi.22` confines Bot layout overrides to its own chat column so 
 
 Version 0.3.2-rabi.1 adds sidebar sections, one settings dialog for Bot and Harness pages, explicit Bot run modes, current local-agent protocol fixes, IM connection recovery, and memory entry IDs, pins, limits, recall, moves and reversible tidying. Existing team data gains optional sections and closed-view records; saved local CLI routes migrate to the `local-` prefix, preserving native OpenCode provider routes. Memory metadata is extended in place and group logs remain readable. Rabi-bound personas continue using Rabi memory and skills exclusively. The Bot workbench, independent pinned chats, reply avatars and last-reply times stay in place.
 
-This maintenance fork tests Windows x64, Node.js `24.15.0`, npm `11.12.1` and pnpm `11.28.5`, running Web from public Core source `vb2250158/deepseek-harness@54931fbd25050ef036e44b1daec931da2bfe7b39` (`0.2.2-rc.1`). The CI runner is `windows-2025`. Earlier-host and cross-platform compatibility matrices are outside this target.
+This maintenance fork tests Windows x64, Node.js `24.15.0`, npm `11.12.1` and pnpm `11.28.5`, running Web from public Core source `vb2250158/deepseek-harness@ea8ade16105b74cca1380caddf852061f558f0f0` (`0.2.2-rc.2`). The CI runner is `windows-2025`. Earlier-host and cross-platform compatibility matrices are outside this target.
 
 Windows local-agent discovery and the Codex, Claude and ACP drivers resolve npm `.cmd` shims to their Node entry point and run without a shell or console window. Paths with spaces and array arguments are preserved; cancellation and timeouts target the CLI process itself. Arbitrary `.cmd`/`.bat` scripts are rejected with `UNSUPPORTED_AGENT_WRAPPER`: select the executable or a Node npm entry point instead. No local-agent account is signed in automatically.
 
@@ -162,8 +166,8 @@ First install DSH and set up at least one model in it. DS Bot uses the models fr
 - **DSH Web** (needs Node.js `22.19` or later, and pnpm):
 
 ```sh
-npx @deepseek-ai/dsh@0.2.2-rc.1 plugin --profile web add ds-bot
-npx @deepseek-ai/dsh@0.2.2-rc.1 web
+npx @deepseek-ai/dsh@0.2.2-rc.2 plugin --profile web add ds-bot
+npx @deepseek-ai/dsh@0.2.2-rc.2 web
 ```
 
 **Docker (NAS, Linux server)**

@@ -15,7 +15,7 @@ function fixture(t, config = {}) {
     continueInterrupted: seq => { calls.push(['interrupted', seq]); return true },
     continueQuotaFailure: seq => { calls.push(['quota', seq]); return true } }
   let release, reads = 0
-  const rt = { ctx, home, config, readOnly: () => undefined,
+  const rt = { ctx, home, config, load: async () => {}, readOnly: () => undefined,
     isBotSession: id => id === 'bot', chatOwners: new Map([['bot', 'owner']]), groupOwners: new Map(), live: new Map(),
     deliver: async message => prompts.push(message), warn: (...args) => warnings.push(args),
     resolveAgent: async () => { reads++; if (release) await release; return agent } }

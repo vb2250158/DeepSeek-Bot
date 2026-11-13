@@ -40,6 +40,17 @@ if (process.argv[2] === '--host') {
       dsh: { profile: { bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', 'ds-bot'] } },
     }))
     await writeFile(join(profile, 'pnpm-workspace.yaml'), 'packages:\n  - .\nnodeLinker: hoisted\nautoInstallPeers: false\n')
+    await mkdir(join(home, 'bot'), { recursive: true })
+    await writeFile(join(home, 'bot/state.json'), JSON.stringify({
+      version: 1, mainBotIds: ['seed-a'],
+      bots: {
+        'seed-a': { id: 'seed-a', name: 'Synthetic Chief', role: 'Coordinator', sessionId: 'seed-a', createdAt: 1 },
+        'seed-b': { id: 'seed-b', name: 'Synthetic Writer', role: 'Writer', sessionId: 'seed-b', createdAt: 2 },
+      },
+      rooms: { 'seed-room': { id: 'seed-room', name: 'Synthetic group', members: ['seed-a', 'seed-b'], admin: 'seed-a', mode: 'admin', named: true, sessions: {}, log: [{ seq: 1, who: 'User', text: 'Earlier group line.', time: 1 }], seq: 1, seen: {} } },
+      agents: {}, exchanges: [{ id: 'seed-exchange', from: 'seed-a', to: 'seed-b', role: 'request', text: 'Earlier pair exchange.', time: 1 }],
+      exchangeTurns: {}, questions: {}, prefs: {}, revision: 0,
+    }))
     const env = { ...process.env, DSH_HOME: home, DSH_TELEMETRY_DISABLED: '1' }
     execSync('pnpm install --no-frozen-lockfile', { cwd: profile, env, stdio: 'pipe', windowsHide: true })
     child = spawn(process.execPath, [fileURLToPath(import.meta.url), '--host'], {
@@ -63,6 +74,20 @@ if (process.argv[2] === '--host') {
     })
     assert.equal(api.status, 200)
     assert.equal((await api.json()).ok, true)
+    const call = async (endpoint, payload) => {
+      const response = await fetch(`${base}/api/bot`, {
+        method: 'POST', headers: { cookie, 'content-type': 'application/json' },
+        body: JSON.stringify({ endpoint, payload }), signal: AbortSignal.timeout(15_000),
+      })
+      assert.equal(response.status, 200)
+      const result = await response.json()
+      assert.equal(result.ok, true)
+      return result.value
+    }
+    const pair = await call('exchange', { a: 'seed-a', b: 'seed-b' })
+    assert.equal(pair.find(entry => entry.id === 'seed-exchange')?.text, 'Earlier pair exchange.')
+    const group = await call('group-rows', { roomId: 'seed-room', from: 1 })
+    assert.equal(group.rows.find(row => row.kind === 'user')?.text, 'Earlier group line.')
     const asset = await fetch(`${base}/api/ds-bot-client-app`, { headers: { cookie }, signal: AbortSignal.timeout(15_000) })
     assert.equal(asset.status, 200)
     const clientBytes = await readFile(join(plugin, 'client-app.js'))
@@ -91,11 +116,15 @@ if (process.argv[2] === '--host') {
     })])
     assert.equal(code, 0)
     assert.equal(signal, null)
+    for (const [book, text] of [['pair-seed-a-seed-b', 'Earlier pair exchange.'], ['group-seed-room', 'Earlier group line.']]) {
+      const rows = (await readFile(join(home, 'bot/ledger', book + '.jsonl'), 'utf8')).trim().split('\n').map(row => JSON.parse(row))
+      assert.ok(rows.some(row => row.text === text), 'Imported history must persist before shutdown')
+    }
     const socket = connect({ host: '127.0.0.1', port: Number(new URL(base).port) })
     try {
       await assert.rejects(once(socket, 'connect', { signal: AbortSignal.timeout(5000) }), { code: 'ECONNREFUSED' })
     } finally { socket.destroy() }
-    console.log('Source Web smoke passed: page, Bot API, exact client bytes, content hash and ETag, public exit 0, port closed')
+    console.log('Source Web smoke passed: page, Bot API, legacy pair/group ledger import, exact client bytes, content hash and ETag, public exit 0, port closed')
   } catch (error) {
     console.error(output.replace(/([?&]token=)[^&\s]+/gu, '$1<hidden>').slice(-4000))
     throw error

@@ -8,11 +8,13 @@ This fork tests its current DS Bot behavior on one source Web host. It does not 
 | Node.js | `24.15.0` |
 | npm, plugin tools | `11.12.1` |
 | pnpm, Core source dependencies | `11.28.5` |
-| Core source | [`vb2250158/deepseek-harness@54931fbd25050ef036e44b1daec931da2bfe7b39`](https://github.com/vb2250158/deepseek-harness/commit/54931fbd25050ef036e44b1daec931da2bfe7b39) |
-| Core host version | `0.2.2-rc.1` |
+| Core source | [`vb2250158/deepseek-harness@ea8ade16105b74cca1380caddf852061f558f0f0`](https://github.com/vb2250158/deepseek-harness/commit/ea8ade16105b74cca1380caddf852061f558f0f0) |
+| Core host version | `0.2.2-rc.2` |
 | Runtime entry | Source `dsh` Web profile through `@deepseek-ai/dsh/profile-boot` |
 
 This table declares the source verification target; it does not report a production installation. DS Bot source releases remain candidates until its actual profile installation, loaded source and Web behavior are verified. Production switching belongs to the environment-maintenance owner.
+
+The last recorded formal Core is `54931fbd25050ef036e44b1daec931da2bfe7b39` / `0.2.2-rc.1`. The rc.2 source target above becomes formal only after the environment owner verifies its complete installed combination.
 
 ## Prepare the source host
 
@@ -33,13 +35,15 @@ From `ds-bot/`, with `DSH_HARNESS` set to the absolute Core checkout path:
 
 ```powershell
 npm ci --no-fund --no-audit
+npm ci --no-fund --no-audit --prefix ../link
 node --import ./test/harness-resolve.mjs --test --test-concurrency=4 --test-reporter=tap "test/*.test.js"
 node scripts/build-client.mjs --check
+node scripts/build-link.mjs --check
 npm run lint
 node dev/ci-web-smoke.mjs
 ```
 
-The Web smoke creates and removes its own temporary Home/profile, starts the public source Web profile on a dynamically allocated loopback port, checks authenticated HTML, the Bot API and exact served client bytes, and verifies public shutdown with exit code zero and a closed port. It uses no production profile, credentials or model calls.
+The Web smoke creates and removes its own temporary Home/profile, starts the public source Web profile on a dynamically allocated loopback port, checks authenticated HTML, the Bot API, persisted import of synthetic legacy group and pair messages, and exact served client bytes, and verifies public shutdown with exit code zero and a closed port. It uses no production profile, credentials or model calls.
 
 ## Default CI and local evidence
 

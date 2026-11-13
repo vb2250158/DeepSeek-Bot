@@ -23,7 +23,7 @@ jobs:
         shell: pwsh
     env:
       DSH_HARNESS: ${{ github.workspace }}/core
-      DSH_CORE_SHA: 955ba060b3bfa9908cb3ea4da63ff580f51beb72
+      DSH_CORE_SHA: ea8ade16105b74cca1380caddf852061f558f0f0
       DSH_TELEMETRY_DISABLED: '1'
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
     steps:
@@ -43,7 +43,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: vb2250158/deepseek-harness
-          ref: 955ba060b3bfa9908cb3ea4da63ff580f51beb72
+          ref: ea8ade16105b74cca1380caddf852061f558f0f0
           path: core
       - name: Verify the target environment
         run: |
@@ -53,7 +53,7 @@ jobs:
           if ((npm --version) -ne '11.12.1') { throw 'Unexpected npm version' }
           if ((pnpm --version) -ne '11.28.5') { throw 'Unexpected pnpm version' }
           if ((git -C core rev-parse HEAD) -ne $env:DSH_CORE_SHA) { throw 'Unexpected Core commit' }
-          node -e "if (require('./core/package.json').version !== '0.2.2-rc.1') process.exit(1)"
+          node -e "if (require('./core/package.json').version !== '0.2.2-rc.2') process.exit(1)"
       - name: Install Core source dependencies
         working-directory: core
         run: pnpm install --frozen-lockfile
@@ -72,12 +72,15 @@ jobs:
       - name: Install plugin tools
         working-directory: ds-bot
         run: npm ci --no-fund --no-audit
+      - name: Install the phone link build dependencies
+        working-directory: link
+        run: npm ci --no-fund --no-audit
       - name: Current behavior and saved-data regressions
         working-directory: ds-bot
         run: node --import ./test/harness-resolve.mjs --test --test-concurrency=4 --test-reporter=tap "test/*.test.js"
       - name: Check generated plugin artifacts
         working-directory: ds-bot
-        run: node scripts/build-client.mjs --check
+        run: node scripts/build-client.mjs --check && node scripts/build-link.mjs --check
       - name: Lint
         working-directory: ds-bot
         run: npm run lint

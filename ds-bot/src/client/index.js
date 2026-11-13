@@ -7,6 +7,7 @@ import { teamActions } from './team-actions.js'
 import { themeCss, shellTokens, registry, registerShape, registerTheme, allThemes, layoutOf, widthOf, flatWidthOf } from './themes.js'
 import { MENTION_ORIGIN, currentPart } from './text.js'
 import { SHELL_CSS, CONVERSATION_CSS, installStyles, installCompiledStyles } from './styles.js'
+
 import { lookOf } from './mark.js'
 import { SIDEBAR_CSS, holdShellShortcuts, openHarnessSettings, openHarnessOnboarding, MODELS_STEP } from './sidebar.js'
 import { BOT_PANEL, BotPanelIcon, BotWorkbench, BotTeam, BotConversation, WORKBENCH_CSS } from './workbench.js'
@@ -57,6 +58,8 @@ import { noticeApprovals } from './approval-notices.js'
 import { createSessionNavigator } from './navigation.js'
 import { createRabiWorkspaceStore } from './rabi-workspace-store.js'
 import { installTransientErrors } from './transient-errors.js'
+import { agentSessionToReuse, singleFlight } from './agent-new.js'
+
 
 export const inject = ['sessions', 'uiWorkspace', 'uiConversation', 'slots', 'theme', 'layout']
 
@@ -97,6 +100,9 @@ export function apply(ctx) {
   try { agentSessionCache = new Set(JSON.parse(localStorage.getItem(STORAGE.agentSessions) ?? '[]')) } catch { agentSessionCache = new Set() }
   // Sessions adopted on this window (workspace pick, fork) but not yet in the roster.
   const pendingAdopt = new Map()
+  // A create can finish before the DSH list publishes its Session (#1225).
+  const pendingAgentSession = new Map()
+  const agentNewInFlight = new Map()
   const isAgentSessionId = id => isAgentSession(roster.getSnapshot(), agentSessionCache, id) || pendingAdopt.has(id)
   const agentOfSession = id => roster.getSnapshot().agentOf[id] ?? pendingAdopt.get(id)
   // The workspace a Session lives in, for follow-up creates and switch detection.
@@ -196,10 +202,11 @@ export function apply(ctx) {
     }
     if (value.memoryNews !== undefined) noteMemoryNews(value.memoryNews)
     const current = roster.getSnapshot()
-    // Connector and capability states change without a new revision.
+    // Connector, capability and phone states change without a new revision.
     const live = {}
     if (value.connectors !== undefined && JSON.stringify(value.connectors) !== JSON.stringify(current.connectors ?? [])) live.connectors = value.connectors
     if (value.capabilityStatuses !== undefined && JSON.stringify(value.capabilityStatuses) !== JSON.stringify(current.capabilityStatuses ?? {})) live.capabilityStatuses = value.capabilityStatuses
+    if (value.phone !== undefined && JSON.stringify(value.phone) !== JSON.stringify(current.phone ?? null)) live.phone = value.phone
     if (value.learning !== undefined && JSON.stringify(value.learning) !== JSON.stringify(current.learning ?? {})) live.learning = value.learning
     if (value.learningSettled !== undefined && JSON.stringify(value.learningSettled) !== JSON.stringify(current.learningSettled ?? {})) live.learningSettled = value.learningSettled
     if (value.btwCards !== undefined && JSON.stringify(value.btwCards) !== JSON.stringify(current.btwCards ?? {})) live.btwCards = value.btwCards
@@ -220,6 +227,9 @@ export function apply(ctx) {
     const listed = ctx.sessions.list.getSnapshot().byId ?? {}
     for (const id of pendingAdopt.keys()) {
       if (roster.getSnapshot().agentOf[id] !== undefined || listed[id] === undefined) pendingAdopt.delete(id)
+    }
+    for (const [agentId, sessionId] of pendingAgentSession) {
+      if (listed[sessionId] !== undefined || roster.getSnapshot().agentOf[sessionId] !== agentId) pendingAgentSession.delete(agentId)
     }
     for (const id of [...value.bots.map(currentPart), ...value.rooms.map(room => room.sessionId ?? room.id)]) {
       if (refreshed.has(id)) continue
@@ -434,11 +444,14 @@ export function apply(ctx) {
     for (const [id, owner] of pendingAdopt) if (owner === agentId && !ids.includes(id)) ids.push(id)
     return ids
   }
+  const latestAgentSession = (agentId, list) => agentSessions(agentId)
+    .sort((a, b) => (list.byId[b]?.updatedAt ?? 0) - (list.byId[a]?.updatedAt ?? 0))[0]
   // The Bot chat this browser showed last, so entering the Bot surface returns to it
   // instead of to whatever Session the shell happened to restore.
   const LAST_BOT_KEY = 'ds-bot:last-bot'
   const readLastBot = () => {
     try { return window.localStorage.getItem(LAST_BOT_KEY) || undefined } catch { return undefined }
+
   }
   const rememberBot = (id) => {
     try { if (typeof id === 'string' && id !== '') window.localStorage.setItem(LAST_BOT_KEY, id) } catch { /* storage may be unavailable */ }
@@ -477,23 +490,29 @@ export function apply(ctx) {
       const agent = roster.getSnapshot().agentsById[agentId]
       if (agent === undefined) return
       const list = ctx.sessions.list.getSnapshot()
-      const recent = agentSessions(agentId).sort((a, b) => (list.byId[b]?.updatedAt ?? 0) - (list.byId[a]?.updatedAt ?? 0))
-      if (recent.length === 0) return actions.newAgentSession(agentId)
-      actions.openAgentSession(recent[0])
+      const latest = latestAgentSession(agentId, list)
+      if (latest === undefined) return actions.newAgentSession(agentId)
+      actions.openAgentSession(latest)
     },
     newAgentSession: async (agentId) => {
       const agent = roster.getSnapshot().agentsById[agentId]
       if (agent === undefined) return
-      const list = ctx.sessions.list.getSnapshot()
-      const recent = agentSessions(agentId).sort((a, b) => (list.byId[b]?.updatedAt ?? 0) - (list.byId[a]?.updatedAt ?? 0))
-      // An untouched Session is already the new conversation the user wants.
-      if (recent.length > 0 && list.byId[recent[0]]?.blank === true) {
-        actions.openAgentSession(recent[0])
-        return recent[0]
-      }
-      const { sessionId } = await after(call('agent-session', { agentId, workspaceId: workspaceOf(recent[0]) }))
-      actions.openAgentSession(sessionId)
-      return sessionId
+      // One create per Agent at a time, so two clicks in a row make one Session.
+      return singleFlight(agentNewInFlight, agentId, async () => {
+        const list = ctx.sessions.list.getSnapshot()
+        const latest = latestAgentSession(agentId, list)
+        const pending = pendingAgentSession.get(agentId)
+        if (pending !== undefined && list.byId[pending] !== undefined) pendingAgentSession.delete(agentId)
+        const reuse = agentSessionToReuse(list, latest, pending)
+        if (reuse !== undefined) {
+          actions.openAgentSession(reuse)
+          return reuse
+        }
+        const { sessionId } = await after(call('agent-session', { agentId, workspaceId: workspaceOf(latest) }))
+        if (ctx.sessions.list.getSnapshot().byId[sessionId] === undefined) pendingAgentSession.set(agentId, sessionId)
+        actions.openAgentSession(sessionId)
+        return sessionId
+      })
     },
     archiveAgentSession: async (agentId, sessionId) => {
       await after(call('agent-archive', { agentId, sessionId }))
@@ -669,6 +688,10 @@ export function apply(ctx) {
   actions.signIn = () => ui.set(state => ({ ...state, signIn: (state.signIn ?? 0) + 1 }))
   actions.closeSignIn = () => ui.set(state => ({ ...state, signIn: null }))
   actions.accountT = () => ctx.get('locale').bind('settings.account')
+  // DSH's Plugins page (bundle install and management): its navigation face is
+  // absent where the peer may not list bundles, such as the app's own profile.
+  actions.hasPlugins = () => ctx.get('pluginNavigation') !== undefined
+  actions.openPlugins = () => ctx.get('pluginNavigation')?.openList()
   // The Voice Input plugin's speech Remote; absent while that plugin is off.
   actions.speech = () => ctx.get('remote.speech') ?? undefined
   // DSH's own settings: models, providers, keys and its plugins.
@@ -1119,6 +1142,7 @@ export function apply(ctx) {
     return column !== null && column.getClientRects().length > 0
   }
   ctx.effect(() => publishUserHead({ actions, roster, isActive: headActive }), 'ds-bot: user row head')
+
   ctx.effect(() => installCompiledStyles(COMPUTER_CSS, 'computer'), 'ds-bot: computer styles')
 
   // The main view decides `plain`: a DSH Agent Session keeps the Bot shell but

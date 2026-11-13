@@ -27,14 +27,16 @@ The Bot team:
 
 ## Commands
 
-Use the current Windows source Web target in [docs/dev/testing.md](docs/dev/testing.md): Node `24.15.0`, npm `11.12.1`, pnpm `11.28.5`, Core `955ba060b3bfa9908cb3ea4da63ff580f51beb72` / `0.2.2-rc.1`. Set `DSH_HARNESS` to that independent Core source checkout. Prepare only the existing native Host, Host/Client library and Web build steps listed there; do not install older npm Core versions for compatibility or build SDK executables and desktop/mobile packages.
+Use the current Windows source Web target in [docs/dev/testing.md](docs/dev/testing.md): Node `24.15.0`, npm `11.12.1`, pnpm `11.28.5`, Core `ea8ade16105b74cca1380caddf852061f558f0f0` / `0.2.2-rc.2`. Set `DSH_HARNESS` to that independent Core source checkout. Prepare only the existing native Host, Host/Client library and Web build steps listed there; do not install older npm Core versions for compatibility or build SDK executables and desktop/mobile packages.
 
 In `ds-bot/`:
 
 ```powershell
 npm ci
+npm ci --no-fund --no-audit --prefix ../link
 node --import ./test/harness-resolve.mjs --test --test-concurrency=4 --test-reporter=tap "test/*.test.js"
 node scripts/build-client.mjs --check
+node scripts/build-link.mjs --check
 npm run lint
 node dev/ci-web-smoke.mjs
 ```

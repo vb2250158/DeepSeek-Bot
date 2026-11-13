@@ -8,7 +8,7 @@ import { runInNewContext } from 'node:vm'
 test('Local agents reads API data while the settings runner returns a boolean', async () => {
   const { outputFiles } = await build({
     stdin: { contents: "export { LocalAgentsPage } from './src/client/local-agents-page.js'", resolveDir: fileURLToPath(new URL('..', import.meta.url)) },
-    bundle: true, format: 'cjs', platform: 'browser', write: false, logLevel: 'silent', external: ['react'],
+    bundle: true, format: 'cjs', platform: 'browser', write: false, logLevel: 'silent', external: ['react', 'react-dom'],
   })
   let state = null
   let effect

@@ -4,9 +4,11 @@
 
 [English](README.md) | 中文
 
-![版本](https://img.shields.io/badge/版本-v0.3.0--rabi.3-blue) ![DSH](https://img.shields.io/badge/DSH-0.2.2--rc.1-4D6BFE) ![许可](https://img.shields.io/badge/许可-Apache_2.0-green)
+![版本](https://img.shields.io/badge/版本-v0.3.6--rabi.1-blue) ![DSH](https://img.shields.io/badge/DSH-0.2.2--rc.2-4D6BFE) ![许可](https://img.shields.io/badge/许可-Apache_2.0-green)
 
-本 fork 已合并上游 0.3.2（0.3.2-rabi.1），保留公开 Bot 平等管理、Rabi 助手预设和延迟加载。私密 Bot 通过原生 Bot 工具向团队发布内容前需要批准；删除后，其文件夹、记忆和聊天仍受保护，可在设置中解除。Rabi 绑定 Bot 的记忆和学习技能继续由 Rabi 管理，项目 AGENTS.md 提案仍可使用。Office 目录输入拒绝内部链接，PNG 读取限制内存并拒绝截断图像。
+本 fork 已合并上游 0.3.6（0.3.6-rabi.1），保留公开 Bot 平等管理、Rabi 助手预设和延迟加载。私密 Bot 通过原生 Bot 工具向团队发布内容前需要批准；删除后，其文件夹、记忆和聊天仍受保护，可在设置中解除。Rabi 绑定 Bot 的记忆和学习技能继续由 Rabi 管理，项目 AGENTS.md 提案仍可使用。Office 目录输入拒绝内部链接，PNG 读取限制内存并拒绝截断图像。
+
+Bot 双方与群聊历史保存到团队 `ledger/` 目录中的追加式文件，首次读取时导入已有团队历史。卸载群聊模块会等待其所属轮次及最终账本写入完成。迁移或恢复快照时须连同团队保留这些文件，并使用支持本版账本的读取器。
 
 **[Download DS Bot for Windows 10/11 (64-bit) / 下载 Windows 10/11（64 位）版](https://github.com/Fei2411/DS-Bot/releases/latest)**, about 212 MB / 约 212 MB. A community project, not an official DeepSeek product. / 社区开源项目，不是 DeepSeek 官方产品。
 
@@ -42,6 +44,8 @@ Still stuck? [Report an install problem](https://github.com/Fei2411/DS-Bot/issue
 
 ## 受测宿主与环境
 
+`0.3.6-rabi.1` 合入消息账本、持久群轮次与批次、辅助模型重试、邮件按需解析、当前宿主 API、多语言及可选手机连接。Rabi 原生定时投递、头像持久缓存和调用方取消继续保留原归属。群聊与双 Bot 消息写入 Bot Home 的账本，旧历史仍可读取。源码受测目标为 Core rc.2，最近记录的正式 Core 仍是 `54931fbd25050ef036e44b1daec931da2bfe7b39` / `0.2.2-rc.1`，采用结果由环境维护记录。
+
 `0.3.2-rabi.24` 修正 Unicode 角色标识生成的长任务 ID 被原生投递错误拒绝的问题。队列回执和去重继续使用完整原始 ID。
 
 `0.3.2-rabi.23` 支持明确选择 Rabi → DSH → DS Bot 投递目标，每日多个时间点仍是一条规则。任务列表按完整目标跨存储人格汇总；编辑沿用原人格配置修订号，原生队列回执在换段和重启后仍可核对，插件卸载等待已接纳投递完成。个人任务新建无需主角色会话，群任务沿用 DSH 行为。
@@ -50,7 +54,7 @@ Still stuck? [Report an install problem](https://github.com/Fei2411/DS-Bot/issue
 
 0.3.2-rabi.1 新增侧栏分组、统一 Bot 与 Harness 设置、明确的 Bot 运行方式、本地 Agent 协议修正、IM 连接恢复，以及记忆条目编号、置顶、容量、召回、移动和可撤销整理。现有团队数据增加可选分组和已关闭视图记录；已保存的本地 CLI 路由迁移到 `local-` 前缀，保留原生 OpenCode 服务商路由。记忆元数据在原文件中扩展，原群聊日志继续可读。Rabi 绑定人格的记忆和技能仍由 Rabi 独占管理，保留 Bot 工作台、独立置顶、回复头像和最后回复时间。
 
-本维护 fork 的单一受测目标为 Windows x64、Node.js `24.15.0`、npm `11.12.1`、pnpm `11.28.5`，使用公开 Core 源码 `vb2250158/deepseek-harness@54931fbd25050ef036e44b1daec931da2bfe7b39`（`0.2.2-rc.1`）运行 Web。CI runner 为 `windows-2025`。不运行旧宿主或跨平台兼容矩阵。
+本维护 fork 的单一受测目标为 Windows x64、Node.js `24.15.0`、npm `11.12.1`、pnpm `11.28.5`，使用公开 Core 源码 `vb2250158/deepseek-harness@ea8ade16105b74cca1380caddf852061f558f0f0`（`0.2.2-rc.2`）运行 Web。CI runner 为 `windows-2025`。不运行旧宿主或跨平台兼容矩阵。
 
 Windows 本地 Agent 发现及 Codex、Claude、ACP 驱动会把 npm `.cmd` 启动器解析为 Node 入口，不经过 shell，也不弹出控制台窗口。含空格的路径和数组参数保持原样；取消和超时直接作用于 CLI 进程。任意 `.cmd`/`.bat` 脚本会以 `UNSUPPORTED_AGENT_WRAPPER` 明确拒绝，请选择可执行文件或 Node npm 入口。不会自动登录本地 Agent 账号。
 
@@ -161,8 +165,8 @@ Rabi 自动化提醒采用 DSH 原生 schedule 消息来源和公共提醒格式
 - **dsh Web**（需要 Node.js `22.19` 以上和 pnpm）：
 
 ```sh
-npx @deepseek-ai/dsh@0.2.2-rc.1 plugin --profile web add ds-bot
-npx @deepseek-ai/dsh@0.2.2-rc.1 web
+npx @deepseek-ai/dsh@0.2.2-rc.2 plugin --profile web add ds-bot
+npx @deepseek-ai/dsh@0.2.2-rc.2 web
 ```
 
 **Docker（NAS、Linux 服务器）**
