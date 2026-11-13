@@ -12,7 +12,7 @@ import { join } from 'node:path'
 import { ANCHOR_LINE_MAX, HISTORY_PAGE, HISTORY_PAGES_MAX, HISTORY_TIMEOUT_MS, OWN_CHAT_BRIEF, OWN_CHAT_LINE_MAX, OWN_CHAT_READ, OWN_CHAT_SEARCH } from './constants.js'
 import { excerpt } from './text.js'
 
-const INDEX_VERSION = 3
+const INDEX_VERSION = 4
 const AROUND_LINES = 6
 const SEARCH_TERMS_MAX = 6
 const ANY_TERM_HITS = 50
@@ -154,6 +154,8 @@ export function install(rt) {
       if (events.length > 0 && events.at(-1).seq !== through + 1) throw new Error(`the history of ${part.sessionId} came back with a gap`)
       events.reverse()
       if (index !== chatIndex) return
+      const agent = await rt.resolveAgent(part.sessionId).catch(() => undefined)
+      const presentation = await rt.loadAssistantChat(part.sessionId, agent?.session, AbortSignal.timeout(INDEX_TIMEOUT_MS))
       let keep = mark ? mark.keep === 1 : false
       let turn = mark?.turn ?? -1
       const seal = part.endedAt !== undefined && Date.now() - part.endedAt > SEAL_AFTER_MS
@@ -163,7 +165,7 @@ export function install(rt) {
         for (const event of events) {
           last = event.seq
           if (event.type === 'turn/start') turn = event.seq
-          const entry = rt.historyEntry(event, false)
+          const entry = rt.historyEntry(event, false, presentation)
           if (entry === undefined) continue
           if (entry.answer) {
             if (keep) index.insert.run(entry.text, part.sessionId, event.seq, event.time ?? 0, 'you')

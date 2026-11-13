@@ -79,7 +79,7 @@ function PinnedChat({ entry: { kind, item }, roster, actions, useSessions, useSe
 function BotRow({ bot, roster, actions, useSessions, useSessionStatus, useSessionRetainInfo, useActivity, useWork, wide, marked }) {
   const id = bot.id
   const part = currentPart(bot)
-  const preview = useSessions(list => previewOf(list, part, roster.exchangeTurns[part]))
+  const preview = useSessions(list => previewOf(list, part, roster.exchangeTurns[part], bot.preview ?? ''))
   const lastAt = useSessions(list => list.byId[part]?.updatedAt ?? 0)
   const running = useSessionStatus(map => map.get(part)?.running === true)
   const active = useSessionRetainInfo(part, info => (info?.retainedBy?.mainView ?? 0) > 0)

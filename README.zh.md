@@ -287,3 +287,7 @@ bot 可以直接创建、检查和修改 Word（`.docx`）、PowerPoint（`.pptx
 ds bot 是独立的社区项目，**不是 DeepSeek 官方产品**，与 DeepSeek 没有隶属、认可或赞助关系。“DeepSeek”“DeepSeek Harness”等名称是各自所有者的商标，这里只用来说明本插件和什么一起用。
 
 bot 会消耗你自己的模型额度，也会按你的要求读写文件、运行命令。重要的操作请自己检查。
+
+## Rabi 助手聊天
+
+Rabi 助手会话通过持久化的可忽略事件 `rabiroute/assistant-mode` 及 `{ version: 1 }` 开始显式聊天呈现。标记前的助手消息继续可读。标记后的完整聊天气泡取自成功的 `rabiroute_assistant_say` 工具结果，其 JSON 内容为 `{ text }`，并与工具执行产生的结果元数据一致。语音使用相同的已提交交流文本。普通助手文本、流式输出和工具步骤保留在 Session 任务详情中。刷新、早期会话部分、预览和聊天搜索均从相同记录重建。输入框与 Inbox 沿用后台工作期间的既有输入行为。

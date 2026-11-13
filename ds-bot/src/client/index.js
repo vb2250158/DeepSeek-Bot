@@ -1,3 +1,4 @@
+import { ASSISTANT_CHAT_KEY } from '../shared/assistant-chat.js'
 import { installSettingsShell, SETTINGS_SHELL_CSS } from './settings-shell.js'
 import { call } from './api.js'
 import { isHex, inkText, paintCss } from './inks.js'
@@ -713,14 +714,13 @@ export function apply(ctx) {
     const speech = ctx.get('remote.speech')
     return speech === undefined || providerId === undefined ? null : { prepare: () => requestPreparation(speech, providerId) }
   }
-  // The full text the voice chat reads aloud: the turn's closing Assistant
-  // message, not the turn outline's bounded preview. undefined while the chat
-  // view has not materialized the turn; null when the Session is not bound.
+  // Voice reads committed say results after the assistant marker and full closing
+  // text in ordinary chats. Undefined waits for materialization; null means unbound.
   actions.closingReply = (sessionId, turn) => {
     try {
       const binding = ctx.sessions.binding(sessionId)
       if (binding === undefined) return null
-      return closingReplyText(ctx.uiConversation.binding(binding).target('chat').getSnapshot(), turn)
+      return closingReplyText(ctx.uiConversation.binding(binding).target('chat').getSnapshot(), turn, binding.session.projections.faceOf(ASSISTANT_CHAT_KEY).getSnapshot())
     } catch {
       return null
     }
@@ -836,7 +836,7 @@ export function apply(ctx) {
   }
   const settingsShellHeld = createSource(false)
   let settingsShell
-  const face = () => ({ actions, hooks: { roster, ui, activity, work, memoryNews, registry, turnClock, live, computer, cards, heldCards, browserPages, browserTabs, browserHolds, surface, update, settingsShellHeld } })
+  const face = (sessionId) => ({ actions, hooks: { ...(sessionId ? { assistantChat: ctx.sessions.binding(sessionId)?.session.projections.faceOf(ASSISTANT_CHAT_KEY) } : {}), roster, ui, activity, work, memoryNews, registry, turnClock, live, computer, cards, heldCards, browserPages, browserTabs, browserHolds, surface, update, settingsShellHeld } })
   ctx.effect(() => {
     const offStyles = installCompiledStyles(SETTINGS_SHELL_CSS, 'settings-shell')
     settingsShell = installSettingsShell(ctx, { face, actions, ui, held: settingsShellHeld })
@@ -863,7 +863,7 @@ export function apply(ctx) {
     const binding = ctx.sessions.binding(sessionId)
     if (binding === undefined) throw new Error(`ds-bot: unknown session "${sessionId}"`)
     const chat = ctx.uiConversation.binding(binding).target('chat')
-    return { ...face(), keyedHooks: {
+    return { ...face(sessionId), keyedHooks: {
       turnSteps: (turn) => {
         const snapshot = chat.getSnapshot()
         if (snapshot === undefined) throw new Error('ds-bot: Chat target is unavailable')
@@ -902,7 +902,8 @@ export function apply(ctx) {
       const conversation = ctx.uiConversation.binding(binding)
       const offChat = conversation.target('chat').subscribe(listener)
       const offOpen = conversation.openTurn.subscribe(listener)
-      return () => { offChat(); offOpen() }
+      const offAssistant = binding.session.projections.faceOf(ASSISTANT_CHAT_KEY).subscribe(listener)
+      return () => { offChat(); offOpen(); offAssistant() }
     } catch {
       return () => {}
     }

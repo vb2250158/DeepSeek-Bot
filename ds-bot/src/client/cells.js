@@ -1,3 +1,4 @@
+import { assistantChatActive, assistantSayText } from '../shared/assistant-chat.js'
 import { createElement as h, Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { MarkdownText, writeClipboard } from './dsh-primitives.js'
@@ -261,9 +262,10 @@ function useFileMentions({ node, openFile, fileMentions, useTurnData }) {
   }, [fileMentions, openFile, seq, tail, turn])
 }
 
-export function AssistantCell({ node, groupPart, sessionId, openFile, fileMentions, useTurnData, useRoster, useUi, useTurnSteps, useTurnContext, useTurnSteering, actions }) {
+export function AssistantCell({ node, groupPart, useAssistantChat, sessionId, openFile, fileMentions, useTurnData, useRoster, useUi, useTurnSteps, useTurnContext, useTurnSteering, actions }) {
   const roster = useRoster(value => value)
   const data = node.data
+  const assistantMode = assistantChatActive(useAssistantChat?.(value => value), node.anchorSeq ?? data.seq)
   const turnSteps = useTurnSteps(String(data.turn))
   const steering = useTurnSteering?.(String(data.turn)) ?? []
   const segment = replySegment(turnSteps, data, steering, node.anchorSeq)
@@ -302,7 +304,7 @@ export function AssistantCell({ node, groupPart, sessionId, openFile, fileMentio
   const speaker = roster.byId[sessionId]
   const head = speaker !== undefined && opensReply(steps, data, shown)
     && (reasoning !== '' || (texts.length > 0 && !(groupPart === 'response' && shown && turnReasoning(steps, data) !== '')))
-  return h(Fragment, null,
+  const content = h(Fragment, null,
     relays.map(relay => {
       const source = relay.source
       const sender = roster.byId[source.senderSessionId] ?? { id: source.senderSessionId, name: source.senderName ?? t('a Bot'), color: 'gray' }
@@ -325,6 +327,7 @@ export function AssistantCell({ node, groupPart, sessionId, openFile, fileMentio
     // Only a Bot chat gets the QQ treatment. An ordinary DSH Session has no Bot
     // in the roster and keeps its own message clock, exactly as before.
     texts.length ? h(Bubbles, { texts, roster, selfId, actions, streaming: running, sessionId, msgKey: `${sessionId}:${data.turn}:${node.key ?? data.seq ?? ''}`, useUi, mentions, fold: FOLD_HUGE, time: speaker === undefined ? data.time : undefined }) : null)
+  return assistantMode ? h('details', { className: 'bt-think' }, h('summary', null, t('Details')), content) : content
 }
 
 // `code` in an activity line is the command or path the agent works on.
@@ -1232,10 +1235,11 @@ function renderCall(call, { sessionId, roster, actions, useUi, useWork, findBot,
   }
 }
 
-export function ToolCell({ node, sessionId, useRoster, useUi, useWork, useHeldCards, useBrowserHolds, useBrowserTabs, useBrowserPages, useComputer, actions }) {
+export function ToolCell({ node, useAssistantChat, inspectCall, sessionId, useRoster, useUi, useWork, useHeldCards, useBrowserHolds, useBrowserTabs, useBrowserPages, useComputer, actions }) {
   const roster = useRoster(value => value)
   const heldCards = useHeldCards?.(state => state[sessionId])
   const root = node.data.root
+  const assistantMode = assistantChatActive(useAssistantChat?.(value => value), root.seq)
   const turn = node.location?.turn?.turn ?? root.turn
   const hidden = isHiddenTurn(roster, sessionId, turn)
   const findBot = nameOrId => roster.byId[nameOrId] ?? roster.bots.find(bot => bot.name.toLowerCase() === String(nameOrId ?? '').toLowerCase())
@@ -1252,6 +1256,17 @@ export function ToolCell({ node, sessionId, useRoster, useUi, useWork, useHeldCa
   // A running tool shows only as the activity row's phrase.
   useLiveNote(actions, sessionId, `tool:${root.callId ?? node.key}`, note)
   useShownCards(actions, sessionId, drawn.filter(call => (CARDS.has(toolName(call)) || isComputerCall(toolName(call))) && call.callId).map(call => call.callId))
+  if (assistantMode && !hidden) {
+    const text = root.kind === 'tool-result' ? assistantSayText(root, root.meta) : undefined
+    if (text !== undefined) return h(Bubbles, { texts: [text], roster, selfId: roster.byId[sessionId]?.id ?? sessionId,
+      actions, sessionId, msgKey: `${sessionId}:say:${root.seq}`, useUi, fold: { chars: Infinity, lines: Infinity } })
+    if (toolName(root) === 'rabiroute_assistant_say' && root.kind !== 'tool-result') return h(CellEmpty)
+    return h('details', { className: 'bt-think' },
+      h('summary', null, toolName(root) || t('Details')),
+      h('div', { className: 'bt-think-text' },
+        root.kind === 'tool-result' ? h(MarkdownText, { text: contentText(root.content), labels: mdLabels(), variant: 'compact' }) : null,
+        inspectCall && root.callId ? h('button', { type: 'button', className: 'bt-soft bt-soft-sm', onClick: () => inspectCall(root.callId) }, t('Details')) : null))
+  }
   if (drawn.length === 0) return h(CellEmpty)
   const env = { sessionId, roster, actions, useUi, useWork, findBot, heldCards, hooks: { useBrowserHolds, useBrowserTabs, useBrowserPages, useComputer } }
   return h(Fragment, null, drawn.map((call, index) => h(Fragment, { key: call.callId ?? index }, renderCall(call, env))))

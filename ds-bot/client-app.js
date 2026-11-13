@@ -36,6 +36,27 @@ __export(index_exports, {
 });
 module.exports = __toCommonJS(index_exports);
 
+// src/shared/assistant-chat.js
+var ASSISTANT_MODE_EVENT = "rabiroute/assistant-mode";
+var ASSISTANT_CHAT_KEY = "dsBotAssistantChat";
+function assistantSayText(message, meta) {
+  if (message?.isError !== false || meta?.kind !== "rabi-assistant-say" || typeof meta.text !== "string") return void 0;
+  if (!Array.isArray(message.content) || message.content.length !== 1 || message.content[0]?.type !== "text" || typeof message.content[0].text !== "string") return void 0;
+  let value;
+  try {
+    value = JSON.parse(message.content[0].text);
+  } catch {
+    return void 0;
+  }
+  return typeof value?.text === "string" && value.text.trim() !== "" && value.text === meta.text ? value.text : void 0;
+}
+function assistantChatText(event, state) {
+  return event.type === "tool/result" && assistantChatActive(state, event.seq) ? assistantSayText(event.data?.message, event.data?.meta) : void 0;
+}
+function assistantChatActive(state, seq = Infinity) {
+  return state?.since !== null && state?.since !== void 0 && seq >= state.since;
+}
+
 // src/client/inks.js
 var INKS = {
   deepseek: ["#4D6BFE", "#6A84FF"],
@@ -15155,7 +15176,9 @@ function commRunOf(order, peers, turn, hiddenTurns = []) {
   }
   return { count, peerIds };
 }
-function previewOf(list, id, hiddenTurns = []) {
+function previewOf(list, id, hiddenTurns = [], assistantPreview = "") {
+  const presentation = list.projectionsBySession?.[id]?.values?.[ASSISTANT_CHAT_KEY] ?? list.byId[id]?.projectionValues?.[ASSISTANT_CHAT_KEY];
+  if (assistantChatActive(presentation)) return assistantPreview;
   const outline = list.projectionsBySession?.[id]?.values?.turnOutline ?? list.byId[id]?.projectionValues?.turnOutline;
   if (!Array.isArray(outline)) return "";
   for (let index = outline.length - 1; index >= 0; index -= 1) {
@@ -33401,9 +33424,10 @@ function useFileMentions({ node, openFile, fileMentions, useTurnData }) {
     return tail?.closing?.finalNode.seq === seq ? fileMentions({ turn, seq, openFile }) : void 0;
   }, [fileMentions, openFile, seq, tail, turn]);
 }
-function AssistantCell({ node, groupPart, sessionId, openFile, fileMentions, useTurnData, useRoster, useUi, useTurnSteps, useTurnContext, useTurnSteering, actions }) {
+function AssistantCell({ node, groupPart, useAssistantChat, sessionId, openFile, fileMentions, useTurnData, useRoster, useUi, useTurnSteps, useTurnContext, useTurnSteering, actions }) {
   const roster = useRoster((value) => value);
   const data = node.data;
+  const assistantMode = assistantChatActive(useAssistantChat?.((value) => value), node.anchorSeq ?? data.seq);
   const turnSteps = useTurnSteps(String(data.turn));
   const steering = useTurnSteering?.(String(data.turn)) ?? [];
   const segment = replySegment(turnSteps, data, steering, node.anchorSeq);
@@ -33430,7 +33454,7 @@ function AssistantCell({ node, groupPart, sessionId, openFile, fileMentions, use
   const selfId = roster.byId[sessionId]?.id ?? sessionId;
   const speaker = roster.byId[sessionId];
   const head = speaker !== void 0 && opensReply(steps, data, shown) && (reasoning !== "" || texts2.length > 0 && !(groupPart === "response" && shown && turnReasoning(steps, data) !== ""));
-  return (0, import_react53.createElement)(
+  const content = (0, import_react53.createElement)(
     import_react53.Fragment,
     null,
     relays.map((relay) => {
@@ -33460,6 +33484,7 @@ function AssistantCell({ node, groupPart, sessionId, openFile, fileMentions, use
     // in the roster and keeps its own message clock, exactly as before.
     texts2.length ? (0, import_react53.createElement)(Bubbles, { texts: texts2, roster, selfId, actions, streaming: running, sessionId, msgKey: `${sessionId}:${data.turn}:${node.key ?? data.seq ?? ""}`, useUi, mentions, fold: FOLD_HUGE, time: speaker === void 0 ? data.time : void 0 }) : null
   );
+  return assistantMode ? (0, import_react53.createElement)("details", { className: "bt-think" }, (0, import_react53.createElement)("summary", null, t("Details")), content) : content;
 }
 var activityParts = (line) => line.split("`").map((part, index) => index % 2 === 1 ? (0, import_react53.createElement)("code", { key: index }, part) : part);
 function EventLine({ prefix, bots, joiner = t("and"), onOpen, whole = false }) {
@@ -34362,10 +34387,11 @@ function renderCall(call2, { sessionId, roster, actions, useUi, useWork, findBot
       return (0, import_react53.createElement)(CellEmpty);
   }
 }
-function ToolCell({ node, sessionId, useRoster, useUi, useWork, useHeldCards, useBrowserHolds, useBrowserTabs, useBrowserPages, useComputer, actions }) {
+function ToolCell({ node, useAssistantChat, inspectCall, sessionId, useRoster, useUi, useWork, useHeldCards, useBrowserHolds, useBrowserTabs, useBrowserPages, useComputer, actions }) {
   const roster = useRoster((value) => value);
   const heldCards = useHeldCards?.((state) => state[sessionId]);
   const root = node.data.root;
+  const assistantMode = assistantChatActive(useAssistantChat?.((value) => value), root.seq);
   const turn = node.location?.turn?.turn ?? root.turn;
   const hidden = isHiddenTurn(roster, sessionId, turn);
   const findBot = (nameOrId) => roster.byId[nameOrId] ?? roster.bots.find((bot) => bot.name.toLowerCase() === String(nameOrId ?? "").toLowerCase());
@@ -34376,6 +34402,31 @@ function ToolCell({ node, sessionId, useRoster, useUi, useWork, useHeldCards, us
   const note = running ? toolActivity(toolName(running), toolArgs(running).text, findBot, roster.byId[sessionId]) : null;
   useLiveNote(actions, sessionId, `tool:${root.callId ?? node.key}`, note);
   useShownCards(actions, sessionId, drawn.filter((call2) => (CARDS.has(toolName(call2)) || isComputerCall(toolName(call2))) && call2.callId).map((call2) => call2.callId));
+  if (assistantMode && !hidden) {
+    const text = root.kind === "tool-result" ? assistantSayText(root, root.meta) : void 0;
+    if (text !== void 0) return (0, import_react53.createElement)(Bubbles, {
+      texts: [text],
+      roster,
+      selfId: roster.byId[sessionId]?.id ?? sessionId,
+      actions,
+      sessionId,
+      msgKey: `${sessionId}:say:${root.seq}`,
+      useUi,
+      fold: { chars: Infinity, lines: Infinity }
+    });
+    if (toolName(root) === "rabiroute_assistant_say" && root.kind !== "tool-result") return (0, import_react53.createElement)(CellEmpty);
+    return (0, import_react53.createElement)(
+      "details",
+      { className: "bt-think" },
+      (0, import_react53.createElement)("summary", null, toolName(root) || t("Details")),
+      (0, import_react53.createElement)(
+        "div",
+        { className: "bt-think-text" },
+        root.kind === "tool-result" ? (0, import_react53.createElement)(import_dsh_client_ui_primitives3.MarkdownText, { text: contentText(root.content), labels: mdLabels3(), variant: "compact" }) : null,
+        inspectCall && root.callId ? (0, import_react53.createElement)("button", { type: "button", className: "bt-soft bt-soft-sm", onClick: () => inspectCall(root.callId) }, t("Details")) : null
+      )
+    );
+  }
   if (drawn.length === 0) return (0, import_react53.createElement)(CellEmpty);
   const env = { sessionId, roster, actions, useUi, useWork, findBot, heldCards, hooks: { useBrowserHolds, useBrowserTabs, useBrowserPages, useComputer } };
   return (0, import_react53.createElement)(import_react53.Fragment, null, drawn.map((call2, index) => (0, import_react53.createElement)(import_react53.Fragment, { key: call2.callId ?? index }, renderCall(call2, env))));
@@ -34638,7 +34689,7 @@ function PinnedChat({ entry: { kind, item }, roster, actions, useSessions, useSe
 function BotRow2({ bot, roster, actions, useSessions, useSessionStatus, useSessionRetainInfo, useActivity, useWork, wide, marked }) {
   const id = bot.id;
   const part = currentPart(bot);
-  const preview = useSessions((list) => previewOf(list, part, roster.exchangeTurns[part]));
+  const preview = useSessions((list) => previewOf(list, part, roster.exchangeTurns[part], bot.preview ?? ""));
   const lastAt = useSessions((list) => list.byId[part]?.updatedAt ?? 0);
   const running = useSessionStatus((map) => map.get(part)?.running === true);
   const active = useSessionRetainInfo(part, (info) => (info?.retainedBy?.mainView ?? 0) > 0);
@@ -39264,9 +39315,18 @@ async function transcribeWave(speech, catalog, wave, signal) {
   if (!result?.ok) throw Object.assign(new Error(result?.error?.message ?? "Transcription failed"), { kind: "service" });
   return String(result.value?.text ?? "").trim();
 }
-function closingReplyText(chat, turn) {
+function closingReplyText(chat, turn, presentation) {
   const location2 = chat?.timeline?.turns?.get(turn);
   if (location2 === void 0) return void 0;
+  if (assistantChatActive(presentation, location2.end?.seq)) {
+    if (location2.end === void 0) return void 0;
+    const tools = chat.nodes?.turnDataSource(turn, "tool-call").getSnapshot();
+    if (tools === void 0) return void 0;
+    return tools.flatMap(({ root }) => {
+      const text = root.kind === "tool-result" && assistantChatActive(presentation, root.seq) ? assistantSayText(root, root.meta) : void 0;
+      return text === void 0 ? [] : [text];
+    }).join("\n\n");
+  }
   const closing = location2.data?.get("turn-tail")?.closing;
   if (closing === void 0) return void 0;
   if (closing === null) return "";
@@ -43355,7 +43415,7 @@ function apply(ctx) {
     try {
       const binding = ctx.sessions.binding(sessionId);
       if (binding === void 0) return null;
-      return closingReplyText(ctx.uiConversation.binding(binding).target("chat").getSnapshot(), turn);
+      return closingReplyText(ctx.uiConversation.binding(binding).target("chat").getSnapshot(), turn, binding.session.projections.faceOf(ASSISTANT_CHAT_KEY).getSnapshot());
     } catch {
       return null;
     }
@@ -43475,7 +43535,7 @@ function apply(ctx) {
   }
   const settingsShellHeld = createSource(false);
   let settingsShell;
-  const face = () => ({ actions, hooks: { roster, ui: ui2, activity, work, memoryNews, registry, turnClock, live, computer, cards, heldCards, browserPages, browserTabs, browserHolds, surface, update, settingsShellHeld } });
+  const face = (sessionId) => ({ actions, hooks: { ...sessionId ? { assistantChat: ctx.sessions.binding(sessionId)?.session.projections.faceOf(ASSISTANT_CHAT_KEY) } : {}, roster, ui: ui2, activity, work, memoryNews, registry, turnClock, live, computer, cards, heldCards, browserPages, browserTabs, browserHolds, surface, update, settingsShellHeld } });
   ctx.effect(() => {
     const offStyles = installCompiledStyles(SETTINGS_SHELL_CSS, "settings-shell");
     settingsShell = installSettingsShell(ctx, { face, actions, ui: ui2, held: settingsShellHeld });
@@ -43504,7 +43564,7 @@ function apply(ctx) {
     const binding = ctx.sessions.binding(sessionId);
     if (binding === void 0) throw new Error(`ds-bot: unknown session "${sessionId}"`);
     const chat = ctx.uiConversation.binding(binding).target("chat");
-    return { ...face(), keyedHooks: {
+    return { ...face(sessionId), keyedHooks: {
       turnSteps: (turn) => {
         const snapshot = chat.getSnapshot();
         if (snapshot === void 0) throw new Error("ds-bot: Chat target is unavailable");
@@ -43541,9 +43601,11 @@ function apply(ctx) {
       const conversation = ctx.uiConversation.binding(binding);
       const offChat = conversation.target("chat").subscribe(listener);
       const offOpen = conversation.openTurn.subscribe(listener);
+      const offAssistant = binding.session.projections.faceOf(ASSISTANT_CHAT_KEY).subscribe(listener);
       return () => {
         offChat();
         offOpen();
+        offAssistant();
       };
     } catch {
       return () => {

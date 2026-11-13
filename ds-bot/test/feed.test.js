@@ -283,3 +283,25 @@ test('without DSH\'s session projections the run-stats endpoint has nothing to s
   await call('state')
   assert.deepEqual(await call('run-stats', { botId: 'm1' }), { ok: true, value: null })
 })
+
+
+test('Rabi Assistant feed emits successful say records and suppresses ordinary streams', async t => {
+  const { ctx, call, stop, routes } = start()
+  t.after(stop)
+  await call('state')
+  const abort = new AbortController()
+  t.after(() => abort.abort())
+  const next = reader(await routes['/api/bot/feed'].fetch(new Request('http://localhost/api/bot/feed', { signal: abort.signal })))
+  assert.equal((await next()).event, 'hello')
+  const onEvent = ctx.listeners.get('session/event').at(-2)
+  const session = { id: 'm1c' }
+  onEvent(session, { type: 'rabiroute/assistant-mode', seq: 1, data: { version: 1 } })
+  onEvent(session, { ...botMessage('Internal work', 2), seq: 2 })
+  const [onStream] = ctx.listeners.get('agent/assistant-stream')
+  onStream({ agent: { id: session.id, session }, frame: { type: 'start', attemptId: 'quiet', turn: 1 } })
+  onStream({ agent: { id: session.id, session }, frame: { type: 'chunk', attemptId: 'quiet', chunk: { type: 'text-delta', text: 'Internal stream' } } })
+  onEvent(session, { type: 'tool/call', seq: 3, time: 3, data: { name: 'rabiroute_assistant_say', callId: 'say', arguments: { text: 'Visible' } } })
+  onEvent(session, { type: 'tool/result', seq: 4, time: 4, data: { message: { toolCallId: 'say', isError: true, content: [{ type: 'text', text: '{"text":"Failed"}' }] } } })
+  onEvent(session, { type: 'tool/result', seq: 5, time: 5, data: { meta: { kind: 'rabi-assistant-say', text: 'Visible' }, message: { isError: false, toolCallId: 'say', content: [{ type: 'text', text: '{"text":"Visible"}' }] } } })
+  assert.deepEqual(await next(), { event: 'message', data: { botId: 'm1', sessionId: 'm1c', item: { kind: 'bot', text: 'Visible', time: 5, seq: 5 } } })
+})

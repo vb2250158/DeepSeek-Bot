@@ -14,6 +14,7 @@
 // The next part opens with the handoff package: the note, the latest messages word for
 // word, and where the rest is. Input that arrives meanwhile waits and moves along.
 // read_own_chat searches every part, the condensed messages included.
+import { assistantChatActive, assistantChatText, installAssistantChat } from './assistant-chat.js'
 import { randomUUID } from 'node:crypto'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { openTurnAt } from './btw.js'
@@ -131,8 +132,11 @@ export function replyText(text) {
   }).join('\n\n')
 }
 
-export function historyEntry(event, group) {
+export function historyEntry(event, group, presentation) {
+  const said = assistantChatText(event, presentation)
+  if (said !== undefined) return { answer: true, text: said }
   if (event.type === 'assistant/message') {
+    if (assistantChatActive(presentation, event.seq)) return undefined
     const text = textOf(event.data?.message?.content)
     return text === '' ? undefined : { answer: true, text }
   }
@@ -187,6 +191,7 @@ export async function archivePreviousPart(rt, agent) {
 
 export function install(rt) {
   const { ctx, config, state } = rt
+  installAssistantChat(rt)
 
   const RECENT_TOKENS = config.handoffRecentTokens ?? 16_384
   const RECENT_LINE_MAX = 4_000
@@ -394,8 +399,10 @@ export function install(rt) {
   async function* partLines(sessionId, signal, { group = false, pages } = {}) {
     // Read backwards, a Bot's answers come before the message they answer.
     let answers = []
+    const agent = await rt.resolveAgent(sessionId).catch(() => undefined)
+    const presentation = await rt.loadAssistantChat(sessionId, agent?.session, signal)
     for await (const event of rt.eventsBackwards(sessionId, signal, pages)) {
-      const entry = historyEntry(event, group)
+      const entry = historyEntry(event, group, presentation)
       if (entry === undefined) continue
       if (entry.answer) {
         answers.push({ text: `You: ${entry.text}`, time: event.time, seq: event.seq, who: 'you' })
@@ -1534,6 +1541,7 @@ export function install(rt) {
   const EARLIER_PAGE = 60
   function displayItems(partId, events, session, seedTurn) {
     const hidden = new Set(state.exchangeTurns[partId] ?? [])
+    const presentation = rt.assistantChatState(partId, events, session)
     // Call ids of the page's group_relay calls; their tool/result events carry the
     // round's replies. A result without its call on the page (the page cut between
     // them) draws nothing rather than guessing.
@@ -1554,7 +1562,13 @@ export function install(rt) {
         if (typeof event.data?.turn === 'number' && Number.isInteger(event.data.turn)) turn = event.data.turn
         continue
       }
+      const said = assistantChatText(event, presentation)
+      if (said !== undefined && !hidden.has(event.data?.turn ?? turn)) {
+        stamp(event, { kind: 'bot', text: said, time: event.time })
+        continue
+      }
       if (event.type === 'assistant/message') {
+        if (assistantChatActive(presentation, event.seq)) continue
         if (hidden.has(event.data?.turn)) continue
         // One entry per text block: the chat shows each block in a bubble of its own.
         const content = Array.isArray(event.data?.message?.content) ? event.data.message.content : []
@@ -1658,6 +1672,7 @@ export function install(rt) {
       maxMessages: EARLIER_PAGE,
     }, signal)
     const events = page.records.map(record => record.event)
+    await rt.loadAssistantChat(part.sessionId, agent?.session, signal)
     let seedTurn
     if (agent === undefined) {
       // Without the live session's projection, rows on a page that does not
@@ -1760,7 +1775,8 @@ export function install(rt) {
   // Places a page's `steps` items after the last row of each turn and fills in
   // `ms` from the turn's thinking time when the stream has it.
   async function applySteps(items, events, sessionId) {
-    const byTurn = stepsItems(events, sessionId)
+    const presentation = rt.assistantChatState(sessionId)
+    const byTurn = stepsItems(events.filter(event => !assistantChatActive(presentation, event.seq)), sessionId)
     for (const [turn, tools] of byTurn) {
       const item = { kind: 'steps', turn, tools, time: items.filter(it => it.turn === turn).at(-1)?.time ?? events.at(-1)?.time }
       const ms = await rt.thinkingOf(sessionId, turn).catch(() => undefined)
@@ -1780,6 +1796,7 @@ export function install(rt) {
   const fillTail = async sessionId => {
     // Newest page back until a row shows; chats almost always have it on page one.
     try {
+      await rt.loadAssistantChat(sessionId, undefined, AbortSignal.timeout(HISTORY_TIMEOUT_MS))
       let beforeSeq
       for (let pages = 0; pages < 10; pages += 1) {
         const page = await ctx.sessionController.page({

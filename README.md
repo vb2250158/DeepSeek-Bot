@@ -286,3 +286,7 @@ The plugin source is in [`ds-bot/`](ds-bot/). For options and internals, see [`d
 DS Bot is an independent community project. **It is not an official DeepSeek product**, and it is not affiliated with, endorsed by or sponsored by DeepSeek. "DeepSeek", "DeepSeek Harness" and the other names are trademarks of their owners. They are used here only to say what this plugin works with.
 
 Bots use your own model quota, and they read and write files and run commands when you ask them to. Check important actions yourself.
+
+## Rabi Assistant chat
+
+Rabi Assistant sessions use the persisted ignorable `rabiroute/assistant-mode` event with `{ version: 1 }` to begin explicit chat presentation. Earlier assistant messages remain readable. After that marker, complete chat bubbles come from successful `rabiroute_assistant_say` results containing JSON `{ text }` that matches execution-owned result metadata. Voice uses the same committed say text. Ordinary assistant text, streams and tool steps remain in the Session task detail. Refresh, earlier parts, previews and chat search rebuild from those same records. The composer and Inbox retain their existing background-work input behavior.

@@ -101,3 +101,14 @@ test('turnDetector ends a turn after a pause that follows speech', () => {
   assert.equal(detect(0.01, 1200), 'speech')
   assert.equal(detect(0.01, 2200), 'done')
 })
+
+
+test('assistant voice speaks the same committed say text as chat and ignores execution narration', () => {
+  const root = { kind: 'tool-result', seq: 5, isError: false, content: [{ type: 'text', text: '{"text":"Visible say"}' }], meta: { kind: 'rabi-assistant-say', text: 'Visible say' } }
+  const chat = { timeline: { turns: new Map([[1, { end: { seq: 6 }, data: { get: () => ({ closing: { blocks: [{ kind: 'text', text: 'Execution narration' }] } }) } }]]) },
+    nodes: { turnDataSource: () => ({ getSnapshot: () => [{ root }] }) } }
+  assert.equal(closingReplyText(chat, 1, { since: 2 }), 'Visible say')
+  root.isError = true
+  assert.equal(closingReplyText(chat, 1, { since: 2 }), '')
+  assert.equal(closingReplyText(chat, 1, { since: 9 }), 'Execution narration')
+})

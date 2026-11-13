@@ -1,3 +1,4 @@
+import { ASSISTANT_CHAT_KEY, assistantChatActive } from '../shared/assistant-chat.js'
 // -------------------------------------------------------------------------
 // Text helpers
 import { dateLocale, t } from './i18n.js'
@@ -235,7 +236,9 @@ export function commRunOf(order, peers, turn, hiddenTurns = []) {
 }
 
 // Latest visible line for a sidebar row; Bot-to-Bot exchange turns stay out of it.
-export function previewOf(list, id, hiddenTurns = []) {
+export function previewOf(list, id, hiddenTurns = [], assistantPreview = '') {
+  const presentation = list.projectionsBySession?.[id]?.values?.[ASSISTANT_CHAT_KEY] ?? list.byId[id]?.projectionValues?.[ASSISTANT_CHAT_KEY]
+  if (assistantChatActive(presentation)) return assistantPreview
   const outline = list.projectionsBySession?.[id]?.values?.turnOutline ?? list.byId[id]?.projectionValues?.turnOutline
   if (!Array.isArray(outline)) return ''
   for (let index = outline.length - 1; index >= 0; index -= 1) {

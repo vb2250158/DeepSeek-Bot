@@ -1265,3 +1265,73 @@ test('a message between Bots that the book cannot keep is not sent', { skip: pro
   }
   assert.deepEqual(await exchanges(), [])
 })
+
+
+// Rabi Assistant uses a durable marker so pre-upgrade assistant history stays readable.
+const assistantRows = [
+  { type: 'assistant/message', seq: 1, time: 1, data: { message: { content: [{ type: 'text', text: 'Earlier reply' }] } } },
+  { type: 'rabiroute/assistant-mode', seq: 2, time: 2, data: { version: 1 } },
+  { type: 'turn/start', seq: 3, time: 3, data: { turn: 1 } },
+  { type: 'user/message', seq: 4, time: 4, data: { source: { kind: 'user' }, content: [{ type: 'text', text: 'Hello' }] } },
+  { type: 'assistant/message', seq: 5, time: 5, data: { message: { content: [{ type: 'text', text: 'Internal progress' }] } } },
+  { type: 'tool/call', seq: 6, time: 6, data: { callId: 'say-1', name: 'rabiroute_assistant_say', arguments: { text: 'Hello there' } } },
+  { type: 'tool/result', seq: 7, time: 7, data: { meta: { kind: 'rabi-assistant-say', text: 'Hello there' }, message: { isError: false, toolCallId: 'say-1', content: [{ type: 'text', text: '{"text":"Hello there"}' }] } } },
+]
+
+test('Rabi Assistant live rows match persisted refresh and preserve pre-marker text', async () => {
+  const live = earlierParts([])
+  let turn
+  const rows = assistantRows.flatMap(event => {
+    if (event.type === 'turn/start') turn = event.data.turn
+    return live.displayItems('b1', [event], undefined, turn)
+  })
+  const refreshed = await earlierParts(assistantRows).earlierPage('b2')
+  assert.deepEqual(rows, refreshed.items)
+  const snapshot = JSON.parse(readFileSync(new URL('./fixtures/rabi-assistant-chat.json', import.meta.url), 'utf8'))
+  assert.deepEqual(JSON.parse(JSON.stringify(rows)), snapshot)
+  assert.deepEqual(rows.map(({ kind, text, seq, turn }) => ({ kind, text, seq, turn })), [
+    { kind: 'bot', text: 'Earlier reply', seq: 1, turn: undefined },
+    { kind: 'user', text: 'Hello', seq: 4, turn: 1 },
+    { kind: 'bot', text: 'Hello there', seq: 7, turn: 1 },
+  ])
+})
+
+test('Rabi Assistant rejects failed, malformed, unmatched and argument-only say output', () => {
+  const rt = earlierParts([])
+  rt.displayItems('b1', assistantRows.slice(0, 6))
+  const result = data => rt.displayItems('b1', [{ type: 'tool/result', seq: 8, time: 8, data: { meta: { kind: 'rabi-assistant-say', text: 'Hello there' }, message: { isError: false, toolCallId: 'say-1', content: [{ type: 'text', text: '{"text":"Hello there"}' }], ...data } } }])
+  assert.deepEqual(result({ isError: true }), [])
+  assert.deepEqual(result({ isError: undefined }), [])
+  assert.deepEqual(result({ content: [{ type: 'text', text: '{"text":"Different"}' }] }), [])
+  assert.deepEqual(result({ content: [{ type: 'image', text: '{"text":"Hello there"}' }] }), [])
+  assert.deepEqual(result({ content: [{ type: 'text', text: 'invalid' }] }), [])
+  assert.deepEqual(result({ content: [{ type: 'text', text: '{"text":22}' }] }), [])
+})
+
+test('agentless Rabi Assistant page pairs say calls from older pages', async () => {
+  const rt = earlierParts([])
+  rt.resolveAgent = async () => { throw new Error('Archived') }
+  rt.ctx.sessionController.projections = async () => ({ kind: 'sequenced', values: { dsBotAssistantChat: { since: 2 } } })
+  rt.ctx.sessionController.page = async ({ beforeSeq }) => beforeSeq === undefined
+    ? { records: assistantRows.slice(6).map(event => ({ event })), hasMore: true }
+    : { records: assistantRows.slice(0, 6).map(event => ({ event })), hasMore: false }
+  const { items } = await rt.earlierPage('b2')
+  assert.deepEqual(items, [{ kind: 'bot', text: 'Hello there', seq: 7, turn: 1, time: 7 }])
+})
+
+
+test('Rabi Assistant reads its registered projection for live and refresh paths', async () => {
+  let definition
+  const rt = earlierParts([])
+  rt.ctx.get = name => name === 'sessionProjections' ? {
+    async register(value) { definition = value; return { stateOf: () => assistantRows.reduce(value.apply, value.init()) } },
+    stateOf() { return assistantRows.reduce(definition.apply, definition.init()) },
+  } : undefined
+  installParts(rt)
+  rt.ctx.sessionController.page = async () => { throw new Error('Projection must avoid history reads') }
+  const session = { id: 'b1' }
+  await rt.assistantChatReady
+  const state = await rt.loadAssistantChat('b1', session)
+  assert.deepEqual(definition.stateSchema.parse(state), { since: 2 })
+  assert.equal(rt.displayItems('b1', assistantRows.slice(6), session)[0].text, 'Hello there')
+})

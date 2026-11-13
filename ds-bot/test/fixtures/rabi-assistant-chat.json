@@ -1,0 +1,22 @@
+[
+  {
+    "kind": "bot",
+    "text": "Earlier reply",
+    "time": 1,
+    "seq": 1
+  },
+  {
+    "kind": "user",
+    "text": "Hello",
+    "time": 4,
+    "seq": 4,
+    "turn": 1
+  },
+  {
+    "kind": "bot",
+    "text": "Hello there",
+    "time": 7,
+    "seq": 7,
+    "turn": 1
+  }
+]

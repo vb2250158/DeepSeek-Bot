@@ -1,3 +1,4 @@
+import { assistantChatActive } from './assistant-chat.js'
 // The live feed: a Server-Sent Events stream of what changes, for a window that draws
 // the team itself (the desktop app) instead of polling.
 //   revision  the team was saved: ask for `state` again
@@ -68,7 +69,7 @@ export function install(rt) {
     if (!listening()) return
     const botId = rt.chatOwners.get(session.id)
     if (botId === undefined) return
-    for (const item of rt.displayItems(session.id, [event])) publish('message', { botId, sessionId: session.id, item })
+    for (const item of rt.displayItems(session.id, [event], session)) publish('message', { botId, sessionId: session.id, item })
     if (event.type === 'tool/call') live()
   })
 
@@ -78,6 +79,7 @@ export function install(rt) {
   ctx.on('agent/assistant-stream', ({ agent, frame }) => {
     if (frame.type === 'start') {
       const botId = rt.chatOwners.get(agent.id)
+      if (assistantChatActive(rt.assistantChatState(agent.id, [], agent.session))) return
       if (!listening() || botId === undefined || (state.exchangeTurns[agent.id] ?? []).includes(frame.turn)) return
       writing.set(frame.attemptId, { botId, sessionId: agent.id })
       publish('stream', { botId, sessionId: agent.id, attemptId: frame.attemptId, phase: 'start' })

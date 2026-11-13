@@ -1,3 +1,4 @@
+import { assistantChatActive, assistantSayText } from '../shared/assistant-chat.js'
 // The recognizer of DSH's Voice Input plugin (local SenseVoice). Its `speech` Remote
 // exists only while that plugin is on; the browser's own speech service stays the
 // fallback. The plugin takes one complete 16 kHz mono PCM16 WAV per request.
@@ -139,9 +140,18 @@ export async function transcribeWave(speech, catalog, wave, signal) {
 // The full closing Assistant text of a finished turn: what voice chat speaks.
 // undefined while the chat view has not materialized the turn; '' when the turn
 // closed without assistant text.
-export function closingReplyText(chat, turn) {
+export function closingReplyText(chat, turn, presentation) {
   const location = chat?.timeline?.turns?.get(turn)
   if (location === undefined) return undefined
+  if (assistantChatActive(presentation, location.end?.seq)) {
+    if (location.end === undefined) return undefined
+    const tools = chat.nodes?.turnDataSource(turn, 'tool-call').getSnapshot()
+    if (tools === undefined) return undefined
+    return tools.flatMap(({ root }) => {
+      const text = root.kind === 'tool-result' && assistantChatActive(presentation, root.seq) ? assistantSayText(root, root.meta) : undefined
+      return text === undefined ? [] : [text]
+    }).join('\n\n')
+  }
   const closing = location.data?.get('turn-tail')?.closing
   if (closing === undefined) return undefined
   if (closing === null) return ''
