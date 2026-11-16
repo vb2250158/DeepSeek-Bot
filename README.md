@@ -58,7 +58,7 @@ Version 0.3.2-rabi.1 adds sidebar sections, one settings dialog for Bot and Harn
 
 This maintenance fork tests Windows x64, Node.js `24.15.0`, npm `11.12.1` and pnpm `11.28.5`, running Web from public Core source `vb2250158/deepseek-harness@f8d94a2c5b83e0c715218073a3a6d0465f170e2c` (`0.2.2-rc.3`). The CI runner is `windows-2025`. Earlier-host and cross-platform compatibility matrices are outside this target.
 
-Windows local-agent discovery and the Codex, Claude and ACP drivers resolve npm `.cmd` shims to their Node entry point and run without a shell or console window. Paths with spaces and array arguments are preserved; cancellation and timeouts target the CLI process itself. Arbitrary `.cmd`/`.bat` scripts are rejected with `UNSUPPORTED_AGENT_WRAPPER`: select the executable or a Node npm entry point instead. No local-agent account is signed in automatically.
+Windows local-agent discovery, the Codex, Claude and ACP drivers, and the manual `ds-bot doctor` command resolve npm `.cmd` shims to their Node entry point and run without a shell or console window. Paths with spaces and array arguments are preserved; cancellation and timeouts target the CLI process itself. Arbitrary `.cmd`/`.bat` scripts are rejected with `UNSUPPORTED_AGENT_WRAPPER`: select the executable or a Node npm entry point instead. No local-agent account is signed in automatically.
 
 Inherited environment variables whose names contain `KEY`, `TOKEN`, `SECRET` or `PASSWORD`, and DSH-owned variables, are withheld from local agents. Explicit engine environment settings and the CLI's own file-based sign-in remain separate.
 

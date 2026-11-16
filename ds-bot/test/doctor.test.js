@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import { test } from 'node:test'
@@ -15,7 +15,15 @@ import { planRepair, repair, stalePins } from '../bin/ds-bot-doctor.mjs'
 
 const DOCTOR = join(dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'ds-bot-doctor.mjs')
 const RUNNING = '0.2.2-rc.2'
-const FAKE_PNPM = 'true'
+function fakePnpm(home) {
+  const file = join(home, 'fake-pnpm.mjs')
+  writeFileSync(file, '#!/usr/bin/env node\nprocess.exit(0)\n')
+  chmodSync(file, 0o755)
+  if (process.platform !== 'win32') return file
+  const shim = `${file}.cmd`
+  writeFileSync(shim, `@ECHO off\r\n"${process.execPath}" "%~dp0\\fake-pnpm.mjs" %*\r\n`)
+  return shim
+}
 
 function homeWith(profiles) {
   const home = mkdtempSync(join(tmpdir(), 'ds-bot-doctor-'))
@@ -73,7 +81,7 @@ test('the doctor reads every profile and survives one it cannot parse', () => {
 
 test('a repair removes only the stale pins and reconciles the profile', () => {
   const home = homeWith({ web: manifest({ 'ds-bot': '0.3.2', '@deepseek-ai/dsh-web-app': '0.2.1-rc.5' }) })
-  const changed = repair(planRepair({ home, dshVersion: RUNNING }), { pnpm: FAKE_PNPM })
+  const changed = repair(planRepair({ home, dshVersion: RUNNING }), { pnpm: fakePnpm(home) })
   assert.deepEqual(changed.map(entry => [entry.removed, entry.installed]), [[['@deepseek-ai/dsh-web-app@0.2.1-rc.5'], true]])
   const saved = JSON.parse(readFileSync(join(home, 'profiles', 'web', 'package.json'), 'utf8'))
   assert.deepEqual(Object.keys(saved.dependencies), ['ds-bot'])
@@ -82,14 +90,15 @@ test('a repair removes only the stale pins and reconciles the profile', () => {
 
 test('the command reports a stale pin, --fix reconciles it, and a failed install names the command', () => {
   const home = homeWith({ web: manifest({ 'ds-bot': '0.3.2', '@deepseek-ai/dsh-web-app': '0.2.1-rc.5' }) })
+  const pnpm = fakePnpm(home)
   const run = (env, ...args) => spawnSync(process.execPath, [DOCTOR, 'doctor', '--home', home, '--dsh-version', RUNNING, ...args], { encoding: 'utf8', env: { ...process.env, DSH_PNPM: env } })
-  const check = run(FAKE_PNPM)
+  const check = run(pnpm)
   assert.equal(check.status, 1)
   assert.match(check.stdout, /@deepseek-ai\/dsh-web-app@0\.2\.1-rc\.5/)
   assert.match(check.stdout, /running DSH is 0\.2\.2-rc\.2/)
   assert.match(check.stdout, /--fix/)
   assert.doesNotMatch(check.stdout, /pnpm why/)
-  const fixed = run(FAKE_PNPM, '--fix')
+  const fixed = run(pnpm, '--fix')
   assert.equal(fixed.status, 0)
   assert.match(fixed.stdout, /reconciled with pnpm/)
   const saved = JSON.parse(readFileSync(join(home, 'profiles', 'web', 'package.json'), 'utf8'))

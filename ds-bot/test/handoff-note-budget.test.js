@@ -92,6 +92,7 @@ async function switchPart({ replies, info = {}, fallback, route = {}, oldNote, r
     async load() {},
     readOnly: () => undefined,
     botOf: id => rt.state.bots[id],
+    liveBot: id => rt.state.bots[id],
     roomOf: () => undefined,
     selfOf: () => 'b1',
     isMain: () => false,

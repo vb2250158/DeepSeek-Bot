@@ -190,7 +190,8 @@ test('a failure the reload left only a settlement notice for shows in its group 
 
   const second = await loadPlugin(dsh, home)
   cleanup(t, home, second.ctx)
-  await settle(() => second.rt.hasSubagents('gb') === true)
+  assert.equal(dsh.agentOf('child1').status, 'idle', 'unload drained its owned child before reload')
+  assert.equal(second.rt.hasSubagents('gb'), false)
   // The child's catalog carries the label the group knows it by; the lifecycle ending
   // was lost with the old plugin, so the notice is the only ending the new one sees.
   emit(second.ctx, 'gb', 'subagent/catalog', { childId: 'child1', label: 'Export the deck' })

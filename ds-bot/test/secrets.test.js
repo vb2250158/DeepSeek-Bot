@@ -409,7 +409,7 @@ function stubCordisHost(ctx) {
   const services = {
     llm: { listProviders: () => [], registerAdapter: () => { const h = () => {}; h.replace = () => {}; return h } },
     tools: { register: noop, guard: noop, schemas: () => [] },
-    systemPrompt: { section: noop },
+    systemPrompt: { section: noop, context: noop },
     sessionController: { runningSessions: () => [], running: () => new Set(), list: () => [], get: () => undefined, resolveAgent: async () => undefined, watch: noop },
     sessions: { list: async () => [], get: async () => null, load: async () => null, on: noop },
     sessionTitle: { register: noop, setSource: noop },

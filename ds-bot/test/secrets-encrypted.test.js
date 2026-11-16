@@ -41,7 +41,7 @@ function start({ home = mkdtempSync(join(tmpdir(), 'ds-bot-secrets-enc-')) } = {
   ctx.workspaceRegistry = { archiveSession: async () => {} }
   ctx.llm.stream = () => (async function* () {})()
   let route
-  ctx.connection.fetch.register = (options) => { route = options; return () => {} }
+  ctx.connection.fetch.register = (options) => { if (options.path === '/api/bot') route = options; return () => {} }
   const rt = createRuntime(ctx, { home })
   const call = async (endpoint, payload) => {
     const response = await route.fetch(new Request('http://localhost/api/bot', { method: 'POST', body: JSON.stringify({ endpoint, payload }) }))

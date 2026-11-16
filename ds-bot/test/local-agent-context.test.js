@@ -442,6 +442,7 @@ function localPart({ context, team, decision = 'switch', note = goodNote('from-t
     async load() {},
     readOnly: () => undefined,
     botOf: id => rt.state.bots[id],
+    liveBot: id => rt.state.bots[id],
     roomOf: () => undefined,
     selfOf: () => 'b1',
     chatOf: () => bot.sessionId,

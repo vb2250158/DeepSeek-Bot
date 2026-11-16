@@ -12,7 +12,7 @@ const MINUTE = 60_000
 const HOUR = 60 * MINUTE
 const DAY = 24 * HOUR
 
-// Chief (Main) and Writer in Ops; Writer and Editor in Desk; Diary is a private Bot.
+// Chief and Writer in Ops; Writer and Editor in Desk; Diary is a private Bot.
 const team = ({ questions = {}, views = {}, openPart = false } = {}) => ({
   version: 1,
   mainBotIds: ['a'],
@@ -92,12 +92,13 @@ test('without a filter list_bots lists the whole team and every group the caller
   t.after(stop)
   assert.equal(await list({}, 'c'), [
     'Bots:',
-    '- Chief (Boss, Main Bot)\n  now: idle',
+    '- Chief (Boss)\n  now: idle',
     '- Writer (Write)\n  now: idle',
     '- Editor (Edit, you)',
     '- Diary (Notes, private Bot, closed to other Bots)',
     '',
     'Group chats:',
+    '- "Ops" — members: Chief (admin), Writer; plain messages go to the admin first',
     '- "Desk" — members: Writer, Editor (you); every member replies in turn',
   ].join('\n'))
 })
@@ -110,12 +111,13 @@ test('bot lists only that Bot and the groups it is in that the caller can see', 
     '- Writer (Write)\n  now: idle',
     '',
     'Group chats:',
+    '- "Ops" — members: Chief (admin), Writer; plain messages go to the admin first',
     '- "Desk" — members: Writer, Editor (you); every member replies in turn',
   ].join('\n'))
   const chief = await list({ bot: '@writer' }, 'a')
   assert.match(chief, /- "Ops" — /)
   assert.match(chief, /- "Desk" — /)
-  assert.equal(await list({ bot: 'Chief' }, 'c'), 'Bots:\n- Chief (Boss, Main Bot)\n  now: idle\n\nGroup chats: Chief is in none you can see.')
+  assert.equal(await list({ bot: 'Chief' }, 'c'), 'Bots:\n- Chief (Boss)\n  now: idle\n\nGroup chats:\n- "Ops" — members: Chief (admin), Writer; plain messages go to the admin first')
 })
 
 test('group lists only its members and that group', async (t) => {
@@ -144,12 +146,12 @@ test('bot and group together list that member and that group, and refuse a Bot o
   assert.equal(await list({ bot: 'Editor', group: 'Ops' }, 'a'), 'Editor is not in group "Ops". Members: Chief, Writer')
 })
 
-test('an unknown name, or a group the caller cannot see, gets a plain answer with the valid names', async (t) => {
+test('unknown names get a plain answer and equal team members can inspect public groups', async (t) => {
   const { list, stop } = await start()
   t.after(stop)
   assert.equal(await list({ bot: 'Nobody' }, 'a'), 'No Bot named Nobody. Team: Chief, Writer, Editor, Diary')
   assert.equal(await list({ group: 'Nowhere' }, 'a'), 'No group chat called "Nowhere" that you can see. Groups: "Ops", "Desk".')
-  assert.equal(await list({ group: 'Ops' }, 'c'), 'No group chat called "Ops" that you can see. Groups: "Desk".')
+  assert.equal(await list({ group: 'Ops' }, 'c'), 'Bots:\n- Chief (Boss)\n  now: idle\n- Writer (Write)\n  now: idle\n\nGroup chats:\n- "Ops" — members: Chief (admin), Writer; plain messages go to the admin first')
 })
 
 test('a private Bot stays closed to other Bots when it is asked for by name', async (t) => {

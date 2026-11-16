@@ -44,7 +44,7 @@ function start(saved, existingHome) {
   let route
   const register = ctx.connection.fetch.register
   ctx.connection.fetch.register = (options) => {
-    route = options
+    if (options.path === '/api/bot') route = options
     return register(options)
   }
   const rt = createRuntime(ctx, { home })
@@ -99,16 +99,13 @@ test('add, list and check share one list between the members', async (t) => {
   assert.equal(todos[0].doneBy, undefined)
 })
 
-test('a member of another group cannot read or change this list, but a Main Bot can', async (t) => {
+test('an equal team member can manage another public group and unknown groups stay unavailable', async (t) => {
   const { call, tool, exec, stop } = start(baseTeam())
   t.after(stop)
-  // Editor is in Video Room but not in Other Room, and is not a Main Bot.
-  const refused = await tool('group_todo').execute({ group: 'Other Room', action: 'add', text: 'Nope' }, exec('editor'))
-  assert.match(refused, /^No group chat called "Other Room" that you can see\. Groups: "Video Room"\.$/)
-
-  assert.equal((await call('set-main', { id: 'editor', main: true })).ok, true)
-  const added = await tool('group_todo').execute({ group: 'Other Room', action: 'add', text: 'Main Bot item' }, exec('editor'))
-  assert.match(added, /^Added "Main Bot item"/)
+  const refused = await tool('group_todo').execute({ group: 'Unknown Room', action: 'add', text: 'Nope' }, exec('editor'))
+  assert.match(refused, /^No group chat called "Unknown Room" that you can see\./)
+  const added = await tool('group_todo').execute({ group: 'Other Room', action: 'add', text: 'Team item' }, exec('editor'))
+  assert.match(added, /^Added "Team item"/)
   assert.equal((await todosOf(call, 'r2')).length, 1)
   assert.equal((await todosOf(call, 'r1')), undefined)
 })

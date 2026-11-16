@@ -83,8 +83,16 @@ async function start(t, room, services, extraRooms, bots, llm, top, files = {}) 
       if (listener.length >= 2) listener({ id }, { type, seq: ++seq, data })
     }
   }
+  const observeScoped = (parentId) => {
+    const agent = agentOf(parentId)
+    agent.ctx = fakeContext()
+    t.after(() => agent.ctx.dispose())
+    for (const listener of ctx.listeners.get('agent/created') ?? []) listener({ agent })
+  }
   const emitScoped = (parentId, name, info) => {
-    const carrier = scopeTarget({}, agentOf(parentId))
+    const agent = agentOf(parentId)
+    for (const listener of agent.ctx?.listeners.get(name) ?? []) listener(info)
+    const carrier = scopeTarget({}, agent)
     for (const listener of ctx.listeners.get(name) ?? []) listener.call(carrier, info)
   }
   const tool = (name, args, sessionId, exec = {}) => rt.teamTools.find(d => d.name === name).execute(args, { agent: { id: sessionId }, ...exec })
@@ -122,7 +130,7 @@ async function start(t, room, services, extraRooms, bots, llm, top, files = {}) 
     return { content: post.content, source: post.source }
   }
   await tool('list_bots', {}, 'a')
-  return { home, ctx, agentOf, emit, emitScoped, tool, call, begin, finish, round, say, takePost, selected }
+  return { home, ctx, agentOf, emit, emitScoped, observeScoped, tool, call, begin, finish, round, say, takePost, selected }
 }
 
 // The save before a group post runs on a timer; waiting with setImmediate starves it.
@@ -1850,6 +1858,7 @@ for (const [reason, summary] of [['error', 'failed before it finished.'], ['max-
 
 test('a child that runs again after settling gets its own failure row, and read-only hosts stay untouched (#973)', async (t) => {
   const host = await start(t)
+  host.observeScoped('gb')
   const failure = {
     content: [
       { type: 'text', text: 'Background subagent sub-1 failed before it finished.' },
