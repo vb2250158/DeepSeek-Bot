@@ -42,10 +42,11 @@ runInNewContext(outputFiles[0].text, {
 })
 const { findHost, rowVisible, freshInputAt, clientErrors } = module.exports
 
-test('the activity row mounts at the running slot even under an extra wrapper', () => {
-  dom.window.document.body.innerHTML = '<div data-chat-flow><div class="wrap"><div data-chat-running id="slot"></div></div></div>'
+test('the activity row mounts at the flow tail around the running slot', () => {
+  dom.window.document.body.innerHTML = '<div data-chat-flow id="flow"><div class="wrap"><div data-chat-running id="slot"></div></div></div>'
   const host = findHost()
-  assert.equal(host?.id, 'slot')
+  assert.equal(host?.id, 'flow')
+  assert.equal(host.querySelector('[data-chat-running]')?.id, 'slot')
 })
 
 test('without the running slot the row mounts at the flow tail', () => {
