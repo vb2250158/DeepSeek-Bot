@@ -29790,7 +29790,7 @@ function SettingsShell(props) {
   const installing = update.presentation?.phase === "installing";
   const [kept, leaving] = useLinger(settings, DIALOG_EXIT_MS);
   const showing = Boolean(kept);
-  (0, import_react45.useEffect)(() => showing ? actions.holdSettingsLook?.() : void 0, [showing]);
+  (0, import_react45.useLayoutEffect)(() => showing ? actions.holdSettingsLook?.() : void 0, [showing]);
   const open = settings !== null && settings !== void 0;
   const openSettings = () => actions.openSettings("general");
   return (0, import_react45.createElement)(
@@ -42767,6 +42767,25 @@ function singleFlight(map, key, run2) {
 }
 
 // src/client/index.js
+var SHELL_STYLES = [
+  ["shell", SHELL_CSS],
+  ["sidebar", SIDEBAR_CSS],
+  ["secrets", SECRET_CSS + CONNECTOR_CSS + CONNECTORS_PAGE_CSS],
+  ["learning", LEARNING_CSS],
+  ["models", MODEL_CSS + FOLDER_CSS + BOT_SETTINGS_CSS + GROUP_SETTINGS_CSS + AVATAR_LIBRARY_CSS],
+  ["usage", USAGE_CSS],
+  ["schedules", SCHEDULE_CSS],
+  ["feedback", FEEDBACK_CSS],
+  ["about", ABOUT_CSS],
+  ["members", MEMBER_CSS],
+  ["im", IM_CSS],
+  ["goal", GOAL_CSS],
+  ["user-messages", USER_MESSAGE_CSS],
+  ["widgets", WIDGET_CSS2],
+  ["handoff", HANDOFF_CSS],
+  ["side", SIDE_CSS],
+  ["browser", BROWSER_CSS]
+];
 var inject = ["sessions", "uiWorkspace", "uiConversation", "slots", "theme", "layout"];
 function apply(ctx) {
   ctx.effect(() => installLocale(ctx.get("locale")), "ds-bot: interface copy");
@@ -43554,6 +43573,13 @@ function apply(ctx) {
       offStyles();
     };
   }, "ds-bot: settings shell");
+  let settingsCss;
+  actions.holdSettingsLook = () => {
+    if (surface.getSnapshot().mode === "bot") return void 0;
+    settingsCss ??= SHELL_STYLES.map(([, css]) => botOwnCss(css)).join("\n");
+    const style = installStyles(settingsCss, "settings");
+    return () => style.remove();
+  };
   actions.surfaceMode = () => surface.getSnapshot().mode;
   actions.openHarnessSettings = () => actions.openSettings("general");
   actions.openHarnessModels = () => actions.openSettings("models", "advanced");
@@ -43721,24 +43747,7 @@ function apply(ctx) {
     controller.toggleSource(CHATS_SOURCE, { trigger: "@", query: "", quoted: false, position: "inline", span });
   };
   const installShell = () => [
-    () => installCompiledStyles(SHELL_CSS, "shell"),
-    () => installCompiledStyles(SIDEBAR_CSS, "sidebar"),
-    () => installCompiledStyles(SECRET_CSS + CONNECTOR_CSS + CONNECTORS_PAGE_CSS, "secrets"),
-    () => installCompiledStyles(LEARNING_CSS, "learning"),
-    () => installCompiledStyles(MODEL_CSS + FOLDER_CSS + BOT_SETTINGS_CSS + GROUP_SETTINGS_CSS + AVATAR_LIBRARY_CSS, "models"),
-    () => installCompiledStyles(USAGE_CSS, "usage"),
-    () => installCompiledStyles(SCHEDULE_CSS, "schedules"),
-    () => installCompiledStyles(FEEDBACK_CSS, "feedback"),
-    () => installCompiledStyles(ABOUT_CSS, "about"),
-    () => installCompiledStyles(MEMBER_CSS, "members"),
-    () => installCompiledStyles(IM_CSS, "im"),
-    () => installCompiledStyles(GOAL_CSS, "goal"),
-    () => installCompiledStyles(USER_MESSAGE_CSS, "user-messages"),
-    () => installCompiledStyles(WIDGET_CSS2, "widgets"),
-    () => installCompiledStyles(HANDOFF_CSS, "handoff"),
-    () => installCompiledStyles(SIDE_CSS, "side"),
-    // Strip and panel styles also serve the side-chat tabs, which need no bridge.
-    () => installCompiledStyles(BROWSER_CSS, "browser"),
+    ...SHELL_STYLES.map(([tag, css]) => () => installCompiledStyles(css, tag)),
     () => installTheme(),
     () => {
       const style = installStyles(WORKBENCH_CSS, "workbench");

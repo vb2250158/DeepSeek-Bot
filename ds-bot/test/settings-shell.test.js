@@ -26,6 +26,7 @@ const load = (text) => {
   runInNewContext(text, {
     module, exports: module.exports,
     window: { innerWidth: 1280, matchMedia: () => ({ matches: false }) },
+    document: { body: {} },
     requestAnimationFrame: () => 0, cancelAnimationFrame() {}, setTimeout, clearTimeout, Promise,
     require: name => (name === 'react' ? react : name === 'react-dom' ? { createPortal: node => node } : new Proxy({}, { get: (_, key) => key })),
   })
@@ -261,4 +262,32 @@ test('in Agent mode, General offers the way back to Bot mode', () => {
   const [row] = walk(general.type(general.props), node => node.props?.label === 'Bot mode')
   walk(row, node => node.type === 'button' && textOf(node) === 'Switch')[0].props.onClick()
   assert.deepEqual(calls, ['bot'])
+})
+
+
+test('open Agent settings holds its styles before paint and releases them on unmount', () => {
+  const previous = react.useLayoutEffect
+  const cleanups = []
+  let held = 0
+  react.useLayoutEffect = effect => {
+    const cleanup = effect()
+    if (cleanup) cleanups.push(cleanup)
+  }
+  try {
+    const value = snapshot => pick => pick(snapshot)
+    shell.SettingsShell({
+      actions: { holdSettingsLook: () => { held += 1; return () => { held -= 1 } } },
+      renderSlot: () => null,
+      useUi: value({ settings: { page: 'general' } }),
+      useRoster: value(roster), useUpdate: value({}), useSessions: value({}),
+      useSections: value([]), useGeneralItems: value([]), useOnboardingSteps: value([]),
+      useOnboardingRequest: value(undefined), useConnectionState: value('connected'),
+      useDesktopUpdate: value({}), useSettingsShortcut: value(undefined),
+    })
+    assert.equal(held, 1)
+    for (const cleanup of cleanups.reverse()) cleanup()
+    assert.equal(held, 0)
+  } finally {
+    react.useLayoutEffect = previous
+  }
 })

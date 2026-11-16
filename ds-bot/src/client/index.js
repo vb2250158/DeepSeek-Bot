@@ -7,7 +7,7 @@ import { createSource, EMPTY_ROSTER, indexRoster, isAgentSession, botSurfaceTarg
 import { teamActions } from './team-actions.js'
 import { themeCss, shellTokens, registry, registerShape, registerTheme, allThemes, layoutOf, widthOf, flatWidthOf } from './themes.js'
 import { MENTION_ORIGIN, currentPart } from './text.js'
-import { SHELL_CSS, CONVERSATION_CSS, installStyles, installCompiledStyles } from './styles.js'
+import { SHELL_CSS, CONVERSATION_CSS, botOwnCss, installStyles, installCompiledStyles } from './styles.js'
 
 import { lookOf } from './mark.js'
 import { SIDEBAR_CSS, holdShellShortcuts, openHarnessSettings, openHarnessOnboarding, MODELS_STEP } from './sidebar.js'
@@ -61,6 +61,26 @@ import { createRabiWorkspaceStore } from './rabi-workspace-store.js'
 import { installTransientErrors } from './transient-errors.js'
 import { agentSessionToReuse, singleFlight } from './agent-new.js'
 
+
+const SHELL_STYLES = [
+  ['shell', SHELL_CSS],
+  ['sidebar', SIDEBAR_CSS],
+  ['secrets', SECRET_CSS + CONNECTOR_CSS + CONNECTORS_PAGE_CSS],
+  ['learning', LEARNING_CSS],
+  ['models', MODEL_CSS + FOLDER_CSS + BOT_SETTINGS_CSS + GROUP_SETTINGS_CSS + AVATAR_LIBRARY_CSS],
+  ['usage', USAGE_CSS],
+  ['schedules', SCHEDULE_CSS],
+  ['feedback', FEEDBACK_CSS],
+  ['about', ABOUT_CSS],
+  ['members', MEMBER_CSS],
+  ['im', IM_CSS],
+  ['goal', GOAL_CSS],
+  ['user-messages', USER_MESSAGE_CSS],
+  ['widgets', WIDGET_CSS],
+  ['handoff', HANDOFF_CSS],
+  ['side', SIDE_CSS],
+  ['browser', BROWSER_CSS],
+]
 
 export const inject = ['sessions', 'uiWorkspace', 'uiConversation', 'slots', 'theme', 'layout']
 
@@ -842,6 +862,13 @@ export function apply(ctx) {
     settingsShell = installSettingsShell(ctx, { face, actions, ui, held: settingsShellHeld })
     return () => { settingsShell.dispose(); settingsShell = undefined; offStyles() }
   }, 'ds-bot: settings shell')
+  let settingsCss
+  actions.holdSettingsLook = () => {
+    if (surface.getSnapshot().mode === 'bot') return undefined
+    settingsCss ??= SHELL_STYLES.map(([, css]) => botOwnCss(css)).join('\n')
+    const style = installStyles(settingsCss, 'settings')
+    return () => style.remove()
+  }
   actions.surfaceMode = () => surface.getSnapshot().mode
   actions.openHarnessSettings = () => actions.openSettings('general')
   actions.openHarnessModels = () => actions.openSettings('models', 'advanced')
@@ -1026,24 +1053,7 @@ export function apply(ctx) {
   // group re-skins the session itself. Each step returns a disposer from slots.inject,
   // so a surface change withdraws the whole group and the outlets re-render.
   const installShell = () => [
-    () => installCompiledStyles(SHELL_CSS, 'shell'),
-    () => installCompiledStyles(SIDEBAR_CSS, 'sidebar'),
-    () => installCompiledStyles(SECRET_CSS + CONNECTOR_CSS + CONNECTORS_PAGE_CSS, 'secrets'),
-    () => installCompiledStyles(LEARNING_CSS, 'learning'),
-    () => installCompiledStyles(MODEL_CSS + FOLDER_CSS + BOT_SETTINGS_CSS + GROUP_SETTINGS_CSS + AVATAR_LIBRARY_CSS, 'models'),
-    () => installCompiledStyles(USAGE_CSS, 'usage'),
-    () => installCompiledStyles(SCHEDULE_CSS, 'schedules'),
-    () => installCompiledStyles(FEEDBACK_CSS, 'feedback'),
-    () => installCompiledStyles(ABOUT_CSS, 'about'),
-    () => installCompiledStyles(MEMBER_CSS, 'members'),
-    () => installCompiledStyles(IM_CSS, 'im'),
-    () => installCompiledStyles(GOAL_CSS, 'goal'),
-    () => installCompiledStyles(USER_MESSAGE_CSS, 'user-messages'),
-    () => installCompiledStyles(WIDGET_CSS, 'widgets'),
-    () => installCompiledStyles(HANDOFF_CSS, 'handoff'),
-    () => installCompiledStyles(SIDE_CSS, 'side'),
-    // Strip and panel styles also serve the side-chat tabs, which need no bridge.
-    () => installCompiledStyles(BROWSER_CSS, 'browser'),
+    ...SHELL_STYLES.map(([tag, css]) => () => installCompiledStyles(css, tag)),
     () => installTheme(),
     () => { const style = installStyles(WORKBENCH_CSS, 'workbench'); return () => style.remove() },
     // The whale wins the seat over a shell account plugin's own launcher (the
