@@ -3,7 +3,8 @@
     "kind": "bot",
     "text": "Earlier reply",
     "time": 1,
-    "seq": 1
+    "seq": 1,
+    "sessionId": "b1"
   },
   {
     "kind": "user",
@@ -17,6 +18,7 @@
     "text": "Hello there",
     "time": 7,
     "seq": 7,
-    "turn": 1
+    "turn": 1,
+    "sessionId": "b1"
   }
 ]

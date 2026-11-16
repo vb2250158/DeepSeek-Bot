@@ -26,10 +26,13 @@ import * as groupLibrary from './src/host/group-library.js'
 import * as ledger from './src/host/ledger.js'
 
 import * as goals from './src/host/goals.js'
+import * as agentCommands from './src/host/agent-commands.js'
+import * as tasks from './src/host/tasks.js'
 import * as approvals from './src/host/approvals.js'
 import * as resume from './src/host/resume.js'
 import * as memory from './src/host/memory.js'
 import * as parts from './src/host/parts.js'
+import * as changes from './src/host/changes.js'
 import * as images from './src/host/images.js'
 import * as avatarLibrary from './src/host/avatar-library.js'
 import * as browser from './src/host/browser.js'
@@ -50,6 +53,7 @@ import * as rabiComputers from './src/host/rabi-computers.js'
 import * as rabiAutomation from './src/host/rabi-automation.js'
 import * as rabiPersonas from './src/host/rabi-personas.js'
 import * as rabiSetup from './src/host/rabi-setup.js'
+import * as remote from './src/host/remote.js'
 import * as mobile from './src/host/mobile.js'
 
 import * as feed from './src/host/feed.js'
@@ -60,17 +64,14 @@ import * as localAgents from './src/host/local-agents/index.js'
 
 export { COLORS } from './src/host/constants.js'
 
-export const name = 'ds-bot'
-export const inject = ['llm', 'tools', 'systemPrompt', 'sessionController', 'sessions', 'sessionTitle', 'workspaceRegistry', 'connection']
+export { name, inject } from './src/host/entry.js'
 
 // Each module's install(rt) registers its listeners, tools, and effects, and puts on `rt`
 // the functions other modules call; they call them through `rt` at run time, never during
 // install. Listeners run and tools are listed in registration order, so this order holds:
 // usage meters model requests after every listener that rewrites them. privacy checks a
-// call before tool hooks, so a refused call never reaches a card they show.
-const MODULES = [diagnostics, store, ledger, models, providers, permissions, turns, steer, handoffs, requests, delivery, roster, folders, privacy, agents, prompt, timeContext, tools, chatIndex, groups, groupLibrary, goals, approvals, resume, memory, rabiAutomation, rabiPersonas, rabiSetup, parts, images, avatarLibrary, secrets, connectors, capabilities, learning, schedules, browser, browserPlugins, computer, usage, update, dshUpdate, thinking, mobile, feed, phone, im, rabiComputers, channel, officeSkills, goalSkills, localAgents]
-
-
+// call before the hooks of tools do, so a closed call never reaches a card they show.
+const MODULES = [diagnostics, store, ledger, models, providers, permissions, turns, steer, handoffs, requests, delivery, roster, folders, privacy, agents, prompt, timeContext, tools, chatIndex, groups, groupLibrary, goals, agentCommands, tasks, approvals, resume, memory, rabiAutomation, rabiPersonas, rabiSetup, parts, changes, images, avatarLibrary, secrets, connectors, capabilities, learning, schedules, browser, browserPlugins, computer, usage, update, dshUpdate, thinking, mobile, feed, phone, im, rabiComputers, channel, remote, officeSkills, goalSkills, localAgents]
 
 export function apply(ctx, config = {}) {
   createRuntime(ctx, config)

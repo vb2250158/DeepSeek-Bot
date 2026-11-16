@@ -27,7 +27,7 @@ The Bot team:
 
 ## Commands
 
-Use the current Windows source Web target in [docs/dev/testing.md](docs/dev/testing.md): Node `24.15.0`, npm `11.12.1`, pnpm `11.28.5`, Core `ea8ade16105b74cca1380caddf852061f558f0f0` / `0.2.2-rc.2`. Set `DSH_HARNESS` to that independent Core source checkout. Prepare only the existing native Host, Host/Client library and Web build steps listed there; do not install older npm Core versions for compatibility or build SDK executables and desktop/mobile packages.
+Use the current Windows source Web target in [docs/dev/testing.md](docs/dev/testing.md): Node `24.15.0`, npm `11.12.1`, pnpm `11.28.5`, Core `f8d94a2c5b83e0c715218073a3a6d0465f170e2c` / `0.2.2-rc.3`. Set `DSH_HARNESS` to that independent Core source checkout. Prepare only the existing native Host, Host/Client library and Web build steps listed there; do not install older npm Core versions for compatibility or build SDK executables and desktop/mobile packages.
 
 In `ds-bot/`:
 

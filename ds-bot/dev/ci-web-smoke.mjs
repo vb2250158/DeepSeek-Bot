@@ -26,7 +26,11 @@ if (process.argv[2] === '--host') {
     process.disconnect?.()
   })
   const app = await running
-  process.send({ url: app.ctx.get('connection').authenticatedUrl(`http://127.0.0.1:${app.ctx.get('webServer').port}`) })
+  const entries = []
+  app.ctx.emit('webserver/entry-url', `http://127.0.0.1:${app.ctx.get('webServer').port}`, entries)
+  const entry = entries.find(value => value.label === 'dsh web')
+  assert.ok(entry, 'The authentication provider must contribute the Web entry URL')
+  process.send({ url: entry.url })
 } else {
   const home = await mkdtemp(join(tmpdir(), 'dsbot-ci-web-'))
   const profile = join(home, 'profiles/web')

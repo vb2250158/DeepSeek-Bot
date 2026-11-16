@@ -251,7 +251,8 @@ export function startSnapshot(state, now) {
     lang: state.lang,
     start: state.start,
     motion: state.motion,
-    // Windows draws the caption buttons over the page's band; macOS and Linux a system title bar.
+    effects: state.effects ?? 'full',
+    // Windows and macOS draw their window controls over the page's band; Linux a system title bar.
     frame: state.frame,
     view: state.view,
     phases: [...phasesOf(state)],
@@ -726,7 +727,7 @@ export class StartWindow {
     const now = Date.now()
     this.#phaseAt = now
     this.#state = {
-      lang: this.#o.lang(), start, motion: this.#o.motion, frame: process.platform === 'win32' ? 'band' : 'system',
+      lang: this.#o.lang(), start, motion: this.#o.motion, effects: this.#o.effects ?? 'full', frame: framelessOn(process.platform) ? 'band' : 'system',
       view: start === 'moving' ? 'moving' : 'boot',
       done: [], explain: this.#explain, celebrate: start === 'first', shown: false,
       clock: { base: 0, from: now, running: true },
@@ -943,18 +944,20 @@ export class StartWindow {
     const began = Date.now()
     const step = () => {
       if (!this.#open() || main.isDestroyed()) return
-      const time = Math.min(1, (Date.now() - began) / CROSSFADE.duration)
+      const time = this.#o.effects === 'off' ? 1 : Math.min(1, (Date.now() - began) / CROSSFADE.duration)
       const eased = time * time * (3 - 2 * time)
       main.setOpacity(eased)
       win.setOpacity(1 - eased)
       if (time < 1) { this.#later('fade', CROSSFADE.step, step); return }
-      if (how === 'focused') main.focus()
-      else {
+      this.#destroy()
+      if (how === 'focused') {
+        main.focus()
+        main.webContents?.focus?.()
+      } else {
         main.flashFrame(true)
         main.once('focus', () => { main.flashFrame(false) })
       }
       note(`team window shown (${how}) at ready + ${String(Date.now() - this.#readyAt)} ms`)
-      this.#destroy()
     }
     step()
   }

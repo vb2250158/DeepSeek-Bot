@@ -4,9 +4,11 @@
 
 [English](README.md) | 中文
 
-![版本](https://img.shields.io/badge/版本-v0.3.6--rabi.1-blue) ![DSH](https://img.shields.io/badge/DSH-0.2.2--rc.2-4D6BFE) ![许可](https://img.shields.io/badge/许可-Apache_2.0-green)
+![版本](https://img.shields.io/badge/版本-v0.3.8--rabi.1-blue) ![DSH](https://img.shields.io/badge/DSH-0.2.2--rc.3-4D6BFE) ![许可](https://img.shields.io/badge/许可-Apache_2.0-green)
 
-本 fork 已合并上游 0.3.6（0.3.6-rabi.1），保留公开 Bot 平等管理、Rabi 助手预设和延迟加载。私密 Bot 通过原生 Bot 工具向团队发布内容前需要批准；删除后，其文件夹、记忆和聊天仍受保护，可在设置中解除。Rabi 绑定 Bot 的记忆和学习技能继续由 Rabi 管理，项目 AGENTS.md 提案仍可使用。Office 目录输入拒绝内部链接，PNG 读取限制内存并拒绝截断图像。
+本 fork 已合并上游 0.3.8（0.3.8-rabi.1），保留公开 Bot 平等管理、Rabi 助手预设和延迟加载。私密 Bot 通过原生 Bot 工具向团队发布内容前需要批准；删除后，其文件夹、记忆和聊天仍受保护，可在设置中解除。Rabi 绑定 Bot 的记忆和学习技能继续由 Rabi 管理，项目 AGENTS.md 提案仍可使用。Office 目录输入拒绝内部链接，PNG 读取限制内存并拒绝截断图像。
+
+本源码 Web 候选合入上游并行会话分段、群任务与搜索、界面动效设置及连接器投递修复，保留原生 DSH 工作区与会话导航、独立置顶、团队平等管理、Rabi 助手消息和 Agent 模式设置样式生命周期。受测 Core 为 `f8d94a2c5b83e0c715218073a3a6d0465f170e2c` / `0.2.2-rc.3`，正式采用和改动页面验收由环境维护任务记录。
 
 Bot 双方与群聊历史保存到团队 `ledger/` 目录中的追加式文件，首次读取时导入已有团队历史。卸载群聊模块会等待其所属轮次及最终账本写入完成。旧群聊的 `group-lines/` 全文文件和 `group-logs/` 旧日志均不可用时，导入保留前缀及其声明长度，读取时说明剩余正文缺失。既有旧数据文件继续保留，供恢复使用。迁移或恢复快照时须连同团队保留这些文件，并使用支持本版账本的读取器。
 
@@ -54,7 +56,7 @@ Still stuck? [Report an install problem](https://github.com/Fei2411/DS-Bot/issue
 
 0.3.2-rabi.1 新增侧栏分组、统一 Bot 与 Harness 设置、明确的 Bot 运行方式、本地 Agent 协议修正、IM 连接恢复，以及记忆条目编号、置顶、容量、召回、移动和可撤销整理。现有团队数据增加可选分组和已关闭视图记录；已保存的本地 CLI 路由迁移到 `local-` 前缀，保留原生 OpenCode 服务商路由。记忆元数据在原文件中扩展，原群聊日志继续可读。Rabi 绑定人格的记忆和技能仍由 Rabi 独占管理，保留 Bot 工作台、独立置顶、回复头像和最后回复时间。
 
-本维护 fork 的单一受测目标为 Windows x64、Node.js `24.15.0`、npm `11.12.1`、pnpm `11.28.5`，使用公开 Core 源码 `vb2250158/deepseek-harness@ea8ade16105b74cca1380caddf852061f558f0f0`（`0.2.2-rc.2`）运行 Web。CI runner 为 `windows-2025`。不运行旧宿主或跨平台兼容矩阵。
+本维护 fork 的单一受测目标为 Windows x64、Node.js `24.15.0`、npm `11.12.1`、pnpm `11.28.5`，使用公开 Core 源码 `vb2250158/deepseek-harness@f8d94a2c5b83e0c715218073a3a6d0465f170e2c`（`0.2.2-rc.3`）运行 Web。CI runner 为 `windows-2025`。不运行旧宿主或跨平台兼容矩阵。
 
 Windows 本地 Agent 发现及 Codex、Claude、ACP 驱动会把 npm `.cmd` 启动器解析为 Node 入口，不经过 shell，也不弹出控制台窗口。含空格的路径和数组参数保持原样；取消和超时直接作用于 CLI 进程。任意 `.cmd`/`.bat` 脚本会以 `UNSUPPORTED_AGENT_WRAPPER` 明确拒绝，请选择可执行文件或 Node npm 入口。不会自动登录本地 Agent 账号。
 
@@ -165,8 +167,8 @@ Rabi 自动化提醒采用 DSH 原生 schedule 消息来源和公共提醒格式
 - **dsh Web**（需要 Node.js `22.19` 以上和 pnpm）：
 
 ```sh
-npx @deepseek-ai/dsh@0.2.2-rc.2 plugin --profile web add ds-bot
-npx @deepseek-ai/dsh@0.2.2-rc.2 web
+npx @deepseek-ai/dsh@0.2.2-rc.3 plugin --profile web add ds-bot
+npx @deepseek-ai/dsh@0.2.2-rc.3 web
 ```
 
 **Docker（NAS、Linux 服务器）**
@@ -217,9 +219,9 @@ ds bot 拥有群聊功能。群聊是非常好的多 bot 协作方式，但它�
 
 ### 本地 Agent
 
-你电脑上已经在用的编程 Agent CLI（Claude Code、Codex CLI、Cursor CLI、Devin CLI、OpenCode、Gemini CLI 等）可以直接接入当 bot 用。新建 bot 时选本地 Agent（或在 bot 设置里切换），它就会直接用 CLI 自己的登录、套餐和模型，同时照常参与私聊、群聊、派活和记忆。
+你电脑上已经在用的编程 Agent CLI（Claude Code、Codex CLI、Cursor CLI、GitHub Copilot、Devin CLI、OpenCode、Gemini CLI、Antigravity、Kimi CLI、Kilo CLI 等）可以直接接入当 bot 用。新建 bot 时选本地 Agent（或在 bot 设置里切换），它就会直接用 CLI 自己的登录、套餐和模型，同时照常参与私聊、群聊、派活和记忆。
 
-不过有几点限制：本地 Agent 走的是 CLI 自己的工具和上下文，ds bot 里的共享能力和连接器不会传给它，切换运行方式也会新开一段对话；不支持 HTTP MCP 的自定义 CLI 拿不到建 bot、派活等团队工具。另外，Cursor CLI 会把最后一次切换的模型存成它自己的全局默认（`~/.cursor`），如果你在 ds bot 里给某个 Cursor bot 选了具体模型，其他用默认模型的 Cursor bot 和你终端里的 Cursor 都会跟着变，不想改全局默认的话保持“CLI 默认”即可（需要先登录 Cursor 才能看到模型列表）。
+不过有几点限制：本地 Agent 走的是 CLI 自己的工具和上下文，ds bot 里的共享能力和连接器不会传给它，切换运行方式也会新开一段对话；只有完全拒绝接入 MCP 服务的 CLI 或自定义 CLI 才拿不到建 bot、派活等团队工具。另外，Cursor CLI 会把最后一次切换的模型存成它自己的全局默认（`~/.cursor`），如果你在 ds bot 里给某个 Cursor bot 选了具体模型，其他用默认模型的 Cursor bot 和你终端里的 Cursor 都会跟着变，不想改全局默认的话保持“CLI 默认”即可（需要先登录 Cursor 才能看到模型列表）。
 
 ### 浏览器
 

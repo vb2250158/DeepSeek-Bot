@@ -5,6 +5,7 @@
 import { join, resolve } from 'node:path'
 import { within } from './folders.js'
 import { unquote } from './text.js'
+import { openSessions } from './threads.js'
 
 const FILE_TOOLS = { read: 'file_path', write: 'file_path', edit: 'file_path', read_image: 'file_path', str_replace_editor: 'path' }
 const WRITE_TOOLS = ['write', 'edit', 'str_replace_editor']
@@ -32,7 +33,7 @@ export function install(rt) {
   // During deletion both records can exist: the live Bot protects its files while
   // the persisted archive record closes walks before its destination is known.
   const protectedBots = () => [...privateBots(), ...(state.privateArchives ?? [])]
-  const sessionsOf = bot => [...new Set([bot.id, ...(bot.sessionIds ?? [rt.chatOf(bot.id), ...(bot.segments ?? []).map(segment => segment.sessionId), ...rt.groupSessionsOf(bot.id)])])]
+  const sessionsOf = bot => [...new Set([bot.id, ...(bot.sessionIds ?? [rt.chatOf(bot.id), ...(bot.segments ?? []).map(segment => segment.sessionId), ...openSessions(bot), ...rt.groupSessionsOf(bot.id)])])]
   const dataRoots = () => [rt.dshHome, rt.home, process.env.DS_BOT_USER_DSH_HOME?.trim()].filter(Boolean)
 
   // A path as it is and as the file system resolves it, folded for comparing. realBeyond

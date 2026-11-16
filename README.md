@@ -4,9 +4,11 @@
 
 English | [中文](README.zh.md)
 
-![version](https://img.shields.io/badge/version-v0.3.6--rabi.1-blue) ![DSH](https://img.shields.io/badge/DSH-0.2.2--rc.2-4D6BFE) ![license](https://img.shields.io/badge/license-Apache_2.0-green)
+![version](https://img.shields.io/badge/version-v0.3.8--rabi.1-blue) ![DSH](https://img.shields.io/badge/DSH-0.2.2--rc.3-4D6BFE) ![license](https://img.shields.io/badge/license-Apache_2.0-green)
 
-This fork integrates upstream 0.3.6 (0.3.6-rabi.1) with shared management for public Bots, Rabi assistant presets and deferred client loading. Private Bots require approval before native Bot tools publish their content to the team. Deleted private Bots retain protected folders, memory and chats until you release them in Settings. Rabi-bound Bots keep memory and learned skills under Rabi ownership; project AGENTS.md proposals remain available. Office directory inputs reject internal links, and PNG decoding bounds allocation and rejects truncated image data.
+This fork integrates upstream 0.3.8 (0.3.8-rabi.1) with shared management for public Bots, Rabi assistant presets and deferred client loading. Private Bots require approval before native Bot tools publish their content to the team. Deleted private Bots retain protected folders, memory and chats until you release them in Settings. Rabi-bound Bots keep memory and learned skills under Rabi ownership; project AGENTS.md proposals remain available. Office directory inputs reject internal links, and PNG decoding bounds allocation and rejects truncated image data.
+
+This source Web candidate includes upstream parallel conversation parts, group tasks and search, interface-motion controls, and connector delivery fixes. It keeps the native DSH workspace and conversation navigation, independent pins, equal team management, Rabi assistant messages, and Agent-mode settings style ownership. The tested Core is `f8d94a2c5b83e0c715218073a3a6d0465f170e2c` / `0.2.2-rc.3`. Formal adoption and changed-page acceptance are tracked by the environment owner.
 
 Bot-pair and group history now persists in append-only files under the team's `ledger/` directory, importing existing team history on first use. Group shutdown waits for owned rounds and their final ledger writes. Legacy group prefixes retain their declared length when their `group-lines/` whole-text file and `group-logs/` entry are unavailable, and reads report the missing remainder. Existing legacy source files remain available for recovery. Keep these books with the team when migrating or restoring a snapshot, and use a reader that supports this release's ledger.
 
@@ -54,7 +56,7 @@ Release `0.3.2-rabi.22` confines Bot layout overrides to its own chat column so 
 
 Version 0.3.2-rabi.1 adds sidebar sections, one settings dialog for Bot and Harness pages, explicit Bot run modes, current local-agent protocol fixes, IM connection recovery, and memory entry IDs, pins, limits, recall, moves and reversible tidying. Existing team data gains optional sections and closed-view records; saved local CLI routes migrate to the `local-` prefix, preserving native OpenCode provider routes. Memory metadata is extended in place and group logs remain readable. Rabi-bound personas continue using Rabi memory and skills exclusively. The Bot workbench, independent pinned chats, reply avatars and last-reply times stay in place.
 
-This maintenance fork tests Windows x64, Node.js `24.15.0`, npm `11.12.1` and pnpm `11.28.5`, running Web from public Core source `vb2250158/deepseek-harness@ea8ade16105b74cca1380caddf852061f558f0f0` (`0.2.2-rc.2`). The CI runner is `windows-2025`. Earlier-host and cross-platform compatibility matrices are outside this target.
+This maintenance fork tests Windows x64, Node.js `24.15.0`, npm `11.12.1` and pnpm `11.28.5`, running Web from public Core source `vb2250158/deepseek-harness@f8d94a2c5b83e0c715218073a3a6d0465f170e2c` (`0.2.2-rc.3`). The CI runner is `windows-2025`. Earlier-host and cross-platform compatibility matrices are outside this target.
 
 Windows local-agent discovery and the Codex, Claude and ACP drivers resolve npm `.cmd` shims to their Node entry point and run without a shell or console window. Paths with spaces and array arguments are preserved; cancellation and timeouts target the CLI process itself. Arbitrary `.cmd`/`.bat` scripts are rejected with `UNSUPPORTED_AGENT_WRAPPER`: select the executable or a Node npm entry point instead. No local-agent account is signed in automatically.
 
@@ -166,8 +168,8 @@ First install DSH and set up at least one model in it. DS Bot uses the models fr
 - **DSH Web** (needs Node.js `22.19` or later, and pnpm):
 
 ```sh
-npx @deepseek-ai/dsh@0.2.2-rc.2 plugin --profile web add ds-bot
-npx @deepseek-ai/dsh@0.2.2-rc.2 web
+npx @deepseek-ai/dsh@0.2.2-rc.3 plugin --profile web add ds-bot
+npx @deepseek-ai/dsh@0.2.2-rc.3 web
 ```
 
 **Docker (NAS, Linux server)**
@@ -218,9 +220,9 @@ Note that a private bot cannot be a main bot or join group chats. This boundary 
 
 ### Local agents
 
-Coding-agent CLIs you already use on your computer (Claude Code, Codex CLI, Cursor CLI, Devin CLI, OpenCode, Gemini CLI and others) can be connected as bots directly. Pick Local agent when creating a bot (or switch in the bot's settings), and it will use the CLI's own sign-in, plan and models while working like any other bot in private chats, group chats, handoffs and memory.
+Coding-agent CLIs you already use on your computer (Claude Code, Codex CLI, Cursor CLI, GitHub Copilot, Devin CLI, OpenCode, Gemini CLI, Antigravity, Kimi CLI, Kilo CLI, and others) can be connected as bots directly. Pick Local agent when creating a bot (or switch in the bot's settings), and it will use the CLI's own sign-in, plan and models while working like any other bot in private chats, group chats, handoffs and memory.
 
-There are a few limits to keep in mind: a local agent uses the CLI's own tools and context, so shared capabilities and connectors in DS Bot are not passed to it, and switching how a bot runs starts a fresh conversation part; custom CLIs without HTTP MCP support do not get team tools such as creating bots or handing off work. Also, Cursor CLI saves the last selected model as its own global default (`~/.cursor`), so if you pick a specific model for a Cursor bot in DS Bot, other Cursor bots on the default model and Cursor in your terminal will switch to it too — keep "CLI default" if you don't want to change your global default (sign in to Cursor first so the model list loads).
+There are a few limits to keep in mind: a local agent uses the CLI's own tools and context, so shared capabilities and connectors in DS Bot are not passed to it, and switching how a bot runs starts a fresh conversation part; only CLIs or custom CLIs that reject MCP servers altogether run without team tools such as creating bots or handing off work. Also, Cursor CLI saves the last selected model as its own global default (`~/.cursor`), so if you pick a specific model for a Cursor bot in DS Bot, other Cursor bots on the default model and Cursor in your terminal will switch to it too — keep "CLI default" if you don't want to change your global default (sign in to Cursor first so the model list loads).
 
 ### Browser
 

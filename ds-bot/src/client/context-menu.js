@@ -1,4 +1,5 @@
 import { createElement as h, Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { isMuted, toggleMuted } from './notifications.js'
 import { inkFill } from './inks.js'
 import { currentPart } from './text.js'
 import { GearIcon, PinIcon, UnreadIcon, PencilIcon, CopyIcon, HideIcon, TrashIcon, DuplicateIcon, FolderIcon, PlusIcon, CheckIcon, PeopleIcon, SignOutIcon } from './icons.js'
@@ -58,6 +59,7 @@ export function ContextMenu({ menu, roster, actions, useWork, leaving = false })
     [
       [entry.pinned ? t('Unpin') : t('Pin'), PinIcon, () => actions.setFlags(menu.id, { pinned: !entry.pinned })],
       [t('Mark as Unread'), UnreadIcon, () => actions.markUnread(menu.id)],
+      [isMuted(entry.id) ? t('Unmute notifications') : t('Mute notifications'), UnreadIcon, () => toggleMuted(entry.id)],
     ],
     sectionMoveItems(entry, roster, actions),
     [
