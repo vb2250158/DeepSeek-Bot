@@ -1,17 +1,18 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { runInNewContext } from 'node:vm'
 import { build } from 'esbuild'
+import { bundleClientApp } from '../scripts/build-client.mjs'
 
 // jsdom comes from the harness that test/harness-resolve.mjs found.
 const PLUGIN = dirname(dirname(fileURLToPath(import.meta.url)))
 const { JSDOM } = createRequire(join(process.env.DSH_HARNESS ?? join(PLUGIN, '..', 'deepseek-harness'), 'package.json'))('jsdom')
 const dom = new JSDOM('<!doctype html><body></body>')
 const { document } = dom.window
+const bundle = await bundleClientApp()
 
 const { outputFiles } = await build({
   stdin: { contents: "export * from './src/client/reading.js'", resolveDir: PLUGIN },
@@ -113,7 +114,6 @@ test('a reply follows the scroll by the band it is read in, not by the whole scr
 })
 
 test('the pill is a glass surface that pops in with the tap spring and stays still with reduced motion', () => {
-  const bundle = readFileSync(new URL('../client.js', import.meta.url), 'utf8')
   // The whole line: the rule's spring interpolates, so a brace does not end it.
   const rule = bundle.match(/\n\.bt-reading\{(.*)\r?\n/)?.[1]
   assert.ok(rule, 'no .bt-reading rule')

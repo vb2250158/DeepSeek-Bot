@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
+import { readFileSync } from 'node:fs'
 import { RADII, checks, findStyles, lowered, readDebt } from '../scripts/style-debt.mjs'
 
 const found = findStyles()
@@ -27,6 +28,15 @@ function check(kind, advice) {
 
 test('colors come from the --bt-* variables', () => {
   check('colors', 'Use a --bt-* variable. A new color becomes a variable first, in themes.js or in the base sheet of styles.js.')
+})
+
+test('the sidebar keeps one maintained update surface and Agent motion sheet', () => {
+  const source = readFileSync(new URL('../src/client/sidebar.js', import.meta.url), 'utf8')
+  for (const selector of ['.bt-round.bt-update{', '.bt-agent-sub{']) {
+    assert.equal(source.split('\n').filter(line => line.startsWith(selector)).length, 1, selector)
+  }
+  assert.match(source, /\.bt-update-pop\{[^}]*background:var\(--bt-glass-bg\)/)
+  assert.match(source, /@keyframes bt-agent-row-in\{from\{opacity:0;filter:var\(--bt-fx-blur-4,blur\(4px\)\)\}/)
 })
 
 test('corner radii stay on the steps', () => {

@@ -278,8 +278,9 @@ test('BotMark gaze listeners and offsets respond dynamically to data-bt-effects 
   })
 
   client.BotMark({ bot: { id: 'b1' }, look: { shape: 'orb', color: '#4f7' }, gaze: true })
-  assert.equal(effects.length, 1)
-  const dispose = effects[0]()
+  const activeEffects = effects.map(effect => effect()).filter(dispose => typeof dispose === 'function')
+  assert.equal(activeEffects.length, 1, 'gaze is the sole active effect for a character mark without an avatar image')
+  const dispose = activeEffects[0]
 
   const move = (x, y) => {
     const ev = new window.Event('pointermove')

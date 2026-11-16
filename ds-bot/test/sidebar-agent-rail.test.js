@@ -46,7 +46,7 @@ function agentRow(wide) {
   const actions = Object.fromEntries(['openSession', 'openAgent', 'openAgentSession', 'newAgentSession', 'openMenu', 'toggleSidebar'].map(name => [name, () => {}]))
   // The column's own preference decides rail or open; the viewport stays at 1280.
   const tree = TeamSidebar({
-    actions, useSidebarPref: () => (wide ? 'open' : 'rail'),
+    actions, wide, expandSidebar: () => {},
     useRoster: pick => pick(roster), useUi: pick => pick({ unread: {} }), useRegistry: pick => pick({}),
     useSessions: pick => pick({ ids: [], byId: {} }), useUpdate: () => ({}),
     useSessionStatus: pick => pick(new Map()),

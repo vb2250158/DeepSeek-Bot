@@ -1,12 +1,11 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { bundleClientApp } from '../scripts/build-client.mjs'
 import { test } from 'node:test'
 import { ACCENT_INKS, INKS, luminance } from '../src/client/inks.js'
 import { allThemes, shellTokens, themeCss } from '../src/client/themes.js'
 
-// The browser bundle holds every style sheet ds-bot installs; the bundle test
-// keeps it in step with src/client.
-const bundle = readFileSync(new URL('../client-app.js', import.meta.url), 'utf8')
+// Use the shipped build function in memory while its owner prepares the artifacts.
+const bundle = await bundleClientApp()
 
 // CSS declaration blocks hold no braces, so a declaration's rule runs from the
 // nearest `{` before it to the nearest `}` after it.
@@ -186,9 +185,20 @@ test('a skin that repaints only the bubble background-color leaves the user surf
   const { body } = ruleFor('[class*="_userRow"] [class*="_bubble"]')
   assert.equal(declared(body, 'background-image'), 'linear-gradient(var(--bt-user),var(--bt-user))!important')
   for (const [id, theme] of Object.entries(allThemes())) {
+    if (theme.native) continue
     for (const dark of [false, true]) {
       const vars = themeVars(theme, dark)
       assert.equal(parse(vars['--bt-user']).alpha, 1, `${id} ${dark ? 'dark' : 'light'}: the user surface must be opaque`)
     }
   }
+})
+
+test('Follow DSH keeps the native user fill and foreground in both host modes', () => {
+  const theme = allThemes().harness
+  assert.equal(theme.native, true)
+  const css = themeCss(theme)
+  assert.match(css, /^html body,html body\[data-ds-dark-theme\]\{/)
+  assert.match(css, /--bt-user:var\(--dsw-alias-button-primary-fill\)/)
+  assert.match(css, /--bt-user-ink:var\(--dsw-alias-label-primary-foreground\)/)
+  assert.deepEqual(shellTokens(theme), {})
 })

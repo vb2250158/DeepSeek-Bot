@@ -2,6 +2,11 @@ import assert from 'node:assert/strict'
 import { readdirSync, readFileSync } from 'node:fs'
 import { test } from 'node:test'
 import { DICTIONARY, LANGUAGES, dateLocale, hostText, installLocale, language, t } from '../src/client/i18n.js'
+import { JA } from '../src/client/locales/ja.js'
+import { KO } from '../src/client/locales/ko.js'
+import { ES } from '../src/client/locales/es.js'
+import { FR } from '../src/client/locales/fr.js'
+import { DE } from '../src/client/locales/de.js'
 
 function fakeLocale(initial = 'zh') {
   let active = initial
@@ -75,6 +80,39 @@ test('every DICTIONARY.zh key exists in all other supported locales', () => {
     }
   }
   assert.deepEqual(missing, [])
+})
+
+test('locale supplements preserve every upstream translation', () => {
+  for (const [locale, upstream] of [['ja', JA], ['ko', KO], ['es', ES], ['fr', FR], ['de', DE]]) {
+    for (const [key, value] of Object.entries(upstream)) {
+      assert.equal(DICTIONARY[locale][key], value, `${locale}: ${key}`)
+    }
+  }
+})
+
+test('Rabi receipts and schedule windows follow all eight interface languages', () => {
+  const keys = [
+    'Rabi operation outcome is uncertain. Read back the original operation before retrying; it was not replayed.',
+    'Rabi rejected this request method before saving. Update the integration, then save again.',
+    'The group library folder must not contain links',
+    'Window start',
+    'Window end',
+  ]
+  const mock = fakeLocale('en')
+  const off = installLocale(mock)
+  try {
+    for (const key of keys) assert.equal(t(key), key)
+    for (const locale of ['zh', 'zh-TW', 'ja', 'ko', 'es', 'fr', 'de']) {
+      mock.setActive(locale)
+      for (const key of keys) {
+        assert.equal(t(key), DICTIONARY[locale][key], `${locale}: ${key}`)
+        assert.notEqual(t(key), key, `${locale}: ${key}`)
+      }
+      assert.match(t('The Rabi persona document exceeds rabiPersonaMaxBytes'), /rabiPersonaMaxBytes/)
+    }
+  } finally {
+    off()
+  }
 })
 
 test('copy follows the DSH language across all locales and stays English without a locale service', () => {

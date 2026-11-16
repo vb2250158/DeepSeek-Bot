@@ -381,7 +381,7 @@ export function DetailsDrawer({ sessionId, startRenaming, startTab, hasStrip, co
               key: `about:${bot.id}`, text: bot.instructions ?? '', label: t('Instructions'), placeholder: t('What this Bot is responsible for…'),
               onSave: instructions => run(actions.updateBot(bot.id, { instructions })),
             }),
-        roster.memory === false ? null : h(MemoryRow, { key: 'memory', owner: { id: bot.id, name: bot.name }, actions }),
+        roster.memory === false ? null : h(MemoryRow, { key: 'memory', owner: bot, actions }),
         usage ? h('div', { key: 'usage' }, h('div', { className: 'bt-section-title' }, t('Usage')),
           h('div', { className: 'bt-kv' }, h('span', null, bot.name), h('span', null, usage))) : null,
         h(ScheduleSummary, { key: 'routines', bot, actions }),

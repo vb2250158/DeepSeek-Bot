@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process'
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
-import { test } from 'node:test'
+import { after, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { planRepair, repair, stalePins } from '../bin/ds-bot-doctor.mjs'
 
@@ -15,6 +15,8 @@ import { planRepair, repair, stalePins } from '../bin/ds-bot-doctor.mjs'
 
 const DOCTOR = join(dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'ds-bot-doctor.mjs')
 const RUNNING = '0.2.2-rc.2'
+const homes = new Set()
+after(() => { for (const home of homes) rmSync(home, { recursive: true, force: true }) })
 function fakePnpm(home) {
   const file = join(home, 'fake-pnpm.mjs')
   writeFileSync(file, '#!/usr/bin/env node\nprocess.exit(0)\n')
@@ -27,6 +29,7 @@ function fakePnpm(home) {
 
 function homeWith(profiles) {
   const home = mkdtempSync(join(tmpdir(), 'ds-bot-doctor-'))
+  homes.add(home)
   for (const [name, manifest] of Object.entries(profiles)) {
     const dir = join(home, 'profiles', name)
     mkdirSync(dir, { recursive: true })
