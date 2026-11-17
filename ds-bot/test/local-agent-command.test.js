@@ -23,13 +23,15 @@ const closeChild = async child => {
   await closed
 }
 
-test('agent environments omit inherited credential variables while keeping explicit CLI settings', () => {
-  const keys = ['DSBOT_FIXTURE_API_KEY', 'DSBOT_FIXTURE_TOKEN', 'DSBOT_FIXTURE_SECRET', 'DSBOT_FIXTURE_PASSWORD', 'dsh_fixture_variable']
-  const before = keys.map(key => [key, process.env[key]])
+test('agent environments omit explicitly excluded variables while keeping CLI login and explicit settings', () => {
+  const keys = ['openai_api_key', 'anthropic_auth_token', 'dsh_fixture_variable', 'ds_bot_fixture_variable']
+  const kept = ['DSBOT_FIXTURE_API_KEY', 'DSBOT_FIXTURE_TOKEN', 'DSBOT_FIXTURE_SECRET', 'DSBOT_FIXTURE_PASSWORD']
+  const before = [...keys, ...kept].map(key => [key, process.env[key]])
   try {
-    for (const key of keys) process.env[key] = 'fake-env-value'
+    for (const key of [...keys, ...kept]) process.env[key] = 'fake-env-value'
     const env = cleanEnv({ EXPLICIT_CLI_TOKEN: 'fake-explicit-value' })
     for (const key of keys) assert.equal(Object.hasOwn(env, key), false, key)
+    for (const key of kept) assert.equal(env[key], 'fake-env-value', key)
     assert.equal(env.EXPLICIT_CLI_TOKEN, 'fake-explicit-value')
   } finally {
     for (const [key, value] of before) {
