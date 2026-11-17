@@ -6,6 +6,53 @@ import { dirname, join, resolve } from 'node:path'
 import { test } from 'node:test'
 import { cleanEnv } from '../src/host/local-agents/discover.js'
 
+test('agent subprocesses retain environment sign-in and unrelated names containing credential words', t => {
+  const values = {
+    AWS_ACCESS_KEY_ID: 'fake-aws-id',
+    AWS_SECRET_ACCESS_KEY: 'fake-aws-secret',
+    AWS_SESSION_TOKEN: 'fake-aws-session',
+    GH_TOKEN: 'fake-gh',
+    GITHUB_TOKEN: 'fake-github',
+    NPM_TOKEN: 'fake-npm',
+    CORPORATE_PROXY_TOKEN: 'fake-proxy',
+    KEYTIMEOUT: '50',
+    MONKEY_PATCH: 'fake-unrelated',
+    TOKENIZER_CACHE: 'fake-cache',
+  }
+  const before = new Map(Object.keys(values).map(key => [key, process.env[key]]))
+  t.after(() => {
+    for (const [key, value] of before) {
+      if (value === undefined) delete process.env[key]
+      else process.env[key] = value
+    }
+  })
+  Object.assign(process.env, values)
+  const env = cleanEnv()
+  for (const [key, value] of Object.entries(values)) assert.equal(env[key], value, key)
+  const script = `console.log(JSON.stringify(Object.fromEntries(${JSON.stringify(Object.keys(values))}.map(key => [key, process.env[key]]))))`
+  const child = spawnSync(process.execPath, ['-e', script], { env, encoding: 'utf8' })
+  assert.equal(child.status, 0, child.stderr)
+  assert.deepEqual(JSON.parse(child.stdout), values)
+})
+
+test('env sanitization matches the explicit denylist and host prefixes case-insensitively', () => {
+  const keys = ['openai_api_key', 'anthropic_auth_token', 'acp_backend', 'ds_bot_fixture_variable', 'dsh_fixture_variable', 'antigravity_fixture_variable', 'agy_fixture_variable', 'deepseek_fixture_variable']
+  const before = keys.map(key => [key, process.env[key]])
+  try {
+    for (const key of keys) process.env[key] = 'fake-env-value'
+    const env = cleanEnv({ OPENAI_API_KEY: 'fake-explicit-value', DSH_FIXTURE_VARIABLE: 'fake-explicit-host-value' })
+    for (const key of keys) assert.equal(Object.hasOwn(env, key), false, key)
+    // An engine's explicit environment is passed in, not inherited, so it stays.
+    assert.equal(env.OPENAI_API_KEY, 'fake-explicit-value')
+    assert.equal(env.DSH_FIXTURE_VARIABLE, 'fake-explicit-host-value')
+  } finally {
+    for (const [key, value] of before) {
+      if (value === undefined) delete process.env[key]
+      else process.env[key] = value
+    }
+  }
+})
+
 test('inherited Git command-line config is removed as one group while normal user config remains usable', t => {
   const root = mkdtempSync(join(tmpdir(), 'dsb-git-env-'))
   t.after(() => { assert.equal(dirname(root), resolve(tmpdir())); rmSync(root, { recursive: true, force: true }) })
