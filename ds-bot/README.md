@@ -46,7 +46,7 @@ Browser writes whose requests fail before the click settles still report an unkn
 
 Group chats expose Details, Library and Members. Add members directly in Members. Library stores UTF-8 text files per stable group ID under <Bot home>/groups/<group ID>/library. Configure groupLibraryPath (an absolute parent directory), groupLibraryMaxBytes (default 1048576, range 1–8388608) and groupLibraryPageSize (default 50, range 1–200) on the bot plugin. Existing groups create their folder on first library visit; new groups create it at creation. Read-only Hosts never create folders. Only regular text files are listed or read; paths, device names and links are rejected. Uploads and new documents refuse duplicate names. Group deletion retains documents. Team Bots can list and read a group library with read_group_library; file content is reference data and tool reads enter the normal Session log.
 
-The lower-left **Bot settings** button opens the Bot settings. The right panel centers the avatar, name and role above Details and Library. Details starts with the full-width shared single-line model selector, followed by schedules.
+In DSH, the main menu and settings shortcut open DSH settings. The **Bot settings** button inside the DS Bot workbench opens the team’s settings. The right panel centers the avatar, name and role above Details and Library. Details starts with the full-width shared single-line model selector, followed by schedules.
 
 The DS Bot plugin for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (dsh). It turns dsh into a team of long-lived Bots that talk to you, to each other and in group chats. See the [project page](../README.md) for an overview, install steps and screenshots.
 

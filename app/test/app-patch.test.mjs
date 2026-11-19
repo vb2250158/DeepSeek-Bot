@@ -22,7 +22,7 @@ describe('writeAppPatch', () => {
   before(() => { home = mkdtempSync(join(tmpdir(), 'ds-bot-app-patch-')) })
   after(() => { rmSync(home, { recursive: true, force: true }) })
 
-  test('writes one row that turns off the automatic credential step, next to the profiles', () => {
+  test('writes the app-only settings shell and credential choices next to the profiles', () => {
     const dir = join(home, 'profiles', 'ds-bot')
     mkdirSync(dir, { recursive: true })
     const [file, ...more] = writeAppPatch({ dir, patchPath: join(dir, 'cordis.patch.yml') })
@@ -30,18 +30,19 @@ describe('writeAppPatch', () => {
     // Outside the profile directory itself, so DSH only reads it through patchFiles.
     assert.equal(file, join(home, 'profiles', APP_PATCH_NAME))
     assert.deepEqual(parse(readFileSync(file, 'utf8')), [
+      { id: 'ui-settings-general', disabled: true },
       { id: 'ui-settings-models', name: '@deepseek-ai/dsh-client-ui-settings-models', config: { credentialOnboarding: false } },
     ])
   })
 
-  test('writes the file again on every launch and never carries a Settings page row', () => {
+  test('writes the file again without overriding General form values', () => {
     const dir = join(home, 'profiles', 'ds-bot')
     const file = join(home, 'profiles', APP_PATCH_NAME)
     writeFileSync(file, '- id: ui-settings-general\n  config:\n    welcomeNoticeVersion: x\n')
     writeAppPatch({ dir })
     const written = parse(readFileSync(file, 'utf8'))
     assert.deepEqual(written, APP_PATCH_ROWS)
-    assert.equal(written.some(row => row.id === 'ui-settings-general'), false)
+    assert.deepEqual(written.find(row => row.id === 'ui-settings-general'), { id: 'ui-settings-general', disabled: true })
   })
 })
 
@@ -58,7 +59,7 @@ describe('the overlay on the pinned DSH', () => {
   // A row DSH renamed would only log a warning, and a config key DSH added would be wiped.
   test('targets a row the app profile mounts, whose whole config it restates', () => {
     const entries = rows(composeEntries([...profile.layers.map(layer => layer.patches), profile.patches]))
-    const [patched] = APP_PATCH_ROWS
+    const patched = APP_PATCH_ROWS.find(row => row.id === 'ui-settings-models')
     const row = entries.find(entry => entry.id === patched.id)
     assert.ok(row, `${patched.id} is in the app profile`)
     assert.equal(row.name, patched.name)
@@ -70,7 +71,9 @@ describe('the overlay on the pinned DSH', () => {
     const [file] = writeAppPatch(profile)
     assert.equal(dirname(file), dirname(profile.dir))
     const layers = [...profile.layers.map(layer => layer.patches), profile.patches, parse(readFileSync(file, 'utf8'))]
-    const row = rows(composeEntries(layers)).find(entry => entry.id === 'ui-settings-models')
+    const entries = rows(composeEntries(layers))
+    assert.equal(entries.find(entry => entry.id === 'ui-settings-general')?.disabled, true)
+    const row = entries.find(entry => entry.id === 'ui-settings-models')
     assert.deepEqual(row.config, { credentialOnboarding: false })
   })
 })

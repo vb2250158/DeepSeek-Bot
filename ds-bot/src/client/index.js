@@ -857,11 +857,16 @@ export function apply(ctx) {
   const settingsShellHeld = createSource(false)
   let settingsShell
   const face = (sessionId) => ({ actions, hooks: { ...(sessionId ? { assistantChat: ctx.sessions.binding(sessionId)?.session.projections.faceOf(ASSISTANT_CHAT_KEY) } : {}), roster, ui, activity, work, memoryNews, registry, turnClock, live, computer, cards, heldCards, browserPages, browserTabs, browserHolds, surface, update, settingsShellHeld } })
-  ctx.effect(() => {
-    const offStyles = installCompiledStyles(SETTINGS_SHELL_CSS, 'settings-shell')
-    settingsShell = installSettingsShell(ctx, { face, actions, ui, held: settingsShellHeld })
-    return () => { settingsShell.dispose(); settingsShell = undefined; offStyles() }
-  }, 'ds-bot: settings shell')
+  if (globalThis.dsBotApp) {
+    ctx.effect(() => {
+      const offStyles = installCompiledStyles(SETTINGS_SHELL_CSS, 'settings-shell')
+      settingsShell = installSettingsShell(ctx, { face, actions, ui, held: settingsShellHeld })
+      return () => { settingsShell.dispose(); settingsShell = undefined; offStyles() }
+    }, 'ds-bot: settings shell')
+    actions.openHarnessSettings = () => actions.openSettings('general')
+    actions.openHarnessModels = () => actions.openSettings('models', 'advanced')
+    actions.openHarnessOnboarding = id => settingsShell?.openOnboarding(id)
+  }
   let settingsCss
   actions.holdSettingsLook = () => {
     if (surface.getSnapshot().mode === 'bot') return undefined
@@ -870,9 +875,6 @@ export function apply(ctx) {
     return () => style.remove()
   }
   actions.surfaceMode = () => surface.getSnapshot().mode
-  actions.openHarnessSettings = () => actions.openSettings('general')
-  actions.openHarnessModels = () => actions.openSettings('models', 'advanced')
-  actions.openHarnessOnboarding = id => settingsShell?.openOnboarding(id)
   // The queue dock's per-session verbs, supplied the way the shell's own dock
   // injects them (the session facade and the conversation service).
   const queueFace = (sessionId) => ({

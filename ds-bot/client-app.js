@@ -43564,15 +43564,20 @@ function apply(ctx) {
   const settingsShellHeld = createSource(false);
   let settingsShell;
   const face = (sessionId) => ({ actions, hooks: { ...sessionId ? { assistantChat: ctx.sessions.binding(sessionId)?.session.projections.faceOf(ASSISTANT_CHAT_KEY) } : {}, roster, ui: ui2, activity, work, memoryNews, registry, turnClock, live, computer, cards, heldCards, browserPages, browserTabs, browserHolds, surface, update, settingsShellHeld } });
-  ctx.effect(() => {
-    const offStyles = installCompiledStyles(SETTINGS_SHELL_CSS, "settings-shell");
-    settingsShell = installSettingsShell(ctx, { face, actions, ui: ui2, held: settingsShellHeld });
-    return () => {
-      settingsShell.dispose();
-      settingsShell = void 0;
-      offStyles();
-    };
-  }, "ds-bot: settings shell");
+  if (globalThis.dsBotApp) {
+    ctx.effect(() => {
+      const offStyles = installCompiledStyles(SETTINGS_SHELL_CSS, "settings-shell");
+      settingsShell = installSettingsShell(ctx, { face, actions, ui: ui2, held: settingsShellHeld });
+      return () => {
+        settingsShell.dispose();
+        settingsShell = void 0;
+        offStyles();
+      };
+    }, "ds-bot: settings shell");
+    actions.openHarnessSettings = () => actions.openSettings("general");
+    actions.openHarnessModels = () => actions.openSettings("models", "advanced");
+    actions.openHarnessOnboarding = (id) => settingsShell?.openOnboarding(id);
+  }
   let settingsCss;
   actions.holdSettingsLook = () => {
     if (surface.getSnapshot().mode === "bot") return void 0;
@@ -43581,9 +43586,6 @@ function apply(ctx) {
     return () => style.remove();
   };
   actions.surfaceMode = () => surface.getSnapshot().mode;
-  actions.openHarnessSettings = () => actions.openSettings("general");
-  actions.openHarnessModels = () => actions.openSettings("models", "advanced");
-  actions.openHarnessOnboarding = (id) => settingsShell?.openOnboarding(id);
   const queueFace = (sessionId) => ({
     ...face(),
     updateQueue: async (itemId, action) => await ctx.sessions.binding(sessionId)?.session?.updateQueue(itemId, action) ?? { ok: false },

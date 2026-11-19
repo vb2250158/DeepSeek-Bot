@@ -6,14 +6,15 @@
 //
 // A patch replaces the targeted row's whole `config`, so this row is restated from the
 // pinned DSH whenever it changes. Overlays outrank the profile, and DSH refuses a settings
-// form write that an overlay overrides: the overlay holds no row the Settings page writes
-// (never `ui-settings-general`).
+// form write that an overlay overrides. This overlay selects which shell owns settings
+// in the standalone app and does not set values for the disabled DSH General form.
 import { dirname, join } from 'node:path'
 import { writeFileSync } from 'node:fs'
 import { stringify } from 'yaml'
 
 export const APP_PATCH_NAME = 'app-onboarding.patch.yml'
 export const APP_PATCH_ROWS = [
+  { id: 'ui-settings-general', disabled: true },
   { id: 'ui-settings-models', name: '@deepseek-ai/dsh-client-ui-settings-models', config: { credentialOnboarding: false } },
 ]
 

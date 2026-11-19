@@ -85,11 +85,11 @@ test('the seat declares every child slot DSH\'s own settings shell declares, ali
   assert.deepEqual(Object.keys(ours).filter(name => !(name in dsh) && !NEWER_SLOTS.has(name)), [])
 })
 
-test('the bundle patch turns off the DSH settings shell row that dsh-web-app mounts', () => {
+test('the embedded bundle leaves the DSH settings shell enabled', () => {
   const rows = JSON.stringify(parse(readFileSync(packageFile('@deepseek-ai/dsh-web-app', 'cordis.patch.yml'), 'utf8')))
   assert.match(rows, /"id":"ui-settings-general","name":"@deepseek-ai\/dsh-client-ui-settings-general"/)
   const ours = parse(readFileSync(`${plugin}/cordis.patch.yml`, 'utf8'))
-  assert.ok(ours.some(row => row.id === 'ui-settings-general' && row.disabled === true))
+  assert.equal(ours.some(row => row.id === 'ui-settings-general'), false)
 })
 
 test('onboarding skips DSH\'s preview notice and keeps the ledger order', () => {
