@@ -48513,19 +48513,21 @@ function apply(ctx) {
   const face = (sessionId) => ({ actions, hooks: { ...sessionId ? { assistantChat: ctx.sessions.binding(sessionId)?.session.projections.faceOf(ASSISTANT_CHAT_KEY) } : {}, roster, ui: ui2, activity, work, memoryNews, registry, turnClock, live, computer, cards, heldCards, browserPages, browserTabs, browserHolds, surface, update, settingsShellHeld } });
   const hostDrawsUserText = typeof ctx.uiConversation.userText?.register === "function";
   ctx.effect(() => installCommandActions(ctx, { roster, actions }), "ds-bot: bot command actions");
-  ctx.effect(() => {
-    const offStyles = installCompiledStyles(SETTINGS_SHELL_CSS, "settings-shell");
-    settingsShell = installSettingsShell(ctx, { face, actions, ui: ui2, held: settingsShellHeld });
-    return () => {
-      settingsShell.dispose();
-      settingsShell = void 0;
-      offStyles();
-    };
-  }, "ds-bot: settings shell");
+  if (globalThis.dsBotApp) {
+    ctx.effect(() => {
+      const offStyles = installCompiledStyles(SETTINGS_SHELL_CSS, "settings-shell");
+      settingsShell = installSettingsShell(ctx, { face, actions, ui: ui2, held: settingsShellHeld });
+      return () => {
+        settingsShell.dispose();
+        settingsShell = void 0;
+        offStyles();
+      };
+    }, "ds-bot: settings shell");
+    actions.openHarnessSettings = () => actions.openSettings("general");
+    actions.openHarnessModels = () => actions.openSettings("models", "advanced");
+    actions.openHarnessOnboarding = (id) => settingsShell?.openOnboarding(id);
+  }
   actions.surfaceMode = () => surface.getSnapshot().mode;
-  actions.openHarnessSettings = () => actions.openSettings("general");
-  actions.openHarnessModels = () => actions.openSettings("models", "advanced");
-  actions.openHarnessOnboarding = (id) => settingsShell?.openOnboarding(id);
   const queueFace = (sessionId) => ({
     ...face(),
     updateQueue: async (itemId, action) => await ctx.sessions.binding(sessionId)?.session?.updateQueue(itemId, action) ?? { ok: false },

@@ -926,15 +926,17 @@ export function apply(ctx) {
   ctx.effect(() => installCommandActions(ctx, { roster, actions }), 'ds-bot: bot command actions')
   // DS Bot holds the settings seat in every mode, Agent mode included: the bundle patch
   // turns DSH's own shell off, and this one draws DSH's settings pages in DS Bot's dialog.
-  ctx.effect(() => {
-    const offStyles = installCompiledStyles(SETTINGS_SHELL_CSS, 'settings-shell')
-    settingsShell = installSettingsShell(ctx, { face, actions, ui, held: settingsShellHeld })
-    return () => { settingsShell.dispose(); settingsShell = undefined; offStyles() }
-  }, 'ds-bot: settings shell')
+  if (globalThis.dsBotApp) {
+    ctx.effect(() => {
+      const offStyles = installCompiledStyles(SETTINGS_SHELL_CSS, 'settings-shell')
+      settingsShell = installSettingsShell(ctx, { face, actions, ui, held: settingsShellHeld })
+      return () => { settingsShell.dispose(); settingsShell = undefined; offStyles() }
+    }, 'ds-bot: settings shell')
+    actions.openHarnessSettings = () => actions.openSettings('general')
+    actions.openHarnessModels = () => actions.openSettings('models', 'advanced')
+    actions.openHarnessOnboarding = id => settingsShell?.openOnboarding(id)
+  }
   actions.surfaceMode = () => surface.getSnapshot().mode
-  actions.openHarnessSettings = () => actions.openSettings('general')
-  actions.openHarnessModels = () => actions.openSettings('models', 'advanced')
-  actions.openHarnessOnboarding = id => settingsShell?.openOnboarding(id)
   // The queue dock's per-session verbs, supplied the way the shell's own dock
   // injects them (the session facade and the conversation service).
   const queueFace = (sessionId) => ({

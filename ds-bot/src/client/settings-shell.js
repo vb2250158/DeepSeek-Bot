@@ -1,5 +1,5 @@
-// The settings shell: DS Bot holds `sidebar.settings`, the seat DSH's ui-settings-general
-// fills elsewhere (the bundle patch turns that row off). Holding the seat means declaring
+// In the standalone app, its profile overlay turns off DSH's settings shell and DS Bot
+// holds `sidebar.settings`. Holding the seat means declaring
 // its child slots, and only the declaring entry may render them, so DSH's own settings
 // pages (`settings.section`), their nav icons, header actions, onboarding steps and General
 // rows all draw inside DS Bot's settings dialog. This module also takes over what that

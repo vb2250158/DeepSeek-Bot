@@ -101,7 +101,7 @@ Bot name labels are work titles, assigned from actual responsibilities through t
 
 Bot chat failures are shown for the current page visit. Refreshing clears historical error rows and their retry buttons from the chat view, while retaining messages and diagnostic records. New failures remain visible.
 
-The lower-left **Bot settings** button opens the Bot settings.
+In DSH Web, the main **Settings** menu and global shortcut open DSH settings. Inside the DS Bot workbench, **Bot settings** opens the team settings.
 
 **Settings → Rabi** opens Connection first, then Computers after connecting. A discovered but stopped Rabi shows **Start Rabi**; after it starts, retry the connection. If the installation cannot be found, open the Rabi GitHub repository or ask the existing Bot to install and configure it. That request asks your installation directory, personas and preferences before making installation changes. Local discovery and startup require `dsh-rabiroute-agent` 0.13.37 or newer.
 
