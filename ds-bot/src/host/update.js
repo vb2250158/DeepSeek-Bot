@@ -81,18 +81,20 @@ export async function registryPlan(config, manager) {
   return isPublic ? [...new Set([first, ...fallbacks])] : [first]
 }
 
-// The plugin manager's `source` for this package; DSH releases before it reported
-// one leave the profile's own dependency entry to say the same.
+// The active profile owns the dependency used for reinstall. Older hosts without
+// a profile location can still report the installed source through their manager.
 export async function installSpecOf(ctx) {
+  const dir = ctx.get?.('profileContext')?.dir
+  if (typeof dir === 'string') {
+    try {
+      const source = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')).dependencies?.[PKG.name]
+      return typeof source === 'string' ? source.replace(/^((?:git\+)?https?:\/\/)[^/]*@/i, '$1') : undefined
+    } catch { return undefined }
+  }
   const manager = ctx.get?.('pluginManager')
   const bundles = await Promise.resolve(manager?.listBundles?.()).catch(() => null)
   const own = Array.isArray(bundles) ? bundles.find(bundle => bundle.name === PKG.name) : undefined
-  if (typeof own?.source === 'string') return own.source
-  const dir = ctx.get?.('profileContext')?.dir
-  if (typeof dir !== 'string') return undefined
-  try {
-    return JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')).dependencies?.[PKG.name]
-  } catch { return undefined }
+  return typeof own?.source === 'string' ? own.source : undefined
 }
 
 // The public repository the releases live in, for tags and the "what's new" link.

@@ -1,6 +1,6 @@
 # ds-bot
 
-The Bot sidebar and About page start plugin update checks when they first display update status. Agent mode still follows the roster for navigation, unread activity and approvals.
+The Bot sidebar and About page start plugin update checks when they first display update status. Scheduled and manual checks read the DS Bot installation source from the active profile’s dependency entry. Agent mode still follows the roster for navigation, unread activity and approvals.
 
 The Bot surface loads projections for the team's current chats and rooms when it opens. Agent mode can load the roster without fetching the histories of unrelated team sessions.
 

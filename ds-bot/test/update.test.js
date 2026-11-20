@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, test } from 'node:test'
-import { cleanVersion, install, newer, sourceOf } from '../src/host/update.js'
+import { cleanVersion, install, installSpecOf, newer, sourceOf } from '../src/host/update.js'
 
 const PKG = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
 const flush = async () => { for (let index = 0; index < 14; index += 1) await Promise.resolve() }
@@ -11,6 +11,24 @@ const flush = async () => { for (let index = 0; index < 14; index += 1) await Pr
 const settle = async (rt) => { for (let index = 0; index < 200 && (await rt.updateCheck()).phase === 'installing'; index += 1) await Promise.resolve() }
 const realFetch = globalThis.fetch
 afterEach(() => { globalThis.fetch = realFetch })
+
+test('reading one profile dependency never inventories bundles and a fresh read follows changes to that dependency', async t => {
+  const dir = mkdtempSync(join(tmpdir(), 'ds-bot-source-'))
+  t.after(() => rmSync(dir, { recursive: true, force: true }))
+  let inventories = 0
+  const ctx = { get: name => name === 'profileContext' ? { dir } : { listBundles() { inventories++; return [] } } }
+  const write = deps => writeFileSync(join(dir, 'package.json'), JSON.stringify({ dependencies: deps }))
+  const sources = ['github:example/project#v1.2.3&path:/ds-bot', '^1.2.3', 'link:../my-plugin', 'file:./local.tgz', 'https://example.invalid/ds-bot.tgz']
+  for (const spec of sources) {
+    write({ 'ds-bot': spec })
+    assert.equal(await installSpecOf(ctx), spec)
+  }
+  write({ 'ds-bot': 'git+https://username:example@github.com/example/project.git#v1.2.3' })
+  assert.equal(await installSpecOf(ctx), 'git+https://github.com/example/project.git#v1.2.3')
+  write({})
+  assert.equal(await installSpecOf(ctx), undefined)
+  assert.equal(inventories, 0)
+})
 
 // The update module alone, on a stub plugin manager and a scripted fetch.
 function start({ source, registries, answers = {}, result = { application: 'restart-required' }, remove = { application: 'applied' }, enable = { application: 'applied', changed: true }, config = {}, profileDir, home }) {
