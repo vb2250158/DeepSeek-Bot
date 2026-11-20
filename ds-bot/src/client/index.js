@@ -194,6 +194,15 @@ export function apply(ctx) {
     ui.set(state => (JSON.stringify(state.unread) === JSON.stringify(unread) ? state : { ...state, unread }))
   }
   const refreshed = new Set()
+  const refreshTeamProjections = () => {
+    if (surface.getSnapshot().mode !== 'bot') return
+    const { bots, rooms } = roster.getSnapshot()
+    for (const id of [...bots.map(currentPart), ...rooms.map(room => room.sessionId ?? room.id)]) {
+      if (refreshed.has(id)) continue
+      refreshed.add(id)
+      void Promise.resolve(ctx.sessions.refreshProjections?.(id)).catch(quietly('refresh projections'))
+    }
+  }
   // Pulls can overlap (the poll and a navigation); an older answer never wins.
   let pulls = 0
   let applied = 0
@@ -256,11 +265,7 @@ export function apply(ctx) {
     for (const [agentId, sessionId] of pendingAgentSession) {
       if (listed[sessionId] !== undefined || roster.getSnapshot().agentOf[sessionId] !== agentId) pendingAgentSession.delete(agentId)
     }
-    for (const id of [...value.bots.map(currentPart), ...value.rooms.map(room => room.sessionId ?? room.id)]) {
-      if (refreshed.has(id)) continue
-      refreshed.add(id)
-      void Promise.resolve(ctx.sessions.refreshProjections?.(id)).catch(quietly('refresh projections'))
-    }
+    refreshTeamProjections()
     return true
   }
 
@@ -651,6 +656,7 @@ export function apply(ctx) {
       }
       writeMode(mode)
       surface.set(state => ({ ...state, mode }))
+      if (mode === 'bot') refreshTeamProjections()
     },
     markUnread: id => writeUnread(id, true),
     beginVisit: (id) => {

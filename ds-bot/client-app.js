@@ -47792,6 +47792,15 @@ function apply(ctx) {
     ui2.set((state) => JSON.stringify(state.unread) === JSON.stringify(unread) ? state : { ...state, unread });
   };
   const refreshed = /* @__PURE__ */ new Set();
+  const refreshTeamProjections = () => {
+    if (surface.getSnapshot().mode !== "bot") return;
+    const { bots, rooms } = roster.getSnapshot();
+    for (const id of [...bots.map(currentPart), ...rooms.map((room2) => room2.sessionId ?? room2.id)]) {
+      if (refreshed.has(id)) continue;
+      refreshed.add(id);
+      void Promise.resolve(ctx.sessions.refreshProjections?.(id)).catch(quietly("refresh projections"));
+    }
+  };
   let pulls = 0;
   let applied = 0;
   const pull = async () => {
@@ -47858,11 +47867,7 @@ function apply(ctx) {
     for (const [agentId, sessionId] of pendingAgentSession) {
       if (listed[sessionId] !== void 0 || roster.getSnapshot().agentOf[sessionId] !== agentId) pendingAgentSession.delete(agentId);
     }
-    for (const id of [...value.bots.map(currentPart), ...value.rooms.map((room2) => room2.sessionId ?? room2.id)]) {
-      if (refreshed.has(id)) continue;
-      refreshed.add(id);
-      void Promise.resolve(ctx.sessions.refreshProjections?.(id)).catch(quietly("refresh projections"));
-    }
+    refreshTeamProjections();
     return true;
   };
   ctx.effect(() => {
@@ -48282,6 +48287,7 @@ function apply(ctx) {
       }
       writeMode(mode);
       surface.set((state) => ({ ...state, mode }));
+      if (mode === "bot") refreshTeamProjections();
     },
     markUnread: (id) => writeUnread(id, true),
     beginVisit: (id) => {

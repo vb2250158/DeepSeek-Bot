@@ -1,5 +1,7 @@
 # ds-bot
 
+The Bot surface loads projections for the team's current chats and rooms when it opens. Agent mode can load the roster without fetching the histories of unrelated team sessions.
+
 Fork 0.3.6-rabi.1 integrates upstream 0.3.6 and keeps Rabi assistant presets, persona-owned memory and skills, shared Bot management, pinned chats and the native DSH team workspace. Group goals and memory change history are available in that workspace, including later conversation parts; the Enter key preference applies to its composers. Scheduled tasks follow new conversation parts without losing task identity or delivery history on current DSH hosts. A failed move keeps the original input and recovery marker.
 
 Windows local-agent commands support executable paths and npm Node `.cmd` shims without a shell. The Codex, Claude and ACP drivers preserve argument arrays, hide subprocess windows, and keep cancellation attached to the CLI's real PID. Other batch launchers fail explicitly with `UNSUPPORTED_AGENT_WRAPPER`; choose the executable or Node entry point. Version probes use the sanitized environment and report unsupported launchers without crashing discovery.
