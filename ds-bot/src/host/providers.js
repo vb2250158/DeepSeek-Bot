@@ -133,7 +133,10 @@ export function install(rt) {
     if (found === undefined) throw invalid('This DSH cannot set up model providers')
     return found
   }
-  const sections = settings => new Map(settings.describe({ redactSecrets: true }).map(section => [section.ns, section]))
+  const sections = (settings, namespaces = [PI_AI]) => new Map(settings.describe({
+    redactSecrets: true,
+    namespaces: [...new Set(namespaces)],
+  }).map(section => [section.ns, section]))
   const profileOf = (entry, map, layer = 'value') => entry.settingsPath.reduce((value, key) => value?.[key], map.get(entry.settingsNs)?.[layer])
   const refOf = profile => (typeof profile?.apiKeyEnv === 'string' && profile.apiKeyEnv !== '' ? profile.apiKeyEnv : undefined)
   const entryOf = provider => ctx.llm.listConfigurableProviders().find(entry => entry.provider === provider)
@@ -191,14 +194,16 @@ export function install(rt) {
 
   // Per provider route, the credential its DSH settings name as its API key. A
   // provider with none authenticates some other way.
-  function keyRefs() {
+  function keyRefs(providers) {
     const found = seams()
     if (found === undefined) return new Map()
-    const map = sections(found.settings)
     const refs = new Map()
     const llm = serviceOf(ctx, 'llm')
     if (llm === undefined) return refs
-    for (const entry of llm.listConfigurableProviders()) {
+    const entries = llm.listConfigurableProviders().filter(entry => providers === undefined || providers.includes(entry.provider))
+    if (entries.length === 0) return refs
+    const map = sections(found.settings, entries.map(entry => entry.settingsNs))
+    for (const entry of entries) {
       const ref = refOf(profileOf(entry, map))
       if (ref !== undefined) refs.set(entry.provider, ref)
     }
@@ -208,7 +213,7 @@ export function install(rt) {
   async function missingKeys(providers) {
     await repairRoutes()
     let refs
-    try { refs = keyRefs() } catch { return new Set() }
+    try { refs = keyRefs(providers) } catch { return new Set() }
     const missing = new Set()
     await Promise.all(providers.filter(id => refs.has(id)).map(async (id) => {
       const info = await seams().credentials.describe(refs.get(id)).catch(() => undefined)
@@ -224,11 +229,12 @@ export function install(rt) {
     await repairRoutes()
     const found = seams()
     if (found === undefined) return { available: false }
-    const map = sections(found.settings)
     const catalog = await rt.catalog({ fresh: true })
+    const entries = ctx.llm.listConfigurableProviders()
+    const map = sections(found.settings, [PI_AI, ...entries.map(entry => entry.settingsNs)])
     const providers = []
     const addable = []
-    for (const entry of ctx.llm.listConfigurableProviders()) {
+    for (const entry of entries) {
       const profile = profileOf(entry, map)
       if (entry.settingsNs === PI_AI && profile === undefined) {
         if (entry.declared !== true) addable.push({ id: entry.provider, name: entry.displayName })
@@ -269,7 +275,7 @@ export function install(rt) {
   }
 
   async function writableRef(provider) {
-    const ref = keyRefs().get(provider)
+    const ref = keyRefs([provider]).get(provider)
     if (ref === undefined) throw invalid(`${provider} takes no API key here`)
     if ((await usable().credentials.describe(ref)).writable === false) throw invalid(`The API key for ${provider} is set outside DS Bot and cannot be changed here`)
     return ref

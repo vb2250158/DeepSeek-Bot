@@ -74,6 +74,26 @@ function dsh({ keys = {}, readOnly = [], user = {}, base = {}, catalog = { anthr
 const needing = async rt => (await rt.catalog({ fresh: true })).filter(entry => entry.needsKey).map(entry => entry.provider)
 const row = (view, id) => view.providers.find(provider => provider.id === id)
 
+test('startup repairs only pi-ai and checks the settings namespaces of the providers in use', async () => {
+  const { rt } = dsh()
+  const settings = rt.ctx.get('settings')
+  const describeAll = settings.describe
+  const reads = []
+  settings.describe = options => {
+    assert.equal(options.redactSecrets, true)
+    reads.push(options.namespaces)
+    return describeAll().filter(section => options.namespaces.includes(section.ns))
+  }
+  assert.deepEqual(await rt.missingKeys(['deepseek-official']), new Set(['deepseek-official']))
+  assert.deepEqual([...new Set(reads.flat())], ['llm-pi-ai', 'llm-deepseek'])
+  reads.length = 0
+  await rt.providersView()
+  assert.deepEqual([...new Set(reads.flat())], ['llm-pi-ai', 'llm-deepseek', 'llm-deepseek-account'])
+  reads.length = 0
+  assert.deepEqual(rt.keyRefs(['no-such-provider']), new Map())
+  assert.deepEqual(reads, [])
+})
+
 test('models of a provider whose API key is set nowhere need the key', async () => {
   const user = { providers: { moonshotai: { apiKeyEnv: 'MOONSHOTAI_API_KEY' }, bedrock: {} } }
   const catalog = { moonshotai: ['kimi-k3'], bedrock: ['nova'] }
