@@ -47914,6 +47914,16 @@ function apply(ctx) {
   const update = createSource({ available: false, phase: "idle" });
   let wakeUpdate = () => {
   };
+  let startUpdate = () => {
+  };
+  const updateView = {
+    getSnapshot: update.getSnapshot,
+    subscribe(listener) {
+      const off = update.subscribe(listener);
+      startUpdate();
+      return off;
+    }
+  };
   ctx.effect(() => {
     let stopped = false;
     let timer;
@@ -47926,7 +47936,11 @@ function apply(ctx) {
       timer = setTimeout(loop, value?.phase === "installing" || value?.dsh?.phase === "installing" ? 2e3 : 60 * 6e4);
     };
     wakeUpdate = loop;
-    void loop();
+    startUpdate = () => {
+      startUpdate = () => {
+      };
+      void loop();
+    };
     return () => {
       stopped = true;
       clearTimeout(timer);
@@ -48545,7 +48559,7 @@ function apply(ctx) {
   }
   const settingsShellHeld = createSource(false);
   let settingsShell;
-  const face = (sessionId) => ({ actions, hooks: { ...sessionId ? { assistantChat: ctx.sessions.binding(sessionId)?.session.projections.faceOf(ASSISTANT_CHAT_KEY) } : {}, roster, ui: ui2, activity, work, memoryNews, registry, turnClock, live, computer, cards, heldCards, browserPages, browserTabs, browserHolds, surface, update, settingsShellHeld } });
+  const face = (sessionId) => ({ actions, hooks: { ...sessionId ? { assistantChat: ctx.sessions.binding(sessionId)?.session.projections.faceOf(ASSISTANT_CHAT_KEY) } : {}, roster, ui: ui2, activity, work, memoryNews, registry, turnClock, live, computer, cards, heldCards, browserPages, browserTabs, browserHolds, surface, update: updateView, settingsShellHeld } });
   const hostDrawsUserText = typeof ctx.uiConversation.userText?.register === "function";
   ctx.effect(() => installCommandActions(ctx, { roster, actions }), "ds-bot: bot command actions");
   if (globalThis.dsBotApp) {

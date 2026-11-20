@@ -307,10 +307,19 @@ export function apply(ctx) {
     return () => { stopped = true; clearTimeout(timer); document.removeEventListener('visibilitychange', wake) }
   }, 'ds-bot: roster poll')
 
-  // Plugin updates: every window that opens asks the host once (the host keeps its
-  // answer for a while), again each hour, and every two seconds while installing.
+  // Only the Bot sidebar and About page render plugin update status. Start the
+  // hourly poll with their first subscription; keep following an install afterward.
   const update = createSource({ available: false, phase: 'idle' })
   let wakeUpdate = () => {}
+  let startUpdate = () => {}
+  const updateView = {
+    getSnapshot: update.getSnapshot,
+    subscribe(listener) {
+      const off = update.subscribe(listener)
+      startUpdate()
+      return off
+    },
+  }
   ctx.effect(() => {
     let stopped = false
     let timer
@@ -323,7 +332,10 @@ export function apply(ctx) {
       timer = setTimeout(loop, value?.phase === 'installing' || value?.dsh?.phase === 'installing' ? 2000 : 60 * 60_000)
     }
     wakeUpdate = loop
-    void loop()
+    startUpdate = () => {
+      startUpdate = () => {}
+      void loop()
+    }
     return () => { stopped = true; clearTimeout(timer); wakeUpdate = () => {} }
   }, 'ds-bot: update check')
 
@@ -923,7 +935,7 @@ export function apply(ctx) {
   }
   const settingsShellHeld = createSource(false)
   let settingsShell
-  const face = (sessionId) => ({ actions, hooks: { ...(sessionId ? { assistantChat: ctx.sessions.binding(sessionId)?.session.projections.faceOf(ASSISTANT_CHAT_KEY) } : {}), roster, ui, activity, work, memoryNews, registry, turnClock, live, computer, cards, heldCards, browserPages, browserTabs, browserHolds, surface, update, settingsShellHeld } })
+  const face = (sessionId) => ({ actions, hooks: { ...(sessionId ? { assistantChat: ctx.sessions.binding(sessionId)?.session.projections.faceOf(ASSISTANT_CHAT_KEY) } : {}), roster, ui, activity, work, memoryNews, registry, turnClock, live, computer, cards, heldCards, browserPages, browserTabs, browserHolds, surface, update: updateView, settingsShellHeld } })
   // Since DSH 0.2.1-alpha.3 user text is drawn by rules and a content factory, not the
   // primitives' text projection; the user's bubble draws with either (user-message.js).
   const hostDrawsUserText = typeof ctx.uiConversation.userText?.register === 'function'

@@ -1,5 +1,7 @@
 # ds-bot
 
+The Bot sidebar and About page start plugin update checks when they first display update status. Agent mode still follows the roster for navigation, unread activity and approvals.
+
 The Bot surface loads projections for the team's current chats and rooms when it opens. Agent mode can load the roster without fetching the histories of unrelated team sessions.
 
 Fork 0.3.6-rabi.1 integrates upstream 0.3.6 and keeps Rabi assistant presets, persona-owned memory and skills, shared Bot management, pinned chats and the native DSH team workspace. Group goals and memory change history are available in that workspace, including later conversation parts; the Enter key preference applies to its composers. Scheduled tasks follow new conversation parts without losing task identity or delivery history on current DSH hosts. A failed move keeps the original input and recovery marker.
