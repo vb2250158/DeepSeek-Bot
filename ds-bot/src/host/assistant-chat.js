@@ -47,7 +47,7 @@ export function installAssistantChat(rt) {
     if (preset !== undefined && preset !== 'rabi-assistant') return empty()
     // The public controller reads archived projections without activating an Agent.
     if (typeof ctx.sessionController?.projections === 'function') {
-      const value = await ctx.sessionController.projections({ sessionId }, signal ?? AbortSignal.timeout(HISTORY_TIMEOUT_MS))
+      const value = await ctx.sessionController.projections({ sessionId, keys: [KEY] }, signal ?? AbortSignal.timeout(HISTORY_TIMEOUT_MS))
       const state = value?.values?.[KEY]
       if (state !== undefined) {
         cached.set(sessionId, state)

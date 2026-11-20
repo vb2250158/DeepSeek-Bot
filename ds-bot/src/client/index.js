@@ -209,7 +209,9 @@ export function apply(ctx) {
   const pull = async () => {
     const order = ++pulls
     const known = roster.getSnapshot()
-    const value = await call('state', { since: known.revision, models: known.modelsKey ?? '', live: liveKey, locale: language() })
+    const chatPreviews = surface.getSnapshot().mode === 'bot'
+    const value = await call('state', { since: known.revision, models: known.modelsKey ?? '', live: liveKey, locale: language(),
+      chatPreviews, ...(chatPreviews && known.previewKey ? { previewKey: known.previewKey } : {}) })
     if (order < applied) return
     applied = order
     const prevLiveKey = liveKey
@@ -246,7 +248,7 @@ export function apply(ctx) {
     // closed, without a reload: the window holds the answer's live fields until then.
     if (value.readOnly !== undefined && (value.readOnly ?? null) !== (current.readOnly ?? null)) live.readOnly = value.readOnly
     if (Object.keys(live).length > 0 && current.ready) roster.set({ ...current, ...live })
-    if (value.unchanged || (value.revision === current.revision && value.modelsKey === current.modelsKey)) {
+    if (value.unchanged || (value.revision === current.revision && value.modelsKey === current.modelsKey && value.previewKey === current.previewKey)) {
       return value.liveKey !== undefined && value.liveKey !== prevLiveKey
     }
     // On a browser with no visit record yet, everything already there counts as seen.
@@ -668,7 +670,10 @@ export function apply(ctx) {
       }
       writeMode(mode)
       surface.set(state => ({ ...state, mode }))
-      if (mode === 'bot') refreshTeamProjections()
+      if (mode === 'bot') {
+        refreshTeamProjections()
+        void pull().catch(quietly('load Bot sidebar'))
+      }
     },
     markUnread: id => writeUnread(id, true),
     beginVisit: (id) => {

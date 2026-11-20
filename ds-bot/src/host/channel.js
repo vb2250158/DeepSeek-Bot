@@ -63,7 +63,7 @@ export function install(rt) {
   // Models come from DSH, not state.json, so a provider added on the Models pages of Settings
   // changes the view without a new revision.
   const modelsKey = () => `${rt.cachedCatalog().map(entry => `${entry.ref}${entry.needsKey ? '!' : ''}${entry.reasoning ? `:${JSON.stringify(entry.reasoning)}` : ''}`).join(',')}|${rt.cachedDefault() ?? ''}`
-  const view = () => ({
+  const view = (includeChatPreviews = true) => ({
     revision: state.revision,
     workspaceId: state.workspaceId ?? null,
     // Legacy landing preference only; it grants no permissions or sidebar priority.
@@ -73,7 +73,7 @@ export function install(rt) {
     // `waiting`: the Bot holds its greeting until the user picks its model or fixes
     // what failed it. `blocked`: the facts of a failure only the user can fix (turns.js).
     bots: Object.values(state.bots).map(({ segments, kickoff, openParts, ...bot }) => {
-      const tail = rt.chatTail(rt.chatOf(bot.id))
+      const tail = includeChatPreviews ? rt.chatTail(rt.chatOf(bot.id)) : undefined
       // `openParts` are the parts opened while the Bot was busy: live, with their own
       // earlier parts, and each one's run state read from the live turns.
       const open = (openParts ?? []).map(part => ({
@@ -308,12 +308,14 @@ export function install(rt) {
           await rt.catalog()
           await rt.loadSecrets()
           const answer = liveAnswer()
-          if (body.since === state.revision && (body.models === undefined || body.models === modelsKey())) {
+          // An open Bot sidebar can receive newly hydrated previews without a team-state mutation.
+          const previewKey = body.chatPreviews === true ? `${liveRun}:${rt.chatPreviewRevision()}` : undefined
+          if (body.since === state.revision && (previewKey === undefined || body.previewKey === previewKey) && (body.models === undefined || body.models === modelsKey())) {
             if (body.live === answer.key) return ok({ revision: state.revision, unchanged: true, liveKey: answer.key })
             return ok({ revision: state.revision, unchanged: true, liveKey: answer.key, ...answer.value })
           }
           // A phone asks for photos by reference and fetches each once (`avatar`).
-          const out = { ...view(), liveKey: answer.key, ...answer.value }
+          const out = { ...view(body.chatPreviews !== false), ...(previewKey === undefined ? {} : { previewKey }), liveKey: answer.key, ...answer.value }
           return ok(body.avatars === 'ref' ? rt.slimAvatars(out) : out)
         }
         case 'models':

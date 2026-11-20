@@ -47806,7 +47806,15 @@ function apply(ctx) {
   const pull = async () => {
     const order = ++pulls;
     const known = roster.getSnapshot();
-    const value = await call("state", { since: known.revision, models: known.modelsKey ?? "", live: liveKey, locale: language() });
+    const chatPreviews = surface.getSnapshot().mode === "bot";
+    const value = await call("state", {
+      since: known.revision,
+      models: known.modelsKey ?? "",
+      live: liveKey,
+      locale: language(),
+      chatPreviews,
+      ...chatPreviews && known.previewKey ? { previewKey: known.previewKey } : {}
+    });
     if (order < applied) return;
     applied = order;
     const prevLiveKey = liveKey;
@@ -47849,7 +47857,7 @@ function apply(ctx) {
     if (value.imVia !== void 0 && JSON.stringify(value.imVia) !== JSON.stringify(current2.imVia ?? {})) live2.imVia = value.imVia;
     if (value.readOnly !== void 0 && (value.readOnly ?? null) !== (current2.readOnly ?? null)) live2.readOnly = value.readOnly;
     if (Object.keys(live2).length > 0 && current2.ready) roster.set({ ...current2, ...live2 });
-    if (value.unchanged || value.revision === current2.revision && value.modelsKey === current2.modelsKey) {
+    if (value.unchanged || value.revision === current2.revision && value.modelsKey === current2.modelsKey && value.previewKey === current2.previewKey) {
       return value.liveKey !== void 0 && value.liveKey !== prevLiveKey;
     }
     if (Object.keys(seenAt).length === 0) leaveVisits([...value.bots, ...value.rooms].map((entry) => entry.id));
@@ -48301,7 +48309,10 @@ function apply(ctx) {
       }
       writeMode(mode);
       surface.set((state) => ({ ...state, mode }));
-      if (mode === "bot") refreshTeamProjections();
+      if (mode === "bot") {
+        refreshTeamProjections();
+        void pull().catch(quietly("load Bot sidebar"));
+      }
     },
     markUnread: (id) => writeUnread(id, true),
     beginVisit: (id) => {

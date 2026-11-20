@@ -80,6 +80,45 @@ const settled = async (check) => {
   for (let i = 0; i < 50 && !check(); i += 1) await new Promise(resolve => setTimeout(resolve, 10))
 }
 
+test('Agent roster keeps the team live without opening chats; the Bot sidebar receives its previews once ready', async t => {
+  const { call, rt } = await team(t, [])
+  const gate = Promise.withResolvers()
+  const reads = []
+  const pages = []
+  rt.ctx.sessionController = {
+    async projections(req) { reads.push(req); return { values: { dsBotAssistantChat: { since: null } } } },
+    async page({ address }) {
+      pages.push(address.sessionId)
+      await gate.promise
+      return { hasMore: false, records: [{ event: { type: 'assistant/message', seq: 7, time: 20,
+        data: { turn: 1, message: { content: [{ type: 'text', text: 'Last reply: ' + address.sessionId }] } } } }] }
+    },
+  }
+  const agent = (await call('state', { chatPreviews: false })).value
+  assert.equal(agent.bots.length, 2)
+  assert.ok(agent.work.approvals)
+  assert.deepEqual(reads, [])
+  assert.deepEqual(pages, [])
+  const opening = (await call('state', { since: agent.revision, chatPreviews: true })).value
+  assert.equal(opening.bots.length, 2)
+  await settled(() => pages.length === 2)
+  assert.deepEqual(reads.map(r => r.keys), [['dsBotAssistantChat'], ['dsBotAssistantChat']])
+  gate.resolve()
+  await settled(() => rt.chatPreviewRevision() === 2)
+  const loaded = (await call('state', { since: opening.revision, chatPreviews: true, previewKey: opening.previewKey })).value
+  assert.equal(loaded.revision, opening.revision)
+  assert.notEqual(loaded.previewKey, opening.previewKey)
+  assert.deepEqual(loaded.bots.map(b => b.preview), ['Last reply: m1', 'Last reply: w2'])
+  const current = (await call('state', { since: loaded.revision, chatPreviews: true, previewKey: loaded.previewKey })).value
+  assert.equal(current.unchanged, true)
+  const reconnected = (await call('state', { since: loaded.revision, chatPreviews: true, previewKey: 'previous-process:2' })).value
+  assert.deepEqual(reconnected.bots, loaded.bots)
+  const olderClient = (await call('state')).value
+  assert.deepEqual(olderClient.bots, loaded.bots)
+  assert.equal(pages.length, 2)
+  assert.equal(reads.length, 2)
+})
+
 test('opening an earlier part takes it out of the archive and archives the part it replaces', async (t) => {
   const { home, registry, call } = await team(t, ['w1'])
   await call('state')

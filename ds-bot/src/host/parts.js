@@ -1997,8 +1997,16 @@ export function install(rt) {
   // preview. Read once per part, then kept by session/event.
   const PREVIEWABLE = new Set(['bot', 'user', 'answer', 'post', 'view'])
   const tails = new Map()
+  let previewRevision = 0
+  rt.chatPreviewRevision = () => previewRevision
   const previewText = item => String(item.text ?? item.title ?? item.texts?.join(' ') ?? '').replace(/\s+/g, ' ').trim()
-  const applyTail = (sessionId, item) => tails.set(sessionId, { lastAt: item.time ?? 0, preview: previewText(item) })
+  const applyTail = (sessionId, item) => {
+    const next = { lastAt: item.time ?? 0, preview: previewText(item) }
+    const prior = tails.get(sessionId)
+    if (prior?.lastAt === next.lastAt && prior.preview === next.preview) return
+    tails.set(sessionId, next)
+    previewRevision++
+  }
   const fillTail = async sessionId => {
     // Newest page back until a row shows; chats almost always have it on page one.
     try {
@@ -2012,12 +2020,15 @@ export function install(rt) {
         }, AbortSignal.timeout(HISTORY_TIMEOUT_MS))
         const events = page.records.map(record => record.event)
         const last = [...displayItems(sessionId, events)].reverse().find(item => PREVIEWABLE.has(item.kind))
-        if (last !== undefined) { applyTail(sessionId, last); return }
+        if (last !== undefined) {
+          if (tails.get(sessionId) === null) applyTail(sessionId, last)
+          return
+        }
         if (!page.hasMore || events.length === 0) break
         beforeSeq = events[0]?.seq
       }
-      tails.set(sessionId, { lastAt: 0, preview: '' })
-    } catch { tails.set(sessionId, { lastAt: 0, preview: '' }) }
+    } catch { /* A missing or unreadable history has no preview. */ }
+    if (tails.get(sessionId) === null) tails.set(sessionId, { lastAt: 0, preview: '' })
   }
   rt.chatTail = sessionId => {
     if (!tails.has(sessionId)) { tails.set(sessionId, null); void fillTail(sessionId); return undefined }
