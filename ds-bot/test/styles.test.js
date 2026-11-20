@@ -154,6 +154,18 @@ test('a compiled style removed from outside comes back, until its cleanup runs',
   assert.equal(style.isConnected, false)
 })
 
+test('a plain Bot style installs without reading the shell stylesheets', () => {
+  const { window, module } = bench([])
+  try {
+    const { document } = window
+    Object.defineProperty(document, 'styleSheets', { get() { throw new Error('unexpected stylesheet scan') } })
+    const css = '.bt-title{color:red}'
+    const dispose = module.exports.installCompiledStyles(css, 'title')
+    assert.equal(tagged(document, 'title')[0].textContent, css)
+    dispose()
+  } finally { window.close() }
+})
+
 test('mounting and unmounting compiled styles twice leaves no extra nodes', async () => {
   const { window, module } = bench([])
   const { installCompiledStyles } = module.exports

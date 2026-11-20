@@ -1589,13 +1589,15 @@ function compileFragmentSelectors(text, names) {
 }
 
 export function installCompiledStyles(text, tag) {
-  const style = installStyles('', tag)
+  const hasFragments = text.search(FRAGMENT_SELECTOR) !== -1
+  const style = installStyles(hasFragments ? '' : text, tag)
   let disposed = false
   const cache = new WeakMap()
   const render = () => {
     if (disposed) return
     // A tag removed out from under us (not by the module system, which owns it) goes back.
     if (!style.isConnected) document.head.appendChild(style)
+    if (!hasFragments) return
     const names = new Set()
     for (const sheet of document.styleSheets) {
       if (sheet.ownerNode?.dataset?.dshBot) continue
@@ -1606,7 +1608,7 @@ export function installCompiledStyles(text, tag) {
     const next = compileFragmentSelectors(text, names)
     if (style.textContent !== next) style.textContent = next
   }
-  render()
+  if (hasFragments) render()
   // Lazily loaded shell features append their own sheets later.
   let timer
   const schedule = () => { clearTimeout(timer); timer = setTimeout(render, 120) }
@@ -1617,10 +1619,10 @@ export function installCompiledStyles(text, tag) {
   const shell = node => node.dataset?.dshBot === undefined
   const observer = new MutationObserver((records) => {
     if (records.some(record => [...record.removedNodes].includes(style))) render()
-    if (records.some(record => [...record.addedNodes, ...record.removedNodes].some(shell))) schedule()
+    if (hasFragments && records.some(record => [...record.addedNodes, ...record.removedNodes].some(shell))) schedule()
   })
   observer.observe(document.head, { childList: true })
-  document.addEventListener('load', onLoad, true)
+  if (hasFragments) document.addEventListener('load', onLoad, true)
   return () => {
     disposed = true
     observer.disconnect()

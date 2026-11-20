@@ -701,6 +701,18 @@ function chatRow(row, key, { sessionId, selfId, roster, actions, useUi, onBtwDel
   }
 }
 
+// Keep the selector value stable when an outline changes without adding turns.
+const orderByOutline = new WeakMap()
+function turnOrder(outline) {
+  if (!Array.isArray(outline)) return ''
+  let order = orderByOutline.get(outline)
+  if (order === undefined) {
+    order = outline.map(entry => entry.turn).join(',')
+    orderByOutline.set(outline, order)
+  }
+  return order
+}
+
 export function TriggerCell({ node, sessionId, useAssistantChat, useRoster, useSessions, useTurnClock, useUi, actions }) {
   const roster = useRoster(value => value)
   const data = node.data
@@ -720,7 +732,7 @@ export function TriggerCell({ node, sessionId, useAssistantChat, useRoster, useS
   }, [relayed, sessionId, turn, source.senderSessionId])
   const order = useSessions((list) => {
     const outline = list.projectionsBySession?.[sessionId]?.values?.turnOutline ?? list.byId[sessionId]?.projectionValues?.turnOutline
-    return Array.isArray(outline) ? outline.map(entry => entry.turn).join(',') : ''
+    return turnOrder(outline)
   })
   const peers = useTurnClock((state) => {
     if (!relayed) return ''
@@ -732,8 +744,10 @@ export function TriggerCell({ node, sessionId, useAssistantChat, useRoster, useS
   const visit = useUi(state => state.visits?.[sessionId])
   const hiddenTurns = roster.exchangeTurns[sessionId]
   const unreadOpening = useTurnClock((state) => {
-    const first = openingTurn(state[sessionId], order, hiddenTurns)
-    return first?.turn === turn && unseenSince(visit, first.start) ? clockLabel(first.start) : ''
+    const turns = state[sessionId]
+    if (turn === undefined || !unseenSince(visit, turns?.[turn]?.first)) return ''
+    const first = openingTurn(turns, order, hiddenTurns, turn)
+    return first ? clockLabel(first.start) : ''
   })
   const body = triggerBody()
   return unreadOpening
@@ -845,24 +859,42 @@ export { CellEmpty }
 
 // A pause longer than this splits the transcript with a time separator.
 const SEPARATOR_GAP_MS = 30 * 60 * 1000
-function nextTurnStart(turns, turn) {
-  let next
-  for (const key in turns) {
-    const candidate = Number(key)
-    if (candidate > turn && turns[key].first !== undefined && (next === undefined || candidate < next)) next = candidate
+// noteTurnTime and noteTurnPeer replace the session's clock on every edit.
+const startsByClock = new WeakMap()
+function startedTurns(turns) {
+  let ordered = startsByClock.get(turns)
+  if (!ordered) {
+    ordered = Object.keys(turns).filter(key => turns[key].first !== undefined).map(Number).sort((a, b) => a - b)
+    startsByClock.set(turns, ordered)
   }
-  return next === undefined ? undefined : turns[next].first
+  return ordered
 }
-// The first turn the transcript shows: the earliest rendered start, with only hidden
-// exchange turns before it. `firstTurns` lists the outline's first turns.
-export function openingTurn(turns, firstTurns, hiddenTurns) {
+
+function nextTurnStart(turns, turn) {
+  if (!turns) return undefined
+  const ordered = startedTurns(turns)
+  let low = 0, high = ordered.length
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2)
+    if (ordered[middle] <= turn) low = middle + 1
+    else high = middle
+  }
+  return turns[ordered[low]]?.first
+}
+
+// Only the earliest rendered turn may draw the opening, even when earlier
+// exchange turns are present in the outline but hidden in this conversation.
+export function openingTurn(turns, firstTurns, hiddenTurns, expectedTurn) {
   if (!turns || !firstTurns) return null
-  const start = nextTurnStart(turns, -Infinity)
-  if (start === undefined) return null
-  const turn = Number(Object.keys(turns).filter(key => turns[key].first === start)[0])
-  const listed = firstTurns.split(',').map(Number)
-  const earlier = listed.filter(entry => entry < turn)
-  return listed.includes(turn) && earlier.every(entry => hiddenTurns?.includes(entry)) ? { turn, start } : null
+  const turn = startedTurns(turns)[0]
+  if (turn === undefined || (expectedTurn !== undefined && turn !== expectedTurn)) return null
+  let listed = false
+  for (const key of firstTurns.split(',')) {
+    const entry = Number(key)
+    if (entry < turn && !hiddenTurns?.includes(entry)) return null
+    if (entry === turn) listed = true
+  }
+  return listed ? { turn, start: turns[turn].first } : null
 }
 // Began after the user last left the conversation and before this visit opened it.
 export const unseenSince = (visit, time) => typeof visit?.seen === 'number' && time > visit.seen && time <= visit.entered
@@ -876,7 +908,7 @@ export function TurnTailCell({ turn: location, sessionId, useTurnClock, useUi, a
   const time = location.end.time
   useEffect(() => { actions.noteTurnTime(sessionId, turn, 'end', time) }, [sessionId, turn, time])
   const label = useTurnClock((state) => {
-    const start = nextTurnStart(state[sessionId] ?? {}, turn)
+    const start = nextTurnStart(state[sessionId], turn)
     return start !== undefined && start - time >= SEPARATOR_GAP_MS ? clockLabel(start) : ''
   })
   // The unread divider sits before the first turn that began after the last visit;
@@ -884,7 +916,7 @@ export function TurnTailCell({ turn: location, sessionId, useTurnClock, useUi, a
   const visit = useUi(state => state.visits?.[sessionId])
   const fresh = useTurnClock((state) => {
     if (typeof visit?.seen !== 'number' || time > visit.seen) return false
-    const start = nextTurnStart(state[sessionId] ?? {}, turn)
+    const start = nextTurnStart(state[sessionId], turn)
     return start !== undefined && start > visit.seen && start <= visit.entered
   })
   if (!label && !fresh) return null

@@ -34948,12 +34948,14 @@ function compileFragmentSelectors(text, names) {
   });
 }
 function installCompiledStyles(text, tag) {
-  const style = installStyles("", tag);
+  const hasFragments = text.search(FRAGMENT_SELECTOR) !== -1;
+  const style = installStyles(hasFragments ? "" : text, tag);
   let disposed = false;
   const cache = /* @__PURE__ */ new WeakMap();
   const render = () => {
     if (disposed) return;
     if (!style.isConnected) document.head.appendChild(style);
+    if (!hasFragments) return;
     const names = /* @__PURE__ */ new Set();
     for (const sheet of document.styleSheets) {
       if (sheet.ownerNode?.dataset?.dshBot) continue;
@@ -34967,7 +34969,7 @@ function installCompiledStyles(text, tag) {
     const next = compileFragmentSelectors(text, names);
     if (style.textContent !== next) style.textContent = next;
   };
-  render();
+  if (hasFragments) render();
   let timer;
   const schedule = () => {
     clearTimeout(timer);
@@ -34979,10 +34981,10 @@ function installCompiledStyles(text, tag) {
   const shell = (node) => node.dataset?.dshBot === void 0;
   const observer = new MutationObserver((records) => {
     if (records.some((record) => [...record.removedNodes].includes(style))) render();
-    if (records.some((record) => [...record.addedNodes, ...record.removedNodes].some(shell))) schedule();
+    if (hasFragments && records.some((record) => [...record.addedNodes, ...record.removedNodes].some(shell))) schedule();
   });
   observer.observe(document.head, { childList: true });
-  document.addEventListener("load", onLoad, true);
+  if (hasFragments) document.addEventListener("load", onLoad, true);
   return () => {
     disposed = true;
     observer.disconnect();
@@ -37297,6 +37299,16 @@ function chatRow(row, key, { sessionId, selfId, roster, actions, useUi, onBtwDel
       return null;
   }
 }
+var orderByOutline = /* @__PURE__ */ new WeakMap();
+function turnOrder(outline) {
+  if (!Array.isArray(outline)) return "";
+  let order = orderByOutline.get(outline);
+  if (order === void 0) {
+    order = outline.map((entry) => entry.turn).join(",");
+    orderByOutline.set(outline, order);
+  }
+  return order;
+}
 function TriggerCell({ node, sessionId, useAssistantChat, useRoster, useSessions, useTurnClock, useUi, actions }) {
   const roster = useRoster((value) => value);
   const data = node.data;
@@ -37311,7 +37323,7 @@ function TriggerCell({ node, sessionId, useAssistantChat, useRoster, useSessions
   }, [relayed, sessionId, turn, source.senderSessionId]);
   const order = useSessions((list) => {
     const outline = list.projectionsBySession?.[sessionId]?.values?.turnOutline ?? list.byId[sessionId]?.projectionValues?.turnOutline;
-    return Array.isArray(outline) ? outline.map((entry) => entry.turn).join(",") : "";
+    return turnOrder(outline);
   });
   const peers = useTurnClock((state) => {
     if (!relayed) return "";
@@ -37321,8 +37333,10 @@ function TriggerCell({ node, sessionId, useAssistantChat, useRoster, useSessions
   const visit = useUi((state) => state.visits?.[sessionId]);
   const hiddenTurns = roster.exchangeTurns[sessionId];
   const unreadOpening = useTurnClock((state) => {
-    const first = openingTurn(state[sessionId], order, hiddenTurns);
-    return first?.turn === turn && unseenSince(visit, first.start) ? clockLabel(first.start) : "";
+    const turns = state[sessionId];
+    if (turn === void 0 || !unseenSince(visit, turns?.[turn]?.first)) return "";
+    const first = openingTurn(turns, order, hiddenTurns, turn);
+    return first ? clockLabel(first.start) : "";
   });
   const body = triggerBody();
   return unreadOpening ? (0, import_react57.createElement)(import_react57.Fragment, null, (0, import_react57.createElement)("div", { className: "bt-open-new" }, (0, import_react57.createElement)(NewDivider), (0, import_react57.createElement)("div", { className: "bt-time-sep", role: "separator" }, unreadOpening)), body) : body ?? (0, import_react57.createElement)(CellEmpty);
@@ -37421,22 +37435,37 @@ function Nothing() {
   return null;
 }
 var SEPARATOR_GAP_MS = 30 * 60 * 1e3;
-function nextTurnStart(turns, turn) {
-  let next;
-  for (const key in turns) {
-    const candidate = Number(key);
-    if (candidate > turn && turns[key].first !== void 0 && (next === void 0 || candidate < next)) next = candidate;
+var startsByClock = /* @__PURE__ */ new WeakMap();
+function startedTurns(turns) {
+  let ordered = startsByClock.get(turns);
+  if (!ordered) {
+    ordered = Object.keys(turns).filter((key) => turns[key].first !== void 0).map(Number).sort((a, b) => a - b);
+    startsByClock.set(turns, ordered);
   }
-  return next === void 0 ? void 0 : turns[next].first;
+  return ordered;
 }
-function openingTurn(turns, firstTurns, hiddenTurns) {
+function nextTurnStart(turns, turn) {
+  if (!turns) return void 0;
+  const ordered = startedTurns(turns);
+  let low = 0, high = ordered.length;
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2);
+    if (ordered[middle] <= turn) low = middle + 1;
+    else high = middle;
+  }
+  return turns[ordered[low]]?.first;
+}
+function openingTurn(turns, firstTurns, hiddenTurns, expectedTurn) {
   if (!turns || !firstTurns) return null;
-  const start = nextTurnStart(turns, -Infinity);
-  if (start === void 0) return null;
-  const turn = Number(Object.keys(turns).filter((key) => turns[key].first === start)[0]);
-  const listed = firstTurns.split(",").map(Number);
-  const earlier = listed.filter((entry) => entry < turn);
-  return listed.includes(turn) && earlier.every((entry) => hiddenTurns?.includes(entry)) ? { turn, start } : null;
+  const turn = startedTurns(turns)[0];
+  if (turn === void 0 || expectedTurn !== void 0 && turn !== expectedTurn) return null;
+  let listed = false;
+  for (const key of firstTurns.split(",")) {
+    const entry = Number(key);
+    if (entry < turn && !hiddenTurns?.includes(entry)) return null;
+    if (entry === turn) listed = true;
+  }
+  return listed ? { turn, start: turns[turn].first } : null;
 }
 var unseenSince = (visit, time) => typeof visit?.seen === "number" && time > visit.seen && time <= visit.entered;
 function TurnTailCell({ turn: location2, sessionId, useTurnClock, useUi, actions }) {
@@ -37446,13 +37475,13 @@ function TurnTailCell({ turn: location2, sessionId, useTurnClock, useUi, actions
     actions.noteTurnTime(sessionId, turn, "end", time);
   }, [sessionId, turn, time]);
   const label = useTurnClock((state) => {
-    const start = nextTurnStart(state[sessionId] ?? {}, turn);
+    const start = nextTurnStart(state[sessionId], turn);
     return start !== void 0 && start - time >= SEPARATOR_GAP_MS ? clockLabel(start) : "";
   });
   const visit = useUi((state) => state.visits?.[sessionId]);
   const fresh = useTurnClock((state) => {
     if (typeof visit?.seen !== "number" || time > visit.seen) return false;
-    const start = nextTurnStart(state[sessionId] ?? {}, turn);
+    const start = nextTurnStart(state[sessionId], turn);
     return start !== void 0 && start > visit.seen && start <= visit.entered;
   });
   if (!label && !fresh) return null;

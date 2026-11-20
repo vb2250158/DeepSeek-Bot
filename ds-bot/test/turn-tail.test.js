@@ -129,6 +129,21 @@ test('the turn tail entry notes when the turn ended and shows the pause before t
   assert.equal(find(out, node => node.props?.className === 'bt-time-sep').length, 1)
 })
 
+test('sparse start times update the opening and the next visible separator', () => {
+  const { openingTurn } = module.exports
+  const before = { 7: { first: 4_000_000 }, 3: { end: 1 }, 9: { first: 4_000_000 } }
+  const outline = '3,7,9'
+  assert.equal(openingTurn(before, outline), null)
+  assert.equal(openingTurn(before, outline, [3])?.turn, 7)
+  const tail = turns => TurnTailCell({ turn: { turn: 2, end: { time: 1 } }, sessionId: 'b',
+    useTurnClock: select => select({ b: turns }), useUi: () => undefined, actions: {} })
+  assert.equal(find(tail(before), node => node.props?.className === 'bt-time-sep').length, 1)
+  const after = { ...before, 3: { first: 2, end: 3 } }
+  assert.equal(openingTurn(after, outline)?.turn, 3)
+  assert.equal(tail(after), null)
+  assert.equal(openingTurn(before, outline, [3])?.turn, 7)
+})
+
 // #206: the user reads a Bot's reply in its own chat, so it folds only where rendering
 // all of it would slow the chat down.
 test('a Bot reply in its own chat stays whole up to 20,000 characters', () => {
