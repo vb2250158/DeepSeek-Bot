@@ -75,6 +75,46 @@ test('unload waits for a pending fetch but never evaluates or applies its late r
   assert.equal(loaded.warnings.length, 0)
 })
 
+test('factory prefetch reads once without evaluating until the first live apply', async () => {
+  const app = 'require("probe"); module.exports = { apply: ctx => ctx.record("ready") }'
+  let requests = 0
+  let evaluations = 0
+  const loaded = loader(app, async () => { requests++; return new Response(app) }, () => { evaluations++ })
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(requests, 1)
+  assert.equal(evaluations, 0)
+  const ctx = scope()
+  await loaded.apply(ctx)
+  assert.equal(requests, 1)
+  assert.equal(evaluations, 1)
+  assert.deepEqual(ctx.calls, ['ready'])
+  await ctx.dispose()
+})
+
+test('receiving an unused registration does not fetch or evaluate the app', () => {
+  let requests = 0
+  let registration
+  runInNewContext(thinClientEntry('throw new Error("unused")'), {
+    window: { __ModuleLoader__: { load: value => { registration = value } } },
+    fetch: () => { requests++; return Promise.resolve(new Response('')) },
+  })
+  assert.equal(registration.id, 'ds-bot')
+  assert.equal(requests, 0)
+})
+
+test('an early prefetch failure is retried on activation', async () => {
+  const app = 'module.exports = { apply: ctx => ctx.record("ready") }'
+  let requests = 0
+  const loaded = loader(app, async () => ++requests === 1 ? new Response('', { status: 503 }) : new Response(app))
+  await new Promise(resolve => setImmediate(resolve))
+  const ctx = scope()
+  await loaded.apply(ctx)
+  assert.deepEqual(ctx.calls, ['ready'])
+  assert.equal(requests, 2)
+  assert.equal(loaded.warnings.length, 0)
+  await ctx.dispose()
+})
+
 test('unload while the response body is pending prevents evaluation and registrations', async () => {
   const app = 'require("probe"); module.exports = { apply: ctx => ctx.record("late body") }'
   const body = Promise.withResolvers()
