@@ -11,7 +11,7 @@ const bundle = await build({
 })
 const module = { exports: {} }
 runInNewContext(bundle.outputFiles[0].text, {
-  module, exports: module.exports,
+  module, exports: module.exports, setTimeout, clearTimeout,
   require: (name) => {
     const platform = {
       react: { createContext: (initial) => { const ctx = { value: initial }; ctx.Provider = ({ value, children }) => { ctx.value = value; return children }; return ctx }, useContext: ctx => ctx.value, useMemo: make => make(), useCallback: fn => fn, useId: () => 'dv-id', useSyncExternalStore: (subscribe, getSnapshot) => getSnapshot(),  createElement: (type, props, ...children) => ({ type, props: props ?? {}, children: children.flat(Infinity) }), useState: initial => [initial, () => {}], useEffect: () => {}, useRef: initial => ({ current: initial }), useLayoutEffect: () => {}, Fragment: 'fragment' },
@@ -22,20 +22,18 @@ runInNewContext(bundle.outputFiles[0].text, {
     return platform[name]
   },
 })
-const { busyMembers, summaryText, splitBusy, MemberDock, groupWorkingText, MemberState, StopMemberWork, StopRoomWork, memberWork } = module.exports
+const { busyMembers, summaryText, MemberDock, MemberState, StopMemberWork, StopRoomWork, memberWork, roomApprovals } = module.exports
 // Values from the bundle's realm compare by content only.
 const plain = value => JSON.parse(JSON.stringify(value))
-// Renders the dock's own parts of an element tree, and lists its rows' labels.
-const expand = (node) => {
-  if (Array.isArray(node)) return node.flatMap(expand)
-  if (node === null || typeof node !== 'object') return node
-  if (['WorkRow', 'SummaryLine'].includes(node.type?.name)) return expand(node.type({ ...node.props, children: node.children }))
-  return { ...node, children: node.children.map(expand) }
-}
-const rowLabels = (node) => {
-  if (Array.isArray(node)) return node.flatMap(rowLabels)
-  if (node === null || typeof node !== 'object') return []
-  return [...(node.props.className === 'bt-mw-row' ? [node.props['aria-label']] : []), ...rowLabels(node.children)]
+// The dock's capsule in an element tree.
+const capsuleOf = (node) => {
+  if (node === null || typeof node !== 'object') return null
+  if (node.props.className === 'bt-mw-pill') return node
+  for (const child of node.children) {
+    const found = capsuleOf(child)
+    if (found) return found
+  }
+  return null
 }
 
 test('the members line names who waits for an approval first, then who is at work', () => {
@@ -125,9 +123,17 @@ test('a failed stop of a group\'s work is reported', async () => {
   await new Promise(resolve => setImmediate(resolve))
   assert.deepEqual(reported, [['connection lost', 'stop']])
 })
-const dock = (sessionId, work) => expand(MemberDock({ sessionId, useRoster: pick => pick(team), useWork: pick => pick(work), actions: {} }))
+// The capsule's label and what a click on it asks for.
+const dock = (sessionId, work) => {
+  const calls = []
+  const actions = { showDetails: id => calls.push(['details', id]), openSession: id => calls.push(['session', id]) }
+  const capsule = capsuleOf(MemberDock({ sessionId, useRoster: pick => pick(team), useWork: pick => pick(work), actions }))
+  if (!capsule) return null
+  capsule.props.onClick()
+  return { label: capsule.props['aria-label'], calls }
+}
 
-test('a member at work in the group gets a row; the speaker, work elsewhere and approvals do not', () => {
+test('one capsule names who waits and who works, without the round\'s speaker, and opens the details', () => {
   const work = {
     // Anvil runs in its own chat too; its work here wins. Coral's work in r2 shows
     // there and on its own chat, not here (#473).
@@ -135,44 +141,24 @@ test('a member at work in the group gets a row; the speaker, work elsewhere and 
     rooms: { r1: [{ botId: 'a', since: 1, tool: 'write' }, { botId: 'd', since: 1, speaking: true }], r2: [{ botId: 'b', since: 1, tool: 'edit' }] },
     approvals: [{ botId: 'c', roomId: 'r1' }],
   }
-  const busy = busyMembers(team.roomsById.r1, work, team)
-  const { rows, rest } = splitBusy(busy)
-  assert.deepEqual(plain(rows.map(entry => [entry.bot.name, entry.doing.tool, entry.doing.roomId])), [['Anvil', 'write', 'r1']])
-  assert.deepEqual(plain(rest.map(entry => [entry.bot.name, entry.state])), [['Prism', 'ask']])
-  assert.deepEqual(rowLabels(dock('r1', work)), ['Anvil and Quill working…'])
-  assert.equal(groupWorkingText(busy), 'Anvil and Quill working…')
-  assert.deepEqual(plain(busyMembers(team.roomsById.r2, work, team).map(entry => [entry.id, entry.doing.roomId])), [['b', 'r2']])
+  assert.deepEqual(plain(dock('r1', work)), { label: 'Prism is waiting for your approval · Anvil · Writing changes…', calls: [['details', 'r1']] })
+  assert.equal(dock('r1', { bots: {}, rooms: { r1: [{ botId: 'd', since: 1, speaking: true }] }, approvals: [] }), null)
 })
 
 test('a Bot\'s own chat shows the groups it is at work in, unless its own chat runs', () => {
   const away = { bots: { a: { since: 1, roomId: 'r1', tool: 'pwsh' } }, rooms: { r1: [{ botId: 'a', since: 1, tool: 'pwsh' }], r2: [{ botId: 'a', since: 1 }] }, approvals: [] }
-  assert.deepEqual(rowLabels(dock('a', away)), ['in Ops · Running shell commands…', 'in Docs · Thinking about it…'])
-  assert.deepEqual(rowLabels(dock('a', { ...away, bots: { a: { since: 1 } } })), [])
+  assert.deepEqual(plain(dock('a', away)), { label: 'in Ops · Running shell commands… +1', calls: [['session', 'r1']] })
+  assert.equal(dock('a', { ...away, bots: { a: { since: 1 } } }), null)
   assert.equal(dock('b', away), null)
 })
 
-test('a row says what a member does in its call\'s own words, and that it moves to a fresh conversation', () => {
-  const work = {
-    bots: {},
-    rooms: { r1: [
-      { botId: 'a', since: 1, tool: 'pwsh', note: 'Download Ghidra 12.1.4 and check its hash.' },
-      { botId: 'b', since: 1, tool: 'read', target: 'dump.py' },
-      { botId: 'c', since: 1, switching: true },
-      { botId: 'd', since: 1, tool: 'pwsh', said: '解压 Ghidra，顺便写脚本。', note: 'Expand-Archive' },
-    ] },
-    approvals: [],
-  }
-  assert.match(JSON.stringify(dock('r1', work)), /Anvil, Flint, Prism, and Quill working…/)
-})
-
-test('group feedback removes finished members and excludes work elsewhere and approval waits', () => {
-  const room = team.roomsById.r1
-  const work = { bots: { b: { roomId: 'r2' } }, rooms: { r1: [{ botId: 'a' }, { botId: 'd', speaking: true }] }, approvals: [{ botId: 'c' }] }
-  assert.equal(groupWorkingText(busyMembers(room, work, team)), 'Anvil and Quill working…')
-  work.rooms.r1.pop()
-  assert.equal(groupWorkingText(busyMembers(room, work, team)), 'Anvil working…')
-  work.rooms.r1 = []
-  assert.equal(groupWorkingText(busyMembers(room, work, team)), '')
+test('the capsule says what a member does in its call\'s own words, and that it moves to a fresh conversation', () => {
+  const label = doing => dock('r1', { bots: {}, rooms: { r1: [{ botId: 'a', since: 1, ...doing }] }, approvals: [] }).label
+  assert.equal(label({ tool: 'pwsh', note: 'Download Ghidra 12.1.4 and check its hash.' }), 'Anvil · Download Ghidra 12.1.4 and check its hash…')
+  assert.equal(label({ tool: 'read', target: 'dump.py' }), 'Anvil · Opening a file · dump.py…')
+  assert.equal(label({ switching: true }), 'Anvil · Moving to a fresh conversation…')
+  assert.equal(label({ switching: true, folder: true }), 'Anvil · Switching working folder…')
+  assert.equal(label({ tool: 'pwsh', said: '解压 Ghidra，顺便写脚本。', note: 'Expand-Archive' }), 'Anvil · 解压 Ghidra，顺便写脚本…')
 })
 
 test('a member\'s line runs a clock from its turn\'s start or its approval\'s', () => {
@@ -183,4 +169,50 @@ test('a member\'s line runs a clock from its turn\'s start or its approval\'s', 
   assert.equal(stateText({ state: 'work', doing: { roomId: 'r1', tool: 'pwsh', since: 1_000 } }), 'Running shell commands…{1000}')
   assert.equal(stateText({ state: 'ask', approvals: [{ at: 2_000 }] }), 'Waiting for your approval{2000}')
   assert.equal(flat(MemberState({ entry: { state: 'idle' }, bot: { id: 'a', name: 'Anvil', role: 'Writer' }, room: { id: 'r1' }, roster: team })), 'Writer')
+})
+
+test('roomApprovals combines this group\'s tool approvals and computer app asks in order without cross-room leakage (#1623)', () => {
+  const room = team.roomsById.r1
+  const work = {
+    approvals: [
+      { id: 't1', botId: 'a', roomId: 'r1', answerable: true, at: 200, tool: 'bash' },
+      { id: 't2', botId: 'a', roomId: 'r2', answerable: true, at: 50, tool: 'bash' },
+      { id: 't3', botId: 'b', answerable: true, at: 100, tool: 'bash' },
+    ],
+  }
+  const computer = {
+    asks: {
+      c1: { id: 'c1', botId: 'b', roomId: 'r1', appName: 'Notes', at: 150 },
+      c2: { id: 'c2', botId: 'a', roomId: 'r2', appName: 'Safari', at: 80 },
+      c3: { id: 'c3', botId: 'a', appName: 'Terminal', at: 90 },
+    },
+  }
+  const items = roomApprovals(room, work, computer, team)
+  assert.deepEqual(plain(items.map(item => [item.kind, item.id, item.bot.name])), [
+    ['computer-app', 'c1', 'Flint'],
+    ['tool', 't1', 'Anvil'],
+  ])
+  // Clicking the dock capsule when an approval waits opens the header approval island directly.
+  const calls = []
+  const capsule = capsuleOf(MemberDock({
+    sessionId: 'r1',
+    useRoster: pick => pick(team),
+    useWork: pick => pick({ bots: {}, rooms: {}, ...work }),
+    useComputer: pick => pick(computer),
+    actions: { openApproval: id => calls.push(['approval', id]), showDetails: id => calls.push(['details', id]) },
+  }))
+  assert.ok(capsule)
+  capsule.props.onClick()
+  assert.deepEqual(calls, [['approval', 'r1']])
+})
+
+test('group feedback removes finished members and excludes work elsewhere and approval waits', () => {
+  const room = team.roomsById.r1
+  const work = { bots: { b: { roomId: 'r2' } }, rooms: { r1: [{ botId: 'a' }, { botId: 'd', speaking: true }] }, approvals: [{ botId: 'c' }] }
+  const names = () => plain(busyMembers(room, work, team).filter(entry => entry.state === 'work').map(entry => entry.bot.name))
+  assert.deepEqual(names(), ['Anvil', 'Quill'])
+  work.rooms.r1.pop()
+  assert.deepEqual(names(), ['Anvil'])
+  work.rooms.r1 = []
+  assert.deepEqual(names(), [])
 })

@@ -5,16 +5,16 @@ This fork tests its current DS Bot behavior on one source Web host. It does not 
 | Input | Tested value |
 |---|---|
 | Platform | Windows x64; GitHub runner `windows-2025` |
-| Node.js | `24.15.0` |
+| Node.js | `24.22.3` |
 | npm, plugin tools | `11.12.1` |
 | pnpm, Core source dependencies | `11.28.5` |
-| Core source | [`vb2250158/deepseek-harness@f8d94a2c5b83e0c715218073a3a6d0465f170e2c`](https://github.com/vb2250158/deepseek-harness/commit/f8d94a2c5b83e0c715218073a3a6d0465f170e2c) |
-| Core host version | `0.2.2-rc.3` |
+| Core source | [`vb2250158/deepseek-harness@b071839b9a76fd23a581541d0f3b2b4184430831`](https://github.com/vb2250158/deepseek-harness/commit/b071839b9a76fd23a581541d0f3b2b4184430831) |
+| Core host version | `0.2.3-alpha.2` |
 | Runtime entry | Source `dsh` Web profile through `@deepseek-ai/dsh/profile-boot` |
 
 This table declares the source verification target; it does not report a production installation. DS Bot source releases remain candidates until its actual profile installation, loaded source and Web behavior are verified. Production switching belongs to the environment-maintenance owner.
 
-The last recorded formal Core is `54931fbd25050ef036e44b1daec931da2bfe7b39` / `0.2.2-rc.1`. The rc.2 source target above becomes formal only after the environment owner verifies its complete installed combination.
+The source target matches Core `0.2.3-alpha.2`. The environment owner records formal plugin adoption after verifying the installed combination.
 
 ## Prepare the source host
 

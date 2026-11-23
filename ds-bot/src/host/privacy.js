@@ -2,12 +2,13 @@
 // what it sends out waits for the user. DSH does not fence reads, so this closes the
 // tools DS Bot owns and checks the paths that the file tools and the shell are given;
 // a shell can still reach any file the account can (see docs/plans).
-import { join, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
+import { manualDirectory } from './manual-skills.js'
 import { within } from './folders.js'
 import { unquote } from './text.js'
 import { openSessions } from './threads.js'
 
-const FILE_TOOLS = { read: 'file_path', write: 'file_path', edit: 'file_path', read_image: 'file_path', str_replace_editor: 'path' }
+const FILE_TOOLS = { read: 'file_path', write: 'file_path', edit: 'file_path', read_image: 'file_path', str_replace_editor: 'path', read_document: 'path' }
 const WRITE_TOOLS = ['write', 'edit', 'str_replace_editor']
 const SEARCH_TOOLS = ['glob', 'grep']
 const SHELL_TOOLS = ['bash', 'pwsh', 'terminal_open', 'terminal_send']
@@ -80,6 +81,7 @@ export function install(rt) {
     join(rt.home, 'learning', 'state.json'),
     join(rt.home, 'ocr.json'),
     join(rt.home, 'secrets.json'),
+    join(rt.home, 'task-reports'),
     join(rt.home, 'memory', 'journal.jsonl'),
     join(rt.home, 'memory', 'journal.torn'),
     join(rt.home, 'memory', 'pending.json'),
@@ -118,7 +120,7 @@ export function install(rt) {
       // A walk of the archive stays closed while a private Bot's memory is on its way
       // there: until the path is known, the walk cannot be told which folder to skip.
       const moving = search && bots.some(bot => bot.archiving === true)
-      const open = [rt.workDirOf({ botId: self }), teamFolder(), teamMemory, moving ? undefined : memoryArchive, ...ownRegions].filter(Boolean)
+      const open = [rt.workDirOf({ botId: self }), teamFolder(), teamMemory, moving ? undefined : memoryArchive, dirname(manualDirectory()), ...ownRegions].filter(Boolean)
       const folders = (await Promise.all(open.map(spellings))).flat()
       const roots = (await Promise.all(dataRoots().map(spellings))).flat()
       for (const key of keys) {
@@ -230,9 +232,9 @@ export function install(rt) {
         if (to !== undefined && to.id !== self) await share(exec, self, { en: to.name, zh: ` ${to.name} ` })
         return
       }
-      case 'recall':
-      case 'remember':
-      case 'forget': {
+      case 'bot_recall':
+      case 'bot_remember':
+      case 'bot_forget': {
         // These reserved names follow memory's write scopes; a Bot with the same
         // display name does not turn "team" or "own" into a Bot-memory scope.
         const scope = unquote(String(args.scope ?? ''))
@@ -240,7 +242,7 @@ export function install(rt) {
         const local = scope === '' || /^(own|me|mine|self|yours?|自己|我|group|this group|群|本群|群聊)$/i.test(scope)
         const bot = team || local ? undefined : target(scope)
         if (bot) throw closed(bot, 'memory')
-        if (exec.name === 'remember') {
+        if (exec.name === 'bot_remember') {
           const to = team || local ? undefined : botNamed(scope)
           if (team) await share(exec, self, { en: 'the team memory', zh: '团队记忆' })
           else if (to !== undefined && to.id !== self) await share(exec, self, { en: `${to.name}'s memory`, zh: ` ${to.name} 的记忆` })

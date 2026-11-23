@@ -9,6 +9,7 @@ import { runInNewContext } from 'node:vm'
 import { bundleClientApp, thinClientEntry, bundleOffice } from '../scripts/build-client.mjs'
 
 const committed = () => readFileSync(new URL('../client.js', import.meta.url), 'utf8')
+const committedOffice = () => readFileSync(new URL('../office.js', import.meta.url), 'utf8')
 
 test('build rejects an external node_modules link before generating artifacts', t => {
   const root = mkdtempSync(join(tmpdir(), 'ds-bot-build-'))
@@ -28,6 +29,10 @@ test('both deferred client artifacts match their sources', async () => {
 
 test('Office CLI artifact matches its sources', async () => {
   assert.equal(await bundleOffice(), readFileSync(new URL('../office.js', import.meta.url), 'utf8'))
+})
+
+test('office.js is the build of src/office', async () => {
+  assert.equal(await bundleOffice(), committedOffice(), 'office.js is stale: run `npm run build` and commit it')
 })
 
 // dsh runs client.js as a classic script that hands a factory to the module loader; the

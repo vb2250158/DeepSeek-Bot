@@ -124,6 +124,7 @@ export function install(rt) {
   // from state.bots; while it is on its way out, no group or Bot change treats it as
   // alive, and a second deleteBot does not start.
   const deleting = new Set()
+  const botDeleteHooks = []
   const liveBot = id => (deleting.has(id) ? undefined : rt.botOf(id))
   const isHeld = (kind, name) => held[kind].has(normalize(name))
   async function holdName(kind, name, work) {
@@ -228,6 +229,7 @@ export function install(rt) {
         createdAt: Date.now(),
         createdBy: createdBy ?? null,
         capabilities: [],
+        packs: [],
       }
       if (main) state.mainBotIds.push(id)
       const creator = rt.botOf(createdBy)
@@ -261,9 +263,16 @@ export function install(rt) {
       await rt.save()
       await scopeTools()
       // The greeting runs on the Bot's own model, once its provider is registered.
+      // Reading the model catalog can throw: the greeting then goes out on the model
+      // the Bot has, as a released greeting does. Nothing awaits this chain, so an
+      // uncaught rejection here would end the host.
       void rt.waitForModel(bot)
-        .then(() => rt.applyModel(bot).catch(error => rt.warn('ds-bot: model for %s not applied: %s', cleanName, error)))
+        .then(
+          () => rt.applyModel(bot).catch(error => rt.warn('ds-bot: model for %s not applied: %s', cleanName, error)),
+          error => rt.warn('ds-bot: model for %s not ready, greeting on its current model: %s', cleanName, error),
+        )
         .then(() => sendKickoff(bot, greeting))
+        .catch(error => rt.warn('ds-bot: greeting for %s not sent: %s', cleanName, error))
       return bot
     } catch (error) {
       // The Bot's Session was already made: archive it instead of leaving an orphan.
@@ -847,6 +856,13 @@ export function install(rt) {
       }
     }
     await rt.save()
+    for (const member of removed) {
+      await rt.stopMemberRoomTasks?.(room.id, member, 'removed from group')
+        .catch(error => rt.warn('ds-bot: stopping group tasks for removed member %s in %s failed: %s', member, room.name, error))
+      await rt.reconcileStoppedRoomTask?.(room.id, member)
+        .catch(error => rt.warn('ds-bot: reconciling group batch for removed member %s in %s failed: %s', member, room.name, error))
+    }
+    if (added.length > 0 || removed.length > 0) await rt.selectRoomSession?.(rt.sessionOfRoom(room), room)
     return { room, changes }
   }
 
@@ -855,6 +871,8 @@ export function install(rt) {
     if (room === undefined) throw new Error('Unknown group chat')
     // Before the group's Sessions leave the state, which the archive reads.
     const archived = rt.archiveGroupMemory(room)
+    await rt.stopRoomTasks?.(room.id, 'group deleted')
+      .catch(error => rt.warn('ds-bot: stopping tasks of deleted group %s failed: %s', room.name, error))
     for (const botId of Object.keys(room.sessions ?? {})) rt.dropGroupSession(room, botId)
     for (const segment of room.parts ?? []) delete state.switching[segment.sessionId]
     delete state.switching[rt.sessionOfRoom(room)]
@@ -972,6 +990,8 @@ export function install(rt) {
     if (bot === undefined) throw new Error('Unknown Bot')
     deleting.add(id)
     try {
+      for (const hook of botDeleteHooks) await hook(id)
+      rt.forgetBotTasks?.(bot)
       const current = rt.chatOf(id)
       // Questions and exchange turns are kept per Session, so every part of the chat is cleared.
       const parts = new Set([id, current, ...(bot.segments ?? []).map(segment => segment.sessionId), ...openSessions(bot)])
@@ -1026,6 +1046,7 @@ export function install(rt) {
         if (closedArchive.archivePath !== undefined || previousArchive?.archiving !== true) delete closedArchive.archiving
       }
       const failed = await saveForDelete()
+      for (const room of touched) await rt.selectRoomSession?.(rt.sessionOfRoom(room), room)
       // Same as deleteRoom: stopActivity removes the Session's armed scheduled tasks.
       // Past parts are archived too: a part move can leave tasks on the old Session,
       // which otherwise stays armed and invisible. Already-archived ids are a no-op.
@@ -1065,6 +1086,8 @@ export function install(rt) {
   }
 
   Object.assign(rt, {
+    // Reverse install order (side before BTW) matches the old delete wrappers.
+    onBotDelete: hook => { botDeleteHooks.unshift(hook) },
     ensureWorkspace, keepTeamFolder, createSession, createBot, duplicateBot, updateBot, setFlags,
     saveSection, reorderSections, reorderPins, deleteSection,
     roomBusy, autoRoomName, retitleRoom, createRoom, updateRoom, deleteRoom,

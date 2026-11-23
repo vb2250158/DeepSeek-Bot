@@ -396,3 +396,23 @@ test('the native sidebar distinguishes startup failure from setup without adding
   assert.match(textOf(navigationSidebar(true, { ready: false }).tree), /Setting up your Bots/)
   assert.match(textOf(navigationSidebar(true, { ready: false, bootFailed: true }).tree), /The Bot team could not start/)
 })
+
+test('TeamSidebar subscribes to specific ui slices rather than the whole ui object', () => {
+  const selectors = []
+  const base = { unread: {}, leftDrawer: false, details: null, view: 'details', panelYield: false, bootFailed: false }
+  TeamSidebar({
+    wide: true,
+    useRoster: pick => pick({ bots: [], rooms: [], agents: [], byId: {}, ready: true }),
+    useUi: (pick) => { selectors.push(pick); return pick(base) },
+    useRegistry: pick => pick({}),
+    useSessions: pick => pick({ ids: [], byId: {} }),
+    useUpdate: () => ({}),
+    actions: { toggleSidebar() {} },
+  })
+  assert.ok(selectors.length > 0)
+  for (const pick of selectors) {
+    const before = pick(base)
+    const after = pick({ ...base, palette: { query: 'test', token: 1 }, settings: { page: 'general' }, menu: { kind: 'bot', id: 'b1' }, toast: { text: 'err' } })
+    assert.equal(Object.is(before, after), true)
+  }
+})

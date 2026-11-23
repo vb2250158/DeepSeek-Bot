@@ -86,6 +86,21 @@ test('a failed state write rejects and leaves the saved file unchanged', async (
   assert.deepEqual(fs.readFileSync(statePath), original)
 })
 
+test('model selection witnesses survive a saved store reload', async (t) => {
+  const first = runtime(t)
+  await first.rt.load()
+  const selections = { s1: { provider: 'deepseek', model: 'v4', reasoningEffort: 'high' } }
+  first.rt.state.sessionModelSelections = selections
+  await first.rt.save()
+  await first.dispose()
+  const cleanups = []
+  const second = { ...first.rt, ctx: { effect: execute => cleanups.push(execute()) } }
+  t.after(async () => { for (const cleanup of cleanups) await cleanup() })
+  install(second)
+  await second.load()
+  assert.deepEqual(second.state.sessionModelSelections, selections)
+})
+
 test('a failed migration write warns but load() still resolves', async (t) => {
   const { rt, statePath, warnings } = runtime(t, { version: 1, mainBotId: 'chief', bots: { chief: { id: 'chief', name: 'Chief' } } })
   // The migrated team's first write fails: a directory takes the temp file's path.
@@ -648,7 +663,7 @@ test('saved fork state preserves identities, bindings, permissions and conversat
   const { rt, statePath, dispose } = runtime(t, old)
   await rt.load()
   const saved = JSON.parse(fs.readFileSync(statePath, 'utf8'))
-  assert.deepEqual(saved.bots, old.bots)
+  assert.deepEqual(saved.bots, Object.fromEntries(Object.entries(old.bots).map(([id, bot]) => [id, { ...bot, packs: [] }])))
   for (const key of ['mainBotIds', 'capabilities', 'privateArchives', 'exchanges', 'exchangeTurns', 'prefs', 'works', 'requests', 'questions', 'views', 'switching']) assert.deepEqual(saved[key], old[key])
   const expectedRoom = structuredClone(old.rooms.room)
   delete expectedRoom.relayLimit

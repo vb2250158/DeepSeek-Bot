@@ -27,7 +27,7 @@ The Bot team:
 
 ## Commands
 
-Use the current Windows source Web target in [docs/dev/testing.md](docs/dev/testing.md): Node `24.15.0`, npm `11.12.1`, pnpm `11.28.5`, Core `f8d94a2c5b83e0c715218073a3a6d0465f170e2c` / `0.2.2-rc.3`. Set `DSH_HARNESS` to that independent Core source checkout. Prepare only the existing native Host, Host/Client library and Web build steps listed there; do not install older npm Core versions for compatibility or build SDK executables and desktop/mobile packages.
+Use the current Windows source Web target in [docs/dev/testing.md](docs/dev/testing.md): Node `24.15.0`, npm `11.12.1`, pnpm `11.28.5`, Core `1dc25345183b59fb59606e5f5a8a3e8f81d96803` / `0.2.2-rc.5`. Set `DSH_HARNESS` to that independent Core source checkout. Prepare only the existing native Host, Host/Client library and Web build steps listed there; do not install older npm Core versions for compatibility or build SDK executables and desktop/mobile packages.
 
 In `ds-bot/`:
 
@@ -50,6 +50,19 @@ The full workflow is in [CONTRIBUTING.md](CONTRIBUTING.md#how-we-work). The part
 - Maintain this fork on the existing `main`; do not create maintenance branches. The upstream contribution workflow in CONTRIBUTING is separate from routine fork maintenance.
 - Publish normal commits with an ordinary push and verify the remote commit. Preserve unrelated drafts and existing history.
 - Fill in the pull request template. Link the issue with `Fixes #<number>`; a bug fix names the bug it fixes. Write the user-visible change in the Changelog field, and do not edit `CHANGELOG.md`.
+- When opening a pull request as an AI agent:
+  - Write `Agent: <Agent> (<Model>)` in the PR body (for example, `Agent: Antigravity (Gemini 4 Neon)` or `Agent: Claude Code (Claude Opus 5.5)`).
+  - Always add the matching `agent/*` label (`agent/antigravity`, `agent/claude-code`, `agent/codex`, `agent/devin`, `agent/dsbot`, or `agent/other`).
+  - If a target release version has been decided (for example `v0.3.9` or `v0.4.0`), attach the matching GitHub Milestone.
+  - Still keep the human requester as the git commit author without `Co-authored-by`.
+- When completing an independent review on a pull request:
+  - Post a structured comment (or review) on the PR starting with:
+    ```
+    Review: approved | changes-requested | needs-decision
+    Reviewer: <Agent> (<Model>) @ <short-sha>
+    ```
+  - Immediately set the mutually-exclusive `review/*` label (`review/approved`, `review/changes-requested`, `review/needs-decision`, or `review/re-review`) and add the matching `reviewed-by/*` label (`reviewed-by/antigravity`, `reviewed-by/claude-code`, `reviewed-by/codex`, `reviewed-by/devin`, `reviewed-by/dsbot`, or `reviewed-by/other`).
+  - When new commits are pushed after `review/approved` or `review/changes-requested`, switch the review status label to `review/re-review` and remove stale `reviewed-by/*` labels until re-reviewed (also automated by `.github/workflows/pr-triage-labels.yml` once on the default branch).
 - Do not start work on an issue or pull request with the `maintainer` label; it waits for the maintainer. Do not take an issue that someone else is assigned to.
 - Before you change behavior, read the design for it in `docs/plans/` (and `docs/vision.md`); for interface work also `docs/design/ui-standard.md`. A change to a decided design needs the maintainer; a new large feature adds its design note to the same pull request.
 - Do not close an issue without evidence: the pull request or commit that fixed it, the issue it duplicates, or the reason it will not be fixed.

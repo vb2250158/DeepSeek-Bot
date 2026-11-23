@@ -127,7 +127,7 @@ test('General settings offers the native Agent mode', () => {
     actions: { closeSettings() {}, openSettings() {}, setSurface: mode => calls.push(mode) },
   })
   const [general] = walk(tree, node => typeof node.type === 'function' && node.type.name === 'GeneralPage')
-  const [row] = walk(general.type(general.props), node => node.props?.label === 'Classic Agent mode')
+  const [row] = walk(general.type({ ...general.props, openAdvanced: 1 }), node => node.props?.label === 'Classic Agent mode')
   assert.ok(row)
   const [button] = walk(row, node => node.type === 'button')
   button.props.onClick()

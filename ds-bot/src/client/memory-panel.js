@@ -277,6 +277,7 @@ export function History({ owner, actions, undo, now }) {
     try { await load(rows === null ? undefined : more) } finally { if (alive.current) setPaging(false) }
   }
   if (rows === null && !error) return h(Skeleton)
+  if (rows?.length === 0 && !error) return h('div', { className: 'bt-mem-none' }, t('No changes yet'))
   return h('div', { className: 'bt-mem-entries' },
     error ? h('div', { className: 'bt-mem-failed', role: 'alert' },
       h('span', null, hostText(error)),
@@ -367,7 +368,7 @@ function LocalMemoryDialog({ owner, actions, leaving = false }) {
   const inputRef = useRef(null)
   const now = useNow(30_000)
   const close = useCallback(() => actions.closeMemory(), [])
-  useEscape(close)
+  useEscape(close, !leaving)
   useMenuDismiss(menu, menuRef, dotsRef, () => setMenu(false))
   useMenuDismiss(moveOpen, moveRef, moveAnchor, () => setMoveOpen(false))
   useEffect(() => {
@@ -383,7 +384,12 @@ function LocalMemoryDialog({ owner, actions, leaving = false }) {
     const below = window.innerHeight - rect.bottom - MOVE_MENU_GAP
     const above = rect.top - MOVE_MENU_GAP
     const right = Math.max(MOVE_MENU_GAP, window.innerWidth - rect.right)
-    setMoving({ entry, box: above > below ? { right, bottom: window.innerHeight - rect.top + 4, maxHeight: above } : { right, top: rect.bottom + 4, maxHeight: below } })
+    setMoving({
+      entry,
+      box: above > below
+        ? { right, bottom: window.innerHeight - rect.top + 4, maxHeight: above, '--bt-origin': 'bottom right' }
+        : { right, top: rect.bottom + 4, maxHeight: below, '--bt-origin': 'top right' },
+    })
     setMoveOpen(true)
   }
   const regenerate = () => { setMenu(false); setPage('summary'); void load({ regenerate: true }) }

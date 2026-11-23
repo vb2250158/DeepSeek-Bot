@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict'
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join, relative } from 'node:path'
+import { dirname, join, relative } from 'node:path'
 import { test } from 'node:test'
 import { createRuntime } from '../index.js'
 import { ROUTE } from '../src/host/constants.js'
+import { manualDirectory } from '../src/host/manual-skills.js'
 import { fakeApproval, fakeContext } from './fake-ctx.js'
 
 let rt
@@ -250,10 +251,10 @@ test('other Bots cannot reach a private Bot through the tools between Bots', asy
     ['attach_capability', { bot: 'Diary', name: 'x' }, 'a'],
     ['detach_capability', { bot: 'Diary', name: 'x' }, 'a'],
     ['update_bot', { bot: 'Diary', instructions: 'x' }, 'a'],
-    ['recall', { scope: 'Diary', query: 'x' }, 'a'],
-    ['recall', { scope: '"Diary"' }, 'b'],
-    ['remember', { scope: 'Diary', text: 'x' }, 'a'],
-    ['forget', { scope: 'Diary', entry: 'x' }, 'a'],
+    ['bot_recall', { scope: 'Diary', query: 'x' }, 'a'],
+    ['bot_recall', { scope: '"Diary"' }, 'b'],
+    ['bot_remember', { scope: 'Diary', text: 'x' }, 'a'],
+    ['bot_forget', { scope: 'Diary', entry: 'x' }, 'a'],
   ]) {
     const result = await run(name, args, from)
     assert.equal(result.ran, false, `${name} from ${from}`)
@@ -261,8 +262,8 @@ test('other Bots cannot reach a private Bot through the tools between Bots', asy
   }
   // The others still reach each other and the shared scopes.
   assert.deepEqual(await run('message_bot', { to: 'Writer', message: 'hi' }, 'a'), { ran: true })
-  assert.deepEqual(await run('recall', { scope: 'team', query: 'x' }, 'b'), { ran: true })
-  assert.deepEqual(await run('recall', { scope: 'own' }, P), { ran: true })
+  assert.deepEqual(await run('bot_recall', { scope: 'team', query: 'x' }, 'b'), { ran: true })
+  assert.deepEqual(await run('bot_recall', { scope: 'own' }, P), { ran: true })
   assert.deepEqual(await run('update_bot', { bot: 'Diary', role: 'x' }, P), { ran: true })
 })
 
@@ -341,6 +342,21 @@ test('other Bots cannot read, write or search what a private Bot keeps', async (
     ['session_search', { query: 'x', session_ids: ['b'] }],
   ]) {
     assert.deepEqual(await run(name, args, 'b'), { ran: true }, `${name} ${JSON.stringify(args)}`)
+  }
+})
+
+test('bundled skill references stay readable under a data root with a private Bot present', async (t) => {
+  const { rt, run, home, stop } = await start()
+  t.after(stop)
+  const reader = (await rt.createBot({ name: 'Reader' })).id
+  rt.dshHome = dirname(dirname(manualDirectory()))
+  const reference = join(manualDirectory(), 'references', 'settings.md')
+  assert.ok(readFileSync(reference, 'utf8').includes('# Settings reference'))
+  assert.deepEqual(await run('read', { file_path: reference }, reader), { ran: true })
+  for (const file of [join(rt.dshHome, 'private-data.json'), join(home, 'state.json')]) {
+    const result = await run('read', { file_path: file }, reader)
+    assert.equal(result.ran, false)
+    assert.match(result.error, CLOSED)
   }
 })
 
@@ -427,7 +443,7 @@ const sharedWrites = [
   ['update_group', { group: 'Ops', notice: 'PRIVATE_CONTENT' }],
   ['update_group', { group: 'Ops', name: 'PRIVATE_CONTENT' }],
   ['stop_bot', { bot: 'Writer', reason: 'PRIVATE_CONTENT' }],
-  ...['team', 'TEAM', '团队', '共享', '"team"', 'Writer'].map(scope => ['remember', { scope, text: 'PRIVATE_CONTENT' }]),
+  ...['team', 'TEAM', '团队', '共享', '"team"', 'Writer'].map(scope => ['bot_remember', { scope, text: 'PRIVATE_CONTENT' }]),
 ]
 
 test('every native shared write by a private Bot shows its full content before it runs', async (t) => {
@@ -468,7 +484,7 @@ test('public Bots keep team management and a private Bot keeps its own settings 
   t.after(stop)
   for (const [name, args] of sharedWrites) assert.deepEqual(await run(name, args, 'b'), { ran: true }, name)
   for (const scope of [undefined, '', 'own', 'me', '自己', 'Diary', P]) {
-    assert.deepEqual(await run('remember', { scope, text: 'kept private' }, P), { ran: true }, scope)
+    assert.deepEqual(await run('bot_remember', { scope, text: 'kept private' }, P), { ran: true }, scope)
   }
   assert.deepEqual(await run('update_bot', { instructions: 'kept private' }, P), { ran: true })
   // Execute the actual tool too: the ordinary Writer can still edit another public Bot.
@@ -555,12 +571,12 @@ test('one private Bot reads its own data but not another private Bot\'s', async 
 test('a private Bot reads public memory and keeps its own journal out of the shared log', async (t) => {
   const { tool, run, home, stop } = await start()
   t.after(stop)
-  await tool('remember', { text: 'a public fact', scope: 'own' }, 'b')
-  await tool('remember', { text: 'a private fact', scope: 'own' }, P)
-  const recalled = await tool('recall', { scope: 'Writer', query: 'public fact' }, P)
+  await tool('bot_remember', { text: 'a public fact', scope: 'own' }, 'b')
+  await tool('bot_remember', { text: 'a private fact', scope: 'own' }, P)
+  const recalled = await tool('bot_recall', { scope: 'Writer', query: 'public fact' }, P)
   assert.match(recalled, /a public fact/)
-  assert.match(await tool('recall', { scope: 'Diary' }, 'a'), /That Bot is private/)
-  const denied = await run('recall', { scope: 'Diary' }, 'a')
+  assert.match(await tool('bot_recall', { scope: 'Diary' }, 'a'), /That Bot is private/)
+  const denied = await run('bot_recall', { scope: 'Diary' }, 'a')
   assert.equal(denied.ran, false)
   assert.match(denied.error, CLOSED)
   const shared = readFileSync(join(home, 'memory', 'journal.jsonl'), 'utf8')
@@ -856,6 +872,22 @@ test('a kept Bot whose memory never moved does not close the archive folder', as
   const archiveRoot = join(home, 'memory', 'archive')
   mkdirSync(archiveRoot, { recursive: true })
   assert.deepEqual(await run('glob', { pattern: '**/*', path: archiveRoot }, 'b'), { ran: true })
+})
+
+test('another Bot cannot glob or read a private OCR spill that names the Session in its path', async (t) => {
+  const { run, diary, stop } = await start()
+  t.after(stop)
+  const spill = join(diary, '.ocr', P, P, 'scan.ocr.txt')
+  mkdirSync(join(diary, '.ocr', P, P), { recursive: true })
+  writeFileSync(spill, 'private ocr text')
+  const otherRead = await run('read', { file_path: spill }, 'b')
+  assert.equal(otherRead.ran, false)
+  assert.match(otherRead.error, CLOSED)
+  const otherGlob = await run('glob', { pattern: '**/*.ocr.txt', path: diary }, 'b')
+  assert.equal(otherGlob.ran, false)
+  assert.match(otherGlob.error, CLOSED)
+  assert.deepEqual(await run('read', { file_path: spill }, P), { ran: true })
+  assert.deepEqual(await run('glob', { pattern: '**/*.ocr.txt', path: diary }, P), { ran: true })
 })
 
 test('with no private Bot the tools run as they did', async (t) => {

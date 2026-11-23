@@ -119,16 +119,15 @@ test('Agent roster keeps the team live without opening chats; the Bot sidebar re
   assert.equal(reads.length, 2)
 })
 
-test('opening an earlier part takes it out of the archive and archives the part it replaces', async (t) => {
+test('the removed manual switch keeps the active and archived Session identities', async (t) => {
   const { home, registry, call } = await team(t, ['w1'])
   await call('state')
   const result = await call('bot-open-part', { botId: 'w1', sessionId: 'w1' })
-  assert.equal(result.ok, true, JSON.stringify(result))
-  await settled(() => registry.archivedSessionIds.includes('w2'))
-  assert.deepEqual([...registry.archivedSessionIds].sort(), ['w2'])
+  assert.equal(result.error?.code, 'bot/not-found')
+  assert.deepEqual([...registry.archivedSessionIds], ['w1'])
   const saved = JSON.parse(readFileSync(join(home, 'state.json'), 'utf8')).bots.w1
-  assert.equal(saved.sessionId, 'w1')
-  assert.deepEqual(saved.segments.map(segment => segment.sessionId), ['w2'])
+  assert.equal(saved.sessionId, 'w2')
+  assert.deepEqual(saved.segments.map(segment => segment.sessionId), ['w1'])
 })
 
 test('loading the team preserves current and earlier DSH Session archives', async (t) => {
@@ -149,16 +148,4 @@ test('indexing the team preserves a current Session explicitly archived with sto
   await rt.save()
   assert.equal(unarchive.mock.callCount(), 0)
   assert.deepEqual([...registry.archivedSessionIds].sort(), ['gw', 'outside', 'w2'])
-})
-
-test('a failed task move keeps the replaced part marked for the restart pass', async (t) => {
-  const { home, registry, call, rt } = await team(t, ['w1'])
-  await call('state')
-  rt.moveSchedules = async () => { throw new Error('schedule store unavailable') }
-  const result = await call('bot-open-part', { botId: 'w1', sessionId: 'w1' })
-  assert.equal(result.ok, true, JSON.stringify(result))
-  assert.deepEqual([...registry.archivedSessionIds], [])
-  const saved = JSON.parse(readFileSync(join(home, 'state.json'), 'utf8'))
-  assert.equal(saved.bots.w1.sessionId, 'w1')
-  assert.deepEqual(saved.switching, { w2: { botId: 'w1' } })
 })
