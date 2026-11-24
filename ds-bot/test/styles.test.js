@@ -80,6 +80,31 @@ test('message bodies skip offscreen content without containing overflowing tools
   assert.equal([...style.sheet.cssRules].some(rule => rule.selectorText === '[data-chat-flow-kind]'), false)
 })
 
+test('completed retry rows collapse only in Bot chats', () => {
+  const { window, module } = bench([])
+  try {
+    const { document } = window
+    const style = document.createElement('style')
+    style.textContent = module.exports.CONVERSATION_CSS
+    document.head.appendChild(style)
+    const retryRule = [...style.sheet.cssRules].find(rule => rule.selectorText?.includes('[data-chat-flow-kind="model-retry"]'))
+    assert.ok(retryRule)
+    assert.equal(retryRule.style.display, 'none')
+    document.body.innerHTML = `
+      <main class="bt-chat-column">
+        <div id="done" data-chat-flow-kind="model-retry"><div data-slot="conversation.chat.node"><details></details></div></div>
+        <div id="waiting" data-chat-flow-kind="model-retry"><div data-slot="conversation.chat.node"><details data-active="true"></details></div></div>
+        <div id="error" data-chat-flow-kind="turn-error"><div data-slot="conversation.chat.node"><details></details></div></div>
+      </main>
+      <div id="agent" data-chat-flow-kind="model-retry"><div data-slot="conversation.chat.node"><details></details></div></div>`
+    assert.deepEqual([...document.querySelectorAll(retryRule.selectorText)].map(row => row.id), ['done'])
+    document.querySelector('#waiting details').removeAttribute('data-active')
+    assert.deepEqual([...document.querySelectorAll(retryRule.selectorText)].map(row => row.id), ['done', 'waiting'])
+  } finally {
+    window.close()
+  }
+})
+
 // A fresh jsdom document, the bundled style helpers bound to it, and a real
 // ClientModuleSystem that materializes the pretend modules named in `rows`.
 const bench = (rows) => {

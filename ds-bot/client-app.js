@@ -39915,6 +39915,7 @@ body[data-bt-layout=flat] .bt-think{max-width:calc(var(--bt-flat-w) * 100%)}
 .bt-chat-column [data-step-process]>div:first-child{display:none!important}
 .bt-chat-column [data-step-process]>[data-step-process-body]{display:block!important;content-visibility:visible!important;max-height:none!important;overflow:visible!important;mask-image:none!important;scrollbar-gutter:auto!important}
 .bt-chat-column :is([data-step-process],[data-turn-process-hidden])[hidden]{content-visibility:visible!important}
+.bt-chat-column [data-chat-flow-kind="model-retry"]:has(> [data-slot="conversation.chat.node"] details:not([data-active])){display:none!important}
 [class*="_flowItem"]:has(> [data-slot="conversation.chat.node"]:empty, > [data-slot="conversation.chat.node"][data-bt-emptied]){display:none!important}
 /* A turn's process seat is a flow child of its own, not a flowItem: a seat whose
    member cells all emptied themselves (a hidden exchange turn, a turn whose
