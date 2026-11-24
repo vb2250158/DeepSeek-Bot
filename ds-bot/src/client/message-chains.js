@@ -2,7 +2,7 @@ import { useLayoutEffect } from 'react'
 
 const DIRECT_MESSAGE = '[data-bt-speaker]'
 const HOST_MESSAGE = '[data-chat-flow-kind=assistant-step],[data-chat-flow-kind=user],[data-chat-flow-kind=steering]'
-const CHAIN_BREAK_SEL = '.bt-group-msg, [data-chat-flow-kind=assistant-step], .bt-umsg, .bt-urow, [data-chat-flow-kind=user], [data-chat-flow-kind=steering], [data-pending-steering], [data-chat-flow-kind=command-input], .bt-q-inline, .bt-event, .bt-time-sep, .bt-new-sep, .bt-part-line, .bt-btw-card, .bt-learn-card'
+const CHAIN_BREAK_SEL = '.bt-group-msg, [data-chat-flow-kind=assistant-step], .bt-umsg, .bt-urow, [data-chat-flow-kind=user], [data-chat-flow-kind=steering], [data-pending-steering], [data-chat-flow-kind=command-input], .bt-q-inline, .bt-event, .bt-time-sep, .bt-new-sep, .bt-part-line, .bt-btw-card, .bt-learn-card, .bt-silent-run'
 
 export function syncGroupChains(flow) {
   const direct = [...flow.querySelectorAll(DIRECT_MESSAGE)]

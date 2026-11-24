@@ -1,5 +1,5 @@
-import { assistantChatActive, assistantSayText } from '../shared/assistant-chat.js'
-import { createElement as h, Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { ASSISTANT_SCHEDULE_REPLY_KEY, assistantChatActive, assistantSayText, visibleScheduleReply } from '../shared/assistant-chat.js'
+import { createElement as h, Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import { MarkdownText, writeClipboard } from './dsh-primitives.js'
 import { inkText } from './inks.js'
@@ -908,19 +908,43 @@ export function TurnTailCell({ turn: location, sessionId, useTurnClock, useUi, u
   const showsRunHistory = bot && useTurnSteps && useTurnTools
   if (!showsRunHistory && !label && !fresh) return null
   return h(Fragment, null,
-    showsRunHistory ? h(SilentTurnHistory, { bot, actions, sessionId, turn, useTurnSteps, useTurnTools, assistantState }) : null,
+    showsRunHistory ? h(SilentTurnHistory, { bot, actions, sessionId, location, useRoster, useUi, useTurnSteps, useTurnTools, assistantState }) : null,
     label ? h('div', { className: 'bt-time-sep', role: 'separator' }, label) : null,
     fresh ? h(NewDivider) : null)
 }
 
-function SilentTurnHistory({ bot, actions, sessionId, turn, useTurnSteps, useTurnTools, assistantState }) {
+const emptyReply = { subscribe: () => () => {}, getSnapshot: () => undefined }
+
+function SilentTurnHistory({ bot, actions, sessionId, location, useRoster, useUi, useTurnSteps, useTurnTools, assistantState }) {
+  const { turn, end } = location
   const steps = useTurnSteps(String(turn))
   const tools = useTurnTools(String(turn))
+  const schedule = location.data?.source?.(ASSISTANT_SCHEDULE_REPLY_KEY) ?? emptyReply
+  const recordedReply = useSyncExternalStore(schedule.subscribe, schedule.getSnapshot)
   const hasReply = steps.some(step => !assistantChatActive(assistantState, step.finalNode?.seq ?? step.seq)
     && step.blocks.some(block => block.kind === 'text' && stripToolCallTags(block.text).trim()))
     || tools.some(({ root }) => root.kind === 'tool-result' && assistantSayText(root, root.meta) !== undefined)
   if (hasReply) return null
-  return h('div', { className: 'bt-silent-run' }, h(TurnHistoryAvatar, { bot, actions, sessionId, turn }))
+  const reply = visibleScheduleReply(location, assistantState, recordedReply)
+  const history = { actions, sessionId, turn }
+  if (reply) {
+    return h(SpeakerReply, { bot, history }, h(ScheduledReply, { reply, bot, actions, sessionId, useRoster, useUi }))
+  }
+  const tail = location.data?.get('turn-tail')
+  const closing = tail?.closing
+  const conclusion = end.data?.reason?.kind === 'completed' && tail?.branchUnavailable === false
+    && closing?.status === 'settled' && closing.finalNode?.messageId !== undefined
+    && assistantChatActive(assistantState, closing.finalNode.seq)
+    ? closing.blocks.filter(block => block.kind === 'text').map(block => stripToolCallTags(block.text).trim()).filter(Boolean).join('\n\n')
+    : ''
+  return h(SpeakerReply, { bot, chain: false, history: { ...history, conclusion } },
+    h('div', { className: 'bt-silent-run' }, t('No chat reply. Select the avatar to see the run record.')))
+}
+
+function ScheduledReply({ reply, bot, actions, sessionId, useRoster, useUi }) {
+  const roster = useRoster(value => value)
+  return h(Bubbles, { texts: [reply.text], roster, selfId: bot.id, actions, sessionId,
+    msgKey: `${sessionId}:schedule-reply:${reply.seq}`, useUi })
 }
 
 export function Shimmer({ children }) {

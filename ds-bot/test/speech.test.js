@@ -126,3 +126,12 @@ test('assistant voice speaks the same committed say text as chat and ignores exe
   assert.equal(closingReplyText(chat, 1, { since: 2 }), '')
   assert.equal(closingReplyText(chat, 1, { since: 9 }), 'Execution narration')
 })
+
+test('assistant voice uses a completed schedule reply when the turn has no explicit say', () => {
+  const reply = { turn: 1, seq: 5, text: 'The check finished.' }
+  const location = { turn: 1, end: { seq: 6, data: { reason: { kind: 'completed' } } }, data: new Map([['dsBotAssistantScheduleReply', reply]]) }
+  const chat = { timeline: { turns: new Map([[1, location]]) }, nodes: { turnDataSource: () => ({ getSnapshot: () => [] }) } }
+  assert.equal(closingReplyText(chat, 1, { since: 2 }), reply.text)
+  location.end.data.reason.kind = 'aborted'
+  assert.equal(closingReplyText(chat, 1, { since: 2 }), '')
+})

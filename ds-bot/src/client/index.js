@@ -1,4 +1,5 @@
 import { ASSISTANT_CHAT_KEY } from '../shared/assistant-chat.js'
+import { assistantScheduleReplyDefinition } from './assistant-schedule-reply.js'
 import { installSettingsShell, SETTINGS_SHELL_CSS } from './settings-shell.js'
 import { call } from './api.js'
 import { isHex, inkText, paintCss } from './inks.js'
@@ -89,6 +90,7 @@ const WINDOWS = globalThis.navigator?.userAgentData?.platform === 'Windows' || /
 
 export function apply(ctx) {
   ctx.effect(() => installLocale(ctx.get('locale')), 'ds-bot: interface copy')
+  ctx.effect(() => ctx.uiConversation.events.register(assistantScheduleReplyDefinition), 'ds-bot: scheduled assistant replies')
   const rabiWorkspace = createRabiWorkspaceStore((payload, signal) => call('rabi-bot-view', payload, signal))
   ctx.effect(() => () => rabiWorkspace.dispose(), 'ds-bot: Rabi resource reads')
   migrateStorage()

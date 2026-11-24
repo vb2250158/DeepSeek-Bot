@@ -1691,6 +1691,8 @@ const ZH = {
   'Several tasks have this name.': '有多项任务使用这个名称。',
   'View run history': '查看本轮执行记录',
   'Run history': '本轮执行记录',
+  'No chat reply. Select the avatar to see the run record.': '本轮未在聊天中发言。点头像查看执行记录。',
+  'Recorded closing text': '已保存的结语',
   'Total time: {time}': '总耗时 {time}',
   'Total time unavailable': '暂无总耗时记录',
   'Call failed': '失败',

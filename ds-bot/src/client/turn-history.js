@@ -36,7 +36,7 @@ function CallHistory({ root }) {
     settled && root.error?.reason ? h('p', null, root.error.reason) : null)
 }
 
-function RunHistory({ source, turn }) {
+function RunHistory({ source, turn, conclusion }) {
   const time = useSyncExternalStore(source.chat.subscribe, source.chat.getSnapshot)?.timeline?.turns.get(turn)
   const roots = useSyncExternalStore(source.tools.subscribe, source.tools.getSnapshot)
   const steps = useSyncExternalStore(source.steps.subscribe, source.steps.getSnapshot)
@@ -45,17 +45,19 @@ function RunHistory({ source, turn }) {
   const calls = roots.flatMap(entry => callTree(entry.root))
   return h('div', { className: 'bt-run-history' },
     h('div', { className: 'bt-set-hint' }, elapsed ? t('Total time: {time}', { time: elapsed }) : t('Total time unavailable')),
+    conclusion ? h('details', { className: 'bt-history-call' },
+      h('summary', null, t('Recorded closing text')), h('pre', null, conclusion)) : null,
     calls.map((root, index) => h(CallHistory, { key: root.callId ?? index, root })),
     localCalls.length ? h('ul', null, localCalls.map((line, index) => h('li', { key: index }, line))) : null,
     !calls.length && !localCalls.length ? h('p', null, t('No recorded tool calls.')) : null)
 }
 
-export function TurnHistoryAvatar({ bot, actions, sessionId, turn }) {
+export function TurnHistoryAvatar({ bot, actions, sessionId, turn, conclusion }) {
   const [history, setHistory] = useState(null)
   const title = t('View run history')
   return h('span', { className: 'bt-lead' },
     h('button', { type: 'button', className: 'bt-turn-avatar', title, 'aria-label': title, 'aria-haspopup': 'dialog',
       onClick: () => setHistory({ source: actions.turnHistory?.(sessionId, turn) }) }, h(BotMark, { bot, size: 36 })),
     history ? h(Modal, { open: true, title: t('Run history'), closeLabel: t('Close Chat'), onClose: () => setHistory(null) },
-      history.source ? h(RunHistory, { source: history.source, turn }) : h('p', { role: 'status' }, t('This run is no longer available.'))) : null)
+      history.source ? h(RunHistory, { source: history.source, turn, conclusion }) : h('p', { role: 'status' }, t('This run is no longer available.'))) : null)
 }

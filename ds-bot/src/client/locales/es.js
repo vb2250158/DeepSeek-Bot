@@ -1,6 +1,8 @@
 // Spanish (es) localization for DS Bot client and DSH settings namespaces.
 
 export const ES = {
+  "No chat reply. Select the avatar to see the run record.": "No hubo respuesta en el chat. Selecciona el avatar para ver el registro de ejecución.",
+  "Recorded closing text": "Texto final guardado",
   "Rabi message from {name}": "Mensaje de Rabi de {name}",
   "View original delivery": "Ver la entrega original",
   "Several tasks have this name.": "Hay varias tareas con este nombre.",

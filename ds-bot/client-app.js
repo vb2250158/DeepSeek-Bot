@@ -29,6 +29,8 @@ module.exports = __toCommonJS(index_exports);
 // src/shared/assistant-chat.js
 var ASSISTANT_MODE_EVENT = "rabiroute/assistant-mode";
 var ASSISTANT_CHAT_KEY = "dsBotAssistantChat";
+var ASSISTANT_SCHEDULE_REPLY_EVENT = "rabiroute/assistant-schedule-reply";
+var ASSISTANT_SCHEDULE_REPLY_KEY = "dsBotAssistantScheduleReply";
 function assistantSayText(message, meta) {
   if (message?.isError !== false || meta?.kind !== "rabi-assistant-say" || typeof meta.text !== "string") return void 0;
   if (!Array.isArray(message.content) || message.content.length !== 1 || message.content[0]?.type !== "text" || typeof message.content[0].text !== "string") return void 0;
@@ -41,11 +43,41 @@ function assistantSayText(message, meta) {
   return typeof value?.text === "string" && value.text.trim() !== "" && value.text === meta.text ? value.text : void 0;
 }
 function assistantChatText(event, state) {
-  return event.type === "tool/result" && assistantChatActive(state, event.seq) ? assistantSayText(event.data?.message, event.data?.meta) : void 0;
+  if (!assistantChatActive(state, event.seq)) return void 0;
+  return event.type === "tool/result" ? assistantSayText(event.data?.message, event.data?.meta) : assistantScheduleReply(event)?.text;
+}
+function assistantScheduleReply(event) {
+  if (event.type !== ASSISTANT_SCHEDULE_REPLY_EVENT || !Number.isInteger(event.seq)) return void 0;
+  const { turn, text } = event.data ?? {};
+  if (!Number.isSafeInteger(turn) || turn < 0 || typeof text !== "string" || text.trim() === "") return void 0;
+  return { turn, seq: event.seq, text: text.trim() };
+}
+function visibleScheduleReply(location2, state, reply = location2.data?.get(ASSISTANT_SCHEDULE_REPLY_KEY)) {
+  const reason = location2.end?.data?.reason?.kind;
+  return reply && reason !== void 0 && reason !== "aborted" && reply.turn === location2.turn && assistantChatActive(state, reply.seq) ? reply : void 0;
 }
 function assistantChatActive(state, seq = Infinity) {
   return state?.since !== null && state?.since !== void 0 && seq >= state.since;
 }
+
+// src/client/assistant-schedule-reply.js
+var assistantScheduleReplyDefinition = {
+  kind: ASSISTANT_SCHEDULE_REPLY_KEY,
+  target: "chat",
+  match: {
+    [ASSISTANT_SCHEDULE_REPLY_EVENT]: (event) => {
+      const reply = assistantScheduleReply(event);
+      return reply ? { id: String(reply.turn), role: "start" } : null;
+    }
+  },
+  start: (_context, match) => assistantScheduleReply(match.event),
+  buildLocationData: ({ start, state }, scope) => {
+    const location2 = start?.location;
+    if (scope !== "turn" || !state || location2?.kind !== "turn" && location2?.kind !== "step" || location2.turn.turn !== state.turn) return null;
+    return { kind: "turn", turn: state.turn, key: ASSISTANT_SCHEDULE_REPLY_KEY, value: state };
+  },
+  buildViewNode: () => null
+};
 
 // src/client/dsh-primitives.js
 var import_dsh_client_ui_primitives = require("@deepseek-ai/dsh-client-ui-primitives");
@@ -928,6 +960,8 @@ function convertHostErrors(pairs) {
 
 // src/client/locales/ja.js
 var JA = {
+  "No chat reply. Select the avatar to see the run record.": "チャットでの返信はありません。アバターを選択すると実行記録を確認できます。",
+  "Recorded closing text": "保存されたまとめ",
   "Rabi message from {name}": "{name} からの Rabi メッセージ",
   "View original delivery": "元の配信を表示",
   "Several tasks have this name.": "同じ名前のタスクが複数あります。",
@@ -3724,6 +3758,8 @@ var DSH_JA = {
 
 // src/client/locales/ko.js
 var KO = {
+  "No chat reply. Select the avatar to see the run record.": "채팅 답변이 없습니다. 아바타를 선택하면 실행 기록을 볼 수 있습니다.",
+  "Recorded closing text": "저장된 마무리 텍스트",
   "Rabi message from {name}": "{name}의 Rabi 메시지",
   "View original delivery": "원본 전달 메시지 보기",
   "Several tasks have this name.": "이름이 같은 작업이 여러 개 있습니다.",
@@ -6565,6 +6601,8 @@ var DSH_KO = {
 
 // src/client/locales/es.js
 var ES = {
+  "No chat reply. Select the avatar to see the run record.": "No hubo respuesta en el chat. Selecciona el avatar para ver el registro de ejecución.",
+  "Recorded closing text": "Texto final guardado",
   "Rabi message from {name}": "Mensaje de Rabi de {name}",
   "View original delivery": "Ver la entrega original",
   "Several tasks have this name.": "Hay varias tareas con este nombre.",
@@ -9406,6 +9444,8 @@ var DSH_ES = {
 
 // src/client/locales/fr.js
 var FR = {
+  "No chat reply. Select the avatar to see the run record.": "Aucune réponse dans le chat. Sélectionnez l’avatar pour consulter le journal d’exécution.",
+  "Recorded closing text": "Texte de conclusion enregistré",
   "Rabi message from {name}": "Message Rabi de {name}",
   "View original delivery": "Afficher l’envoi d’origine",
   "Several tasks have this name.": "Plusieurs tâches portent ce nom.",
@@ -12202,6 +12242,8 @@ var DSH_FR = {
 
 // src/client/locales/de.js
 var DE = {
+  "No chat reply. Select the avatar to see the run record.": "Keine Chatantwort. Wähle den Avatar, um den Ausführungsverlauf anzuzeigen.",
+  "Recorded closing text": "Gespeicherter Abschlusstext",
   "Rabi message from {name}": "Rabi-Nachricht von {name}",
   "View original delivery": "Ursprüngliche Zustellung anzeigen",
   "Several tasks have this name.": "Mehrere Aufgaben haben diesen Namen.",
@@ -16729,6 +16771,8 @@ var ZH = {
   "Several tasks have this name.": "有多项任务使用这个名称。",
   "View run history": "查看本轮执行记录",
   "Run history": "本轮执行记录",
+  "No chat reply. Select the avatar to see the run record.": "本轮未在聊天中发言。点头像查看执行记录。",
+  "Recorded closing text": "已保存的结语",
   "Total time: {time}": "总耗时 {time}",
   "Total time unavailable": "暂无总耗时记录",
   "Call failed": "失败",
@@ -40014,7 +40058,7 @@ body[data-bt-layout=flat] .bt-think{max-width:calc(var(--bt-flat-w) * 100%)}
 .bt-think-text[data-fade=both]{mask-image:linear-gradient(to bottom,transparent,#000 18px,#000 calc(100% - 18px),transparent)}
 .bt-turn-avatar{display:inline-flex;align-items:center;justify-content:center;flex:none;padding:0;border:0;background:transparent;color:inherit;cursor:pointer}
 .bt-turn-avatar:focus-visible{outline:1px solid var(--bt-accent);outline-offset:2px}
-.bt-silent-run{display:flex;align-items:center;min-height:36px;margin:4px 0}
+.bt-silent-run{font-size:12px;line-height:18px;color:var(--bt-ink-2)}
 .bt-run-history{display:grid;gap:10px;max-height:65vh;overflow:auto}
 .bt-history-call{min-width:0;overflow-wrap:anywhere}
 .bt-history-call>summary{cursor:pointer}
@@ -41231,7 +41275,7 @@ function publishUserHead({ actions, roster, isActive }) {
 var import_react59 = require("react");
 var DIRECT_MESSAGE = "[data-bt-speaker]";
 var HOST_MESSAGE = "[data-chat-flow-kind=assistant-step],[data-chat-flow-kind=user],[data-chat-flow-kind=steering]";
-var CHAIN_BREAK_SEL = ".bt-group-msg, [data-chat-flow-kind=assistant-step], .bt-umsg, .bt-urow, [data-chat-flow-kind=user], [data-chat-flow-kind=steering], [data-pending-steering], [data-chat-flow-kind=command-input], .bt-q-inline, .bt-event, .bt-time-sep, .bt-new-sep, .bt-part-line, .bt-btw-card, .bt-learn-card";
+var CHAIN_BREAK_SEL = ".bt-group-msg, [data-chat-flow-kind=assistant-step], .bt-umsg, .bt-urow, [data-chat-flow-kind=user], [data-chat-flow-kind=steering], [data-pending-steering], [data-chat-flow-kind=command-input], .bt-q-inline, .bt-event, .bt-time-sep, .bt-new-sep, .bt-part-line, .bt-btw-card, .bt-learn-card, .bt-silent-run";
 function syncGroupChains(flow) {
   const direct = [...flow.querySelectorAll(DIRECT_MESSAGE)];
   const owned = new Set(direct.map((row) => row.closest(HOST_MESSAGE)));
@@ -42389,7 +42433,7 @@ function CallHistory({ root }) {
     settled && root.error?.reason ? (0, import_react65.createElement)("p", null, root.error.reason) : null
   );
 }
-function RunHistory({ source, turn }) {
+function RunHistory({ source, turn, conclusion }) {
   const time = (0, import_react65.useSyncExternalStore)(source.chat.subscribe, source.chat.getSnapshot)?.timeline?.turns.get(turn);
   const roots = (0, import_react65.useSyncExternalStore)(source.tools.subscribe, source.tools.getSnapshot);
   const steps = (0, import_react65.useSyncExternalStore)(source.steps.subscribe, source.steps.getSnapshot);
@@ -42400,12 +42444,18 @@ function RunHistory({ source, turn }) {
     "div",
     { className: "bt-run-history" },
     (0, import_react65.createElement)("div", { className: "bt-set-hint" }, elapsed ? t("Total time: {time}", { time: elapsed }) : t("Total time unavailable")),
+    conclusion ? (0, import_react65.createElement)(
+      "details",
+      { className: "bt-history-call" },
+      (0, import_react65.createElement)("summary", null, t("Recorded closing text")),
+      (0, import_react65.createElement)("pre", null, conclusion)
+    ) : null,
     calls.map((root, index) => (0, import_react65.createElement)(CallHistory, { key: root.callId ?? index, root })),
     localCalls.length ? (0, import_react65.createElement)("ul", null, localCalls.map((line, index) => (0, import_react65.createElement)("li", { key: index }, line))) : null,
     !calls.length && !localCalls.length ? (0, import_react65.createElement)("p", null, t("No recorded tool calls.")) : null
   );
 }
-function TurnHistoryAvatar({ bot, actions, sessionId, turn }) {
+function TurnHistoryAvatar({ bot, actions, sessionId, turn, conclusion }) {
   const [history, setHistory] = (0, import_react65.useState)(null);
   const title = t("View run history");
   return (0, import_react65.createElement)(
@@ -42422,7 +42472,7 @@ function TurnHistoryAvatar({ bot, actions, sessionId, turn }) {
     history ? (0, import_react65.createElement)(
       import_dsh_client_ui_primitives.Modal,
       { open: true, title: t("Run history"), closeLabel: t("Close Chat"), onClose: () => setHistory(null) },
-      history.source ? (0, import_react65.createElement)(RunHistory, { source: history.source, turn }) : (0, import_react65.createElement)("p", { role: "status" }, t("This run is no longer available."))
+      history.source ? (0, import_react65.createElement)(RunHistory, { source: history.source, turn, conclusion }) : (0, import_react65.createElement)("p", { role: "status" }, t("This run is no longer available."))
     ) : null
   );
 }
@@ -43300,17 +43350,46 @@ function TurnTailCell({ turn: location2, sessionId, useTurnClock, useUi, useRost
   return (0, import_react66.createElement)(
     import_react66.Fragment,
     null,
-    showsRunHistory ? (0, import_react66.createElement)(SilentTurnHistory, { bot, actions, sessionId, turn, useTurnSteps, useTurnTools, assistantState }) : null,
+    showsRunHistory ? (0, import_react66.createElement)(SilentTurnHistory, { bot, actions, sessionId, location: location2, useRoster, useUi, useTurnSteps, useTurnTools, assistantState }) : null,
     label ? (0, import_react66.createElement)("div", { className: "bt-time-sep", role: "separator" }, label) : null,
     fresh ? (0, import_react66.createElement)(NewDivider) : null
   );
 }
-function SilentTurnHistory({ bot, actions, sessionId, turn, useTurnSteps, useTurnTools, assistantState }) {
+var emptyReply = { subscribe: () => () => {
+}, getSnapshot: () => void 0 };
+function SilentTurnHistory({ bot, actions, sessionId, location: location2, useRoster, useUi, useTurnSteps, useTurnTools, assistantState }) {
+  const { turn, end } = location2;
   const steps = useTurnSteps(String(turn));
   const tools = useTurnTools(String(turn));
+  const schedule = location2.data?.source?.(ASSISTANT_SCHEDULE_REPLY_KEY) ?? emptyReply;
+  const recordedReply = (0, import_react66.useSyncExternalStore)(schedule.subscribe, schedule.getSnapshot);
   const hasReply = steps.some((step) => !assistantChatActive(assistantState, step.finalNode?.seq ?? step.seq) && step.blocks.some((block) => block.kind === "text" && stripToolCallTags(block.text).trim())) || tools.some(({ root }) => root.kind === "tool-result" && assistantSayText(root, root.meta) !== void 0);
   if (hasReply) return null;
-  return (0, import_react66.createElement)("div", { className: "bt-silent-run" }, (0, import_react66.createElement)(TurnHistoryAvatar, { bot, actions, sessionId, turn }));
+  const reply = visibleScheduleReply(location2, assistantState, recordedReply);
+  const history = { actions, sessionId, turn };
+  if (reply) {
+    return (0, import_react66.createElement)(SpeakerReply, { bot, history }, (0, import_react66.createElement)(ScheduledReply, { reply, bot, actions, sessionId, useRoster, useUi }));
+  }
+  const tail = location2.data?.get("turn-tail");
+  const closing = tail?.closing;
+  const conclusion = end.data?.reason?.kind === "completed" && tail?.branchUnavailable === false && closing?.status === "settled" && closing.finalNode?.messageId !== void 0 && assistantChatActive(assistantState, closing.finalNode.seq) ? closing.blocks.filter((block) => block.kind === "text").map((block) => stripToolCallTags(block.text).trim()).filter(Boolean).join("\n\n") : "";
+  return (0, import_react66.createElement)(
+    SpeakerReply,
+    { bot, chain: false, history: { ...history, conclusion } },
+    (0, import_react66.createElement)("div", { className: "bt-silent-run" }, t("No chat reply. Select the avatar to see the run record."))
+  );
+}
+function ScheduledReply({ reply, bot, actions, sessionId, useRoster, useUi }) {
+  const roster = useRoster((value) => value);
+  return (0, import_react66.createElement)(Bubbles, {
+    texts: [reply.text],
+    roster,
+    selfId: bot.id,
+    actions,
+    sessionId,
+    msgKey: `${sessionId}:schedule-reply:${reply.seq}`,
+    useUi
+  });
 }
 function Shimmer({ children }) {
   return (0, import_react66.createElement)("span", { className: "bt-shimmer" }, children);
@@ -50518,10 +50597,11 @@ function closingReplyText(chat, turn, presentation) {
     if (location2.end === void 0) return void 0;
     const tools = chat.nodes?.turnDataSource(turn, "tool-call").getSnapshot();
     if (tools === void 0) return void 0;
-    return tools.flatMap(({ root }) => {
+    const said = tools.flatMap(({ root }) => {
       const text = root.kind === "tool-result" && assistantChatActive(presentation, root.seq) ? assistantSayText(root, root.meta) : void 0;
       return text === void 0 ? [] : [text];
     }).join("\n\n");
+    return said || visibleScheduleReply(location2, presentation)?.text || "";
   }
   const closing = location2.data?.get("turn-tail")?.closing;
   if (closing === void 0) return void 0;
@@ -55718,6 +55798,7 @@ var inject = ["sessions", "uiWorkspace", "uiConversation", "slots", "theme", "la
 var WINDOWS = globalThis.navigator?.userAgentData?.platform === "Windows" || /^Win/u.test(globalThis.navigator?.platform ?? "");
 function apply(ctx) {
   ctx.effect(() => installLocale(ctx.get("locale")), "ds-bot: interface copy");
+  ctx.effect(() => ctx.uiConversation.events.register(assistantScheduleReplyDefinition), "ds-bot: scheduled assistant replies");
   const rabiWorkspace = createRabiWorkspaceStore((payload, signal) => call("rabi-bot-view", payload, signal));
   ctx.effect(() => () => rabiWorkspace.dispose(), "ds-bot: Rabi resource reads");
   migrateStorage();

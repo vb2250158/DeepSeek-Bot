@@ -1,6 +1,8 @@
 // French (fr) localization for DS Bot client and DSH settings namespaces.
 
 export const FR = {
+  "No chat reply. Select the avatar to see the run record.": "Aucune réponse dans le chat. Sélectionnez l’avatar pour consulter le journal d’exécution.",
+  "Recorded closing text": "Texte de conclusion enregistré",
   "Rabi message from {name}": "Message Rabi de {name}",
   "View original delivery": "Afficher l’envoi d’origine",
   "Several tasks have this name.": "Plusieurs tâches portent ce nom.",

@@ -1,6 +1,8 @@
 // Japanese (ja) localization for DS Bot client and DSH settings namespaces.
 
 export const JA = {
+  "No chat reply. Select the avatar to see the run record.": "チャットでの返信はありません。アバターを選択すると実行記録を確認できます。",
+  "Recorded closing text": "保存されたまとめ",
   "Rabi message from {name}": "{name} からの Rabi メッセージ",
   "View original delivery": "元の配信を表示",
   "Several tasks have this name.": "同じ名前のタスクが複数あります。",

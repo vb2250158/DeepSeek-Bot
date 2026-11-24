@@ -1,6 +1,8 @@
 // German (de) localization for DS Bot client and DSH settings namespaces.
 
 export const DE = {
+  "No chat reply. Select the avatar to see the run record.": "Keine Chatantwort. Wähle den Avatar, um den Ausführungsverlauf anzuzeigen.",
+  "Recorded closing text": "Gespeicherter Abschlusstext",
   "Rabi message from {name}": "Rabi-Nachricht von {name}",
   "View original delivery": "Ursprüngliche Zustellung anzeigen",
   "Several tasks have this name.": "Mehrere Aufgaben haben diesen Namen.",

@@ -6,7 +6,8 @@ import { fileURLToPath } from 'node:url'
 import { runInNewContext } from 'node:vm'
 import { build } from 'esbuild'
 import { previewOf } from '../src/client/text.js'
-import { assistantSayText } from '../src/shared/assistant-chat.js'
+import { assistantChatText, assistantSayText, ASSISTANT_SCHEDULE_REPLY_EVENT, ASSISTANT_SCHEDULE_REPLY_KEY } from '../src/shared/assistant-chat.js'
+import { assistantScheduleReplyDefinition } from '../src/client/assistant-schedule-reply.js'
 
 const { outputFiles } = await build({
   entryPoints: [fileURLToPath(new URL('../src/client/cells.js', import.meta.url))],
@@ -25,7 +26,7 @@ runInNewContext(outputFiles[0].text, {
   module, exports: module.exports, Intl, Date, TextEncoder,
   require: name => name === 'react' ? react : {},
 })
-const { AssistantCell, ToolCell, TriggerCell } = module.exports
+const { AssistantCell, ToolCell, TriggerCell, TurnTailCell } = module.exports
 const roster = { byId: { bot: { id: 'bot', name: 'Rabi', color: 'gray' } }, bots: [], roomsById: {}, prefs: {}, exchangeTurns: {} }
 const props = {
   sessionId: 'bot', useRoster: select => select(roster), useUi: select => select({}),
@@ -57,6 +58,57 @@ test('native tool renderer shows only committed say text as full chat bubbles', 
   assert.equal(pending.type.name, 'CellEmpty')
   const failed = ToolCell({ ...props, node: { data: { root: { ...result, isError: true } } } })
   assert.equal(failed.type.name, 'CellEmpty')
+})
+
+test('a scheduled fallback is admitted only as a nonempty reply to its owning turn', () => {
+  const event = { type: ASSISTANT_SCHEDULE_REPLY_EVENT, seq: 8, data: { turn: 1, text: ' Checked the status. ' } }
+  const match = assistantScheduleReplyDefinition.match[ASSISTANT_SCHEDULE_REPLY_EVENT]
+  assert.deepEqual(match(event), { id: '1', role: 'start' })
+  assert.equal(match({ ...event, data: { ...event.data, text: ' ' } }), null)
+  assert.equal(match({ ...event, data: { ...event.data, turn: '1' } }), null)
+  const state = assistantScheduleReplyDefinition.start({}, { event })
+  const location = { kind: 'turn', turn: { turn: 1 } }
+  const projected = assistantScheduleReplyDefinition.buildLocationData({ start: { location }, state }, 'turn')
+  assert.deepEqual(projected, { kind: 'turn', turn: 1, key: ASSISTANT_SCHEDULE_REPLY_KEY, value: { turn: 1, seq: 8, text: 'Checked the status.' } })
+  assert.equal(assistantScheduleReplyDefinition.buildLocationData({ start: { location: { kind: 'turn', turn: { turn: 2 } } }, state }, 'turn'), null)
+  assert.equal(assistantChatText(event, { since: 2 }), 'Checked the status.')
+  assert.equal(assistantChatText(event, { since: 10 }), undefined)
+})
+
+test('an unspoken turn shows the Bot name and keeps only its finalized closing text in run history', () => {
+  const steps = [{ status: 'settled', finalNode: { seq: 7, messageId: 'closed' }, blocks: [
+    { kind: 'reasoning', text: 'Thought' }, { kind: 'text', text: 'Saved conclusion' },
+  ] }]
+  const tail = (reply, overrides = {}) => {
+    const turnData = new Map([['turn-tail', { closing: steps[0], branchUnavailable: false }], [ASSISTANT_SCHEDULE_REPLY_KEY, reply]])
+    const end = { time: 50, data: { reason: { kind: 'completed' } } }
+    const tree = TurnTailCell({ ...props, turn: { turn: 1, end, data: turnData }, useTurnClock: select => select({}),
+      useTurnSteps: () => steps, useTurnTools: () => [], ...overrides })
+    const history = tree.children[0]
+    return history.type(history.props)
+  }
+  const original = tail()
+  assert.equal(original.type.name, 'SpeakerReply')
+  assert.equal(original.props.chain, false)
+  assert.equal(original.props.history.conclusion, 'Saved conclusion')
+  assert.equal(original.children[0].props.className, 'bt-silent-run')
+  assert.doesNotMatch(original.children[0].children[0], /Saved conclusion|Thought/)
+  const recorded = tail({ turn: 1, seq: 8, text: 'Checked the status.' })
+  assert.equal(recorded.props.history.conclusion, undefined)
+  assert.equal(recorded.children[0].props.reply.text, 'Checked the status.')
+  const failed = tail({ turn: 1, seq: 51, text: 'No result was confirmed.' }, {
+    turn: { turn: 1, end: { time: 50, data: { reason: { kind: 'error' } } },
+      data: new Map([[ASSISTANT_SCHEDULE_REPLY_KEY, { turn: 1, seq: 51, text: 'No result was confirmed.' }]]) },
+  })
+  assert.equal(failed.children[0].props.reply.text, 'No result was confirmed.')
+  const blocked = tail(undefined, {
+    turn: { turn: 1, end: { time: 50, data: { reason: { kind: 'blocked' } } },
+      data: new Map([[ASSISTANT_SCHEDULE_REPLY_KEY, { turn: 1, seq: 49, text: 'No result was confirmed.' }]]) },
+  })
+  assert.equal(blocked.children[0].props.reply.text, 'No result was confirmed.')
+  assert.equal(tail({ turn: 1, seq: 8, text: 'Checked the status.' }, {
+    useTurnTools: () => [{ root: result }],
+  }), null)
 })
 
 test('ordinary Agent task details open the supported tool inspector', () => {

@@ -1404,7 +1404,7 @@ body[data-bt-layout=flat] .bt-think{max-width:calc(var(--bt-flat-w) * 100%)}
 .bt-think-text[data-fade=both]{mask-image:linear-gradient(to bottom,transparent,#000 18px,#000 calc(100% - 18px),transparent)}
 .bt-turn-avatar{display:inline-flex;align-items:center;justify-content:center;flex:none;padding:0;border:0;background:transparent;color:inherit;cursor:pointer}
 .bt-turn-avatar:focus-visible{outline:1px solid var(--bt-accent);outline-offset:2px}
-.bt-silent-run{display:flex;align-items:center;min-height:36px;margin:4px 0}
+.bt-silent-run{font-size:12px;line-height:18px;color:var(--bt-ink-2)}
 .bt-run-history{display:grid;gap:10px;max-height:65vh;overflow:auto}
 .bt-history-call{min-width:0;overflow-wrap:anywhere}
 .bt-history-call>summary{cursor:pointer}

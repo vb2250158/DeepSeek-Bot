@@ -1,6 +1,8 @@
 // Korean (ko) localization for DS Bot client and DSH settings namespaces.
 
 export const KO = {
+  "No chat reply. Select the avatar to see the run record.": "채팅 답변이 없습니다. 아바타를 선택하면 실행 기록을 볼 수 있습니다.",
+  "Recorded closing text": "저장된 마무리 텍스트",
   "Rabi message from {name}": "{name}의 Rabi 메시지",
   "View original delivery": "원본 전달 메시지 보기",
   "Several tasks have this name.": "이름이 같은 작업이 여러 개 있습니다.",
