@@ -1,12 +1,17 @@
 // Japanese (ja) localization for DS Bot client and DSH settings namespaces.
 
 export const JA = {
+  "No chat reply. Select the avatar to see the run record.": "チャットでの返信はありません。アバターを選択すると実行記録を確認できます。",
+  "Recorded closing text": "保存されたまとめ",
   "Sending message": "メッセージを送信中",
   "Rabi connection settings": "Rabi 接続設定",
   "Rabi is not running. Start Rabi, then send your message again.": "Rabi が起動していません。Rabi を起動してから、メッセージを再送信してください。",
   "Rabi is restoring its plan service. This turn has not finished synchronizing.": "Rabi が計画サービスを復旧中です。このターンの同期はまだ完了していません。",
   "Rabi did not confirm this operation. Check its original receipt before retrying.": "Rabi からこの操作の確認が得られませんでした。再試行する前に、元の実行結果を確認してください。",
-  "Could not complete the Rabi connection. Check Rabi and its storage connection.": "Rabi への接続を完了できませんでした。Rabi とストレージへの接続を確認してください。",
+  "Rabi could not access the persona data.": "Rabi がペルソナのデータにアクセスできませんでした。",
+  "Rabi timed out accessing the persona data. Try again.": "ペルソナのデータへのアクセスがタイムアウトしました。もう一度お試しください。",
+  "Could not connect to Rabi. Check the connection settings.": "Rabi に接続できませんでした。接続設定を確認してください。",
+  "Rabi could not complete this request.": "Rabi がリクエストを完了できませんでした。",
   "Managed by Rabi": "Rabi が管理",
   "Work title": "役職",
   "Based on actual responsibilities.": "実際の担当業務に基づきます。",
@@ -79,8 +84,6 @@ export const JA = {
   "Times use the Rabi host time zone.": "時刻には Rabi ホストのタイムゾーンを使用します。",
   "Current rule in Rabi. Review before saving your edits.": "Rabi の現在のルールです。編集内容を保存する前に確認してください。",
   "DSH tasks": "DSH タスク",
-  "Pinned chats": "ピン留めしたチャット",
-  "Drop here to pin": "ここにドロップしてピン留め",
   "Setting up your Bots…": "Bot をセットアップ中…",
   "Yesterday": "昨日",
   "User": "ユーザー",

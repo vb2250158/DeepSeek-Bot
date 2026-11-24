@@ -4,7 +4,7 @@
 import { createElement as h, Fragment, useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { Button, Input, InlineEditor, Menu, Modal, Switch } from '@deepseek-ai/dsh-client-ui-primitives'
 import { BotAvatar, RoomAvatar } from './mark.js'
-import { ClockIcon, PencilIcon, PlusIcon, TrashIcon } from './icons.js'
+import { ClockIcon, ChevronRightIcon, PencilIcon, PlusIcon, TrashIcon } from './icons.js'
 import { Segmented } from './motion.js'
 import { dateLocale, hostText, t } from './i18n.js'
 
@@ -94,9 +94,9 @@ const nextText = (task) => {
   return task.status === 'active' ? t('Next: {time}', { time: dayAndTime(Date.parse(task.scheduledAt)) }) : t('Finished')
 }
 
-function TaskRow({ task, actions, onView, showBot, roster }) {
+function TaskRow({ task, actions, onView, showBot, roster, initiallyExpanded = false }) {
   const [confirming, setConfirming] = useState(false)
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded] = useState(initiallyExpanded)
   const [busy, setBusy] = useState(false)
   useEffect(() => {
     if (!confirming) return undefined
@@ -120,6 +120,119 @@ function TaskRow({ task, actions, onView, showBot, roster }) {
       type: 'button', className: 'bt-mini bt-task-remove', 'data-confirm': confirming || undefined, disabled: busy,
       'aria-label': confirming ? t('Click again to delete') : t('Delete task'), title: confirming ? undefined : t('Delete task'), onClick: remove,
     }, confirming ? t('Delete') : h(TrashIcon)))
+}
+
+function scheduleRunTitle(prompt) {
+  return prompt.trim().split(/\r?\n/, 1)[0].replace(/^定时计划触发[:：]\s*/u, '').split(/\s*\[用户模板补充\]/u, 1)[0].trim()
+}
+
+export function scheduleRuns(content, fallback) {
+  const single = /^reminder_prompt_json: (.*)$/m.exec(content ?? '')
+  const id = /^schedule_id_json: (.*)$/m.exec(content ?? '')
+  const batch = /^reminders_json: (.*)$/m.exec(content ?? '')
+  try {
+    const records = batch ? JSON.parse(batch[1]) : single
+      ? [{ schedule_id: id ? JSON.parse(id[1]) : undefined, reminder_prompt: JSON.parse(single[1]) }]
+      : [{ reminder_prompt: fallback }]
+    if (!Array.isArray(records)) return []
+    return records.filter(record => typeof record?.reminder_prompt === 'string' && record.reminder_prompt.trim())
+      .map(record => ({
+        id: typeof record.schedule_id === 'string' ? record.schedule_id : undefined,
+        title: scheduleRunTitle(record.reminder_prompt),
+        prompt: record.reminder_prompt,
+        rabi: /^定时计划触发[:：]/u.test(record.reminder_prompt.trimStart()),
+      }))
+  } catch { return [] }
+}
+
+export async function resolveScheduleRun({ entry, bot, sessionId, actions }) {
+  const owns = task => task.sessionId === sessionId || task.roomId === sessionId || (bot && task.botId === bot.id)
+  if (!entry.rabi) {
+    const view = await actions.schedules()
+    const ownerTasks = (view?.tasks ?? []).filter(owns)
+    const matches = ownerTasks.filter(task => entry.id ? task.id === entry.id : task.title === entry.title)
+    if (matches.length === 1) return { native: true, task: matches[0] }
+    if (matches.length > 1) throw new Error(t('Several tasks have this name.'))
+  }
+  if (bot && actions.rabiConnection) {
+    const matches = []
+    const cursors = new Set()
+    let cursor
+    do {
+      if (cursors.has(cursor)) throw new Error(t('This task is no longer available.'))
+      cursors.add(cursor)
+      const view = await actions.rabiConnection('rabi-bot-view', { botId: bot.id, resource: 'schedules', ...(cursor ? { cursor } : {}) })
+      if (view.warnings?.length) throw new Error(t('Some Rabi schedules could not be read. Check them in Rabi.'))
+      matches.push(...view.items.filter(task => task.title === entry.title || task.message === entry.prompt))
+      cursor = view.nextCursor
+    } while (cursor && matches.length < 2)
+    if (matches.length > 1) throw new Error(t('Several tasks have this name.'))
+    if (matches.length === 1) {
+      const { sourceRoleId, rawRuleId } = matches[0]
+      const detail = await actions.rabiConnection('rabi-schedule-read', { botId: bot.id, sourceRoleId, id: rawRuleId })
+      const task = detail.items.find(item => item.rawRuleId === rawRuleId && item.sourceRoleId === sourceRoleId)
+      if (task) return { task, revision: detail.revision, roles: detail.roles ?? [] }
+    }
+  }
+  throw new Error(t('This task is no longer available.'))
+}
+
+function ScheduleRunButton({ entry, bot, roster, sessionId, actions }) {
+  const [open, setOpen] = useState(false)
+  const label = t('Task: {name}', { name: entry.title || t('Scheduled task') })
+  return h('div', { className: 'bt-event' },
+    h('button', { type: 'button', className: 'bt-event-whole bt-scheduled-trigger', title: label,
+      'aria-haspopup': 'dialog', onClick: () => setOpen(true) },
+    h(ClockIcon), h('span', { className: 'bt-event-name' }, label), h(ChevronRightIcon)),
+    open ? h(ScheduleRunSettings, { entry, bot, roster, sessionId, actions, close: () => setOpen(false) }) : null)
+}
+
+function ScheduleRunSettings({ entry, bot, roster, sessionId, actions, close }) {
+  const [result, setResult] = useState(null)
+  useEffect(() => {
+    let active = true
+    void resolveScheduleRun({ entry, bot, sessionId, actions }).then(
+      value => { if (active) setResult(value) },
+      error => { if (active) setResult({ error: hostText(error.message) }) },
+    )
+    return () => { active = false }
+  }, [entry.id, entry.title, entry.prompt, entry.rabi, bot?.id, sessionId, actions])
+  return h(Modal, { open: true, title: t('Task settings'), closeLabel: t('Close Chat'), onClose: close },
+    result === null ? h('p', { role: 'status' }, t('Loading…'))
+      : result.error ? h('p', { role: 'alert' }, result.error)
+      : result.native ? h(TaskRow, { task: result.task, actions, roster, onView: close, initiallyExpanded: true })
+      : result.task.editable === false ? h(TaskRow, { task: result.task, actions, roster, onView: close, initiallyExpanded: true })
+      : h(RabiScheduleForm, { bot, actions, task: result.task, revision: result.revision, roles: result.roles, onDone: close, onCancel: close }))
+}
+
+const scheduleLookups = new WeakMap()
+function scheduleCatalog(actions) {
+  const cached = scheduleLookups.get(actions)
+  if (cached && Date.now() - cached.time < POLL_MS) return cached.pending
+  const pending = actions.schedules().catch(error => {
+    if (scheduleLookups.get(actions)?.pending === pending) scheduleLookups.delete(actions)
+    throw error
+  })
+  scheduleLookups.set(actions, { pending, time: Date.now() })
+  return pending
+}
+
+export function ScheduleTrigger({ content, fallback, roster, sessionId, actions }) {
+  const entries = scheduleRuns(content, fallback)
+  const resolveNames = entries.some(entry => !entry.rabi && entry.id)
+  const [tasks, setTasks] = useState([])
+  useEffect(() => {
+    if (!resolveNames || !actions.schedules) return undefined
+    let active = true
+    void scheduleCatalog(actions).then(view => { if (active) setTasks(view.tasks) }, () => {})
+    return () => { active = false }
+  }, [actions, resolveNames])
+  if (!entries.length) return h('div', { className: 'bt-event' }, t('Routine started'))
+  const bot = roster.byId[sessionId]
+  return entries.map((entry, index) => {
+    const task = !entry.rabi && tasks.find(task => task.id === entry.id && (task.sessionId === sessionId || task.roomId === sessionId || (bot && task.botId === bot.id)))
+    return h(ScheduleRunButton, { key: entry.id ?? index, entry: task ? { ...entry, title: task.title } : entry, bot, roster, sessionId, actions })
+  })
 }
 
 /** Reads schedules assigned to this Bot; source roles remain owned by Rabi. */

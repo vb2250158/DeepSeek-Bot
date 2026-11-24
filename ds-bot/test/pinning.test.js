@@ -31,10 +31,11 @@ const roster = () => {
   const bots = [{ id: 'former-main', name: 'First', createdAt: 1 }, { id: 'other', name: 'Other', createdAt: 2 }]
   return { bots, rooms: [], agents: [], mainBotId: 'former-main', mainBotIds: ['former-main'], byId: Object.fromEntries(bots.map(bot => [bot.id, bot])), roomsById: {}, exchangeTurns: {}, prefs: {}, ready: true }
 }
-function sidebar(team, actions = {}) {
+function sidebar(team, { wide = true, unread = {}, sessions = {} } = {}) {
   return TeamSidebar({
-    wide: true, useRoster: select => select(team), useUi: select => select({ unread: {} }),
-    useSessions: select => select({ ids: [], byId: {} }), useSessionStatus: select => select(new Map()), useRegistry() {}, actions,
+    wide, useRoster: select => select(team), useUi: select => select({ unread }),
+    useSessions: select => select({ ids: Object.keys(sessions), byId: sessions }), useSessionStatus: select => select(new Map()),
+    useSessionRetainInfo: (_id, select) => select(undefined), useActivity: select => select({}), useRegistry() {}, actions: {},
   })
 }
 
@@ -49,54 +50,35 @@ test('the former Main Bot has the same pin menu as any other Bot', async () => {
   assert.deepEqual(changed, [['former-main', true]])
 })
 
-test('only pinned conversations become tiles; no Bot is implicitly first', () => {
+test('pinned chats use the normal rows, retain their saved order, and precede recent chats', () => {
   const team = roster()
-  assert.equal(nodes(sidebar(team), node => node.props.entry !== undefined).length, 0)
-  team.bots[1].pinned = true
-  const tree = sidebar(team)
-  const tiles = nodes(tree, node => node.props.entry !== undefined)
-  assert.equal(tiles.length, 1)
-  assert.equal(tiles[0].props.entry.item.id, 'other')
-  const rows = nodes(tree, node => node.props.bot !== undefined && node.props.actions !== undefined)
-  assert.deepEqual(rows.map(node => node.props.bot.id), ['former-main'])
-})
+  team.sections = [{ id: 'work', name: 'Work', collapsed: true }]
+  Object.assign(team.bots[1], { pinned: true, pinnedAt: 10, lastAt: 1500 })
+  team.rooms.push({ id: 'room', name: 'Team', sectionId: 'work', members: [], createdAt: 3, pinned: true, pinOrder: 0, lastAt: 1000, preview: 'Group message' })
+  team.agents.push({ id: 'agent', name: 'DSH Agent', createdAt: 4, pinned: true, pinnedAt: 5, sessions: [] })
+  const listRows = (tree) => nodes(nodes(tree, node => node.props.className === 'bt-list')[0],
+    node => node.props.bot !== undefined || node.props.room !== undefined || node.props.agent !== undefined)
+  const sessions = { other: { updatedAt: 2000, projectionValues: { turnOutline: [{ turn: 1, response: 'Bot message' }] } } }
+  const rows = listRows(sidebar(team, { sessions }))
+  assert.deepEqual(rows.map(row => (row.props.bot ?? row.props.room ?? row.props.agent).id), ['room', 'other', 'agent', 'former-main'])
 
-test('dragging a team row into the pin region persists through the same action as the menu', () => {
-  const changed = []
-  const tree = sidebar(roster(), { setFlags: async (id, flags) => changed.push([id, flags.pinned]) })
-  const target = nodes(tree, node => node.props['aria-label'] === 'Pinned chats')[0]
-  target.props.ref.current = {
-    getBoundingClientRect: () => ({ left: 0, top: 0, right: 200, bottom: 100 }),
-    querySelectorAll: () => [],
+  for (const [index, preview] of [[0, 'Group message'], [1, 'Bot message']]) {
+    const row = rows[index].type(rows[index].props)
+    assert.equal(row.props.className, 'bt-row')
+    assert.match(row.props['aria-label'], /Pinned/)
+    assert.equal(nodes(row, node => node.props.className === 'bt-row-preview')[0].children[0], preview)
+    assert.equal(nodes(row, node => node.type === 'time')[0].props.dateTime, new Date(index === 0 ? 1000 : 1500).toISOString())
   }
-  // closest on the matched row is the DOM contract pointerDown uses to tell a list row from a pin tile.
-  const event = (x, y, pinned = false) => {
-    const row = {
-      dataset: { botId: 'other' },
-      closest: selector => (selector === '.bt-pinned-grid' && pinned ? row : null),
-    }
-    return {
-      clientX: x, clientY: y, pointerId: 1, button: 0, preventDefault() {},
-      target: { closest: () => row },
-      currentTarget: { setPointerCapture() {}, hasPointerCapture: () => true, releasePointerCapture() {} },
-    }
-  }
-  tree.props.onPointerUp(event(50, 40))
-  assert.equal(changed.length, 0)
-  tree.props.onPointerDown(event(50, 200))
-  tree.props.onPointerMove(event(50, 40))
-  tree.props.onPointerUp(event(50, 40))
-  assert.deepEqual(changed, [['other', true]])
-  let suppressed = false
-  tree.props.onClickCapture({ preventDefault() { suppressed = true }, stopPropagation() {} })
-  assert.equal(suppressed, true)
-  tree.props.onPointerDown(event(50, 200))
-  tree.props.onPointerMove(event(50, 40))
-  tree.props.onPointerCancel()
-  tree.props.onPointerUp(event(50, 40))
-  assert.equal(changed.length, 1, 'cancelled drags never write')
-  tree.props.onPointerDown(event(40, 20, true))
-  tree.props.onPointerMove(event(160, 20, true))
-  tree.props.onPointerUp(event(160, 20, true))
-  assert.equal(changed.length, 1, 'a tile already in the pin grid does not pin again')
+  assert.match(rows[2].type(rows[2].props).children[0].props['aria-label'], /Pinned/)
+  const railRoom = listRows(sidebar(team, { wide: false, unread: { room: true } }))[0]
+  const rail = railRoom.type(railRoom.props)
+  assert.equal(rail.props.className, 'bt-row')
+  assert.match(rail.props['aria-label'], /Unread activity/)
+  assert.equal(nodes(rail, node => node.props.className === 'bt-dot').length, 1)
+
+  team.rooms[0].pinned = false
+  const unpinned = sidebar(team)
+  assert.deepEqual(listRows(unpinned).map(row => (row.props.bot ?? row.props.agent).id), ['other', 'agent', 'former-main'])
+  const section = nodes(unpinned, node => node.props.section?.id === 'work')[0]
+  assert.equal(section.props.entries[0].item.id, 'room')
 })

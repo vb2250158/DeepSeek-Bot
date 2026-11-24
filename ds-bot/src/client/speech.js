@@ -1,4 +1,4 @@
-import { assistantChatActive, assistantSayText } from '../shared/assistant-chat.js'
+import { assistantChatActive, assistantSayText, visibleScheduleReply } from '../shared/assistant-chat.js'
 // The recognizer of DSH's Voice Input plugin (local SenseVoice). Its `speech` Remote
 // exists only while that plugin is on; the browser's own speech service stays the
 // fallback. The plugin takes one complete 16 kHz mono PCM16 WAV per request.
@@ -147,10 +147,11 @@ export function closingReplyText(chat, turn, presentation) {
     if (location.end === undefined) return undefined
     const tools = chat.nodes?.turnDataSource(turn, 'tool-call').getSnapshot()
     if (tools === undefined) return undefined
-    return tools.flatMap(({ root }) => {
+    const said = tools.flatMap(({ root }) => {
       const text = root.kind === 'tool-result' && assistantChatActive(presentation, root.seq) ? assistantSayText(root, root.meta) : undefined
       return text === undefined ? [] : [text]
     }).join('\n\n')
+    return said || visibleScheduleReply(location, presentation)?.text || ''
   }
   const closing = location.data?.get('turn-tail')?.closing
   if (closing === undefined) return undefined

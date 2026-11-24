@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.8-rabi.2
+
+- Restore grouped names and avatars, pin ordering, and sidebar state in the Bot Web panel.
+- Show scheduled-run status and the recorded conclusion in history. Keep the fallback reply visible after reload and in Host-side summaries.
+- Keep historical model retries out of Bot chats while showing in-progress retries and terminal failures.
+- Use the existing Bot data format and dependency set. The maintained Windows source Web profile supports this update without a data migration.
+
 All notable changes to DS Bot are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the versions follow [Semantic Versioning](https://semver.org/). Before 1.0, a minor version can contain breaking changes.
 
 ## [0.2.7-rabi.1] - 2026-11-04

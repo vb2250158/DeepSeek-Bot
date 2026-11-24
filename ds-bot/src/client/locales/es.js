@@ -1,12 +1,17 @@
 // Spanish (es) localization for DS Bot client and DSH settings namespaces.
 
 export const ES = {
+  "No chat reply. Select the avatar to see the run record.": "No hubo respuesta en el chat. Selecciona el avatar para ver el registro de ejecución.",
+  "Recorded closing text": "Texto final guardado",
   "Sending message": "Enviando mensaje",
   "Rabi connection settings": "Configuración de conexión con Rabi",
   "Rabi is not running. Start Rabi, then send your message again.": "Rabi no está en ejecución. Inicia Rabi y vuelve a enviar el mensaje.",
   "Rabi is restoring its plan service. This turn has not finished synchronizing.": "Rabi está restaurando su servicio de planes. Este turno aún no ha terminado de sincronizarse.",
   "Rabi did not confirm this operation. Check its original receipt before retrying.": "Rabi no confirmó esta operación. Comprueba su comprobante original antes de reintentarlo.",
-  "Could not complete the Rabi connection. Check Rabi and its storage connection.": "No se pudo completar la conexión con Rabi. Comprueba Rabi y su conexión al almacenamiento.",
+  "Rabi could not access the persona data.": "Rabi no pudo acceder a los datos del personaje.",
+  "Rabi timed out accessing the persona data. Try again.": "Se agotó el tiempo de acceso a los datos del personaje. Vuelve a intentarlo.",
+  "Could not connect to Rabi. Check the connection settings.": "No se pudo conectar con Rabi. Comprueba la configuración de conexión.",
+  "Rabi could not complete this request.": "Rabi no pudo completar esta solicitud.",
   "Managed by Rabi": "Gestionado por Rabi",
   "Work title": "Cargo",
   "Based on actual responsibilities.": "Según las responsabilidades reales.",
@@ -79,8 +84,6 @@ export const ES = {
   "Times use the Rabi host time zone.": "Las horas usan la zona horaria del host de Rabi.",
   "Current rule in Rabi. Review before saving your edits.": "Regla actual en Rabi. Revísala antes de guardar los cambios.",
   "DSH tasks": "Tareas de DSH",
-  "Pinned chats": "Chats fijados",
-  "Drop here to pin": "Suelta aquí para fijar",
   "Setting up your Bots…": "Configurando tus Bots…",
   "Yesterday": "Ayer",
   "User": "Usuario",

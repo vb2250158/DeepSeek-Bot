@@ -1,4 +1,5 @@
 import { ASSISTANT_CHAT_KEY } from '../shared/assistant-chat.js'
+import { assistantScheduleReplyDefinition } from './assistant-schedule-reply.js'
 import { installSettingsShell, SETTINGS_SHELL_CSS } from './settings-shell.js'
 import { call } from './api.js'
 import { isHex, inkText, paintCss } from './inks.js'
@@ -81,6 +82,7 @@ export const inject = ['sessions', 'uiWorkspace', 'uiConversation', 'slots', 'th
 
 export function apply(ctx) {
   ctx.effect(() => installLocale(ctx.get('locale')), 'ds-bot: interface copy')
+  ctx.effect(() => ctx.uiConversation.events.register(assistantScheduleReplyDefinition), 'ds-bot: scheduled assistant replies')
   const rabiWorkspace = createRabiWorkspaceStore((payload, signal) => call('rabi-bot-view', payload, signal))
   ctx.effect(() => () => rabiWorkspace.dispose(), 'ds-bot: Rabi resource reads')
   migrateStorage()
@@ -983,6 +985,11 @@ export function apply(ctx) {
         if (snapshot === undefined) throw new Error('ds-bot: Chat target is unavailable')
         return snapshot.nodes.turnDataSource(Number(turn), 'assistant-step')
       },
+      turnTools: (turn) => {
+        const snapshot = chat.getSnapshot()
+        if (snapshot === undefined) throw new Error('ds-bot: Chat target is unavailable')
+        return snapshot.nodes.turnDataSource(Number(turn), 'tool-call')
+      },
       turnContext: (turn) => {
         const snapshot = chat.getSnapshot()
         if (snapshot === undefined) throw new Error('ds-bot: Chat target is unavailable')
@@ -994,6 +1001,18 @@ export function apply(ctx) {
         return snapshot.nodes.turnDataSource(Number(turn), 'steering')
       },
     } }
+  }
+
+  actions.turnHistory = (sessionId, turn) => {
+    const binding = ctx.sessions.binding(sessionId)
+    if (!binding || !Number.isInteger(turn)) return undefined
+    const chat = ctx.uiConversation.binding(binding).target('chat')
+    const snapshot = chat.getSnapshot()
+    return snapshot ? {
+      chat,
+      tools: snapshot.nodes.turnDataSource(turn, 'tool-call'),
+      steps: snapshot.nodes.turnDataSource(turn, 'assistant-step'),
+    } : undefined
   }
 
   // The dock lives outside the chat snapshot, so it subscribes for the turn that
@@ -1216,7 +1235,7 @@ export function apply(ctx) {
     () => shadow('conversation.chat.node', { key: 'turn-error', priority: BOT_PRIORITY, locale: 'chat', inject: face }, FailureCell),
     // DSH's own turn tail stays, so what other plugins add there shows, such as the
     // cards of the files a turn delivered; its copy and branch row is hidden.
-    () => shadow('conversation.chat.turnTail', { id: 'bot-turn-separators', order: 1000, inject: face }, TurnTailCell),
+    () => shadow('conversation.chat.turnTail', { id: 'bot-turn-separators', order: 1000, inject: assistantFace }, TurnTailCell),
     // A side question is not a transcript row. After its snapshot turn closes it
     // sits on that turn's tail, ahead of the time separator.
     () => shadow('conversation.chat.turnTail', { id: 'bot-btw', order: 800, priority: BOT_PRIORITY, inject: face }, BtwTurnTail),
@@ -1232,7 +1251,9 @@ export function apply(ctx) {
     // message spliced in mid-turn gets an event line from the step that reads it instead.
     () => shadow('conversation.chat.node', { key: 'context', priority: BOT_PRIORITY, locale: 'chat' }, CellEmpty),
     ...(canDrawUserMessages(hostDrawsUserText) ? [() => installUserBubble(ctx.slots, () => {
-      const offs = ['user', 'steering'].map(key => shadow('conversation.chat.node', { key, priority: BOT_PRIORITY, locale: 'chat', inject: face }, UserMessageCell))
+      const offs = ['user', 'steering'].map(key => shadow('conversation.chat.node', { key, priority: BOT_PRIORITY, locale: 'chat', inject: sessionId => ({
+        ...face(sessionId), userTextRegistry: ctx.uiConversation.userText,
+      }) }, UserMessageCell))
       return () => { for (const off of offs) off() }
     })] : []),
     // DSH 0.2.2-rc.1 draws user text by rules, and its file rule cuts "@新 Bot" at the
@@ -1283,17 +1304,32 @@ export function apply(ctx) {
   shadow('bot.conversation', { inject: face }, BotConversation)
   shadow('sidebar.panellist', { id: BOT_PANEL, order: 30, label: () => 'DS Bot' }, BotPanelIcon)
   ctx.effect(() => {
+    let wasSelected = false
+    let collapseFrame
     const sync = () => {
-      const mode = ctx.layout.panelInfo.getSnapshot().activePanelId === BOT_PANEL ? 'bot' : 'agent'
-      actions.setSurface(mode)
+      const selected = ctx.layout.panelInfo.getSnapshot().activePanelId === BOT_PANEL
+      if (selected !== wasSelected) {
+        wasSelected = selected
+        if (collapseFrame !== undefined) cancelAnimationFrame(collapseFrame)
+        collapseFrame = selected ? requestAnimationFrame(() => {
+          collapseFrame = undefined
+          const sidebar = document.querySelector('[class*="_sidebarCol"]')
+          // DSH already closes its own narrow drawer when navigating between panels.
+          if (sidebar && !sidebar.closest('[data-sidebar-drawer], [data-sidebar-collapsed]')) ctx.layout.toggleSidebar()
+        }) : undefined
+      }
+      actions.setSurface(selected ? 'bot' : 'agent')
       // The shell's own Session may stay open under the panel; the surface lands on a
       // Bot conversation rather than on its empty page, and lets the sidebar follow.
-      if (mode === 'bot') actions.landOnBot()
+      if (selected) actions.landOnBot()
     }
-    if (surface.getSnapshot().mode === 'bot') ctx.layout.selectPanel(BOT_PANEL)
+    if (surface.getSnapshot().mode === 'bot') ctx.layout.selectPanel(BOT_PANEL, { collapseSidebar: true })
     const off = ctx.layout.panelInfo.subscribe(sync)
     sync()
-    return off
+    return () => {
+      off()
+      if (collapseFrame !== undefined) cancelAnimationFrame(collapseFrame)
+    }
   }, 'ds-bot: panel navigation')
   // The byline answers only while DS Bot's own chat column is on screen. A Bot Session
   // opened from the shell's list renders in the shell's chat instead, so its row keeps

@@ -55,32 +55,12 @@ const waitingFor = (roster, waits) => {
   return names.length === 0 ? '' : t('Waiting for {names}', { names: names.join(t(' and ')) })
 }
 
-function PinnedChat({ entry: { kind, item }, roster, actions, useSessions, useSessionStatus, useWork, marked, lifted, drop }) {
-  const ids = kind === 'bot' ? [currentPart(item)] : kind === 'agent' ? item.sessions : [item.id]
-  const active = useSessions(list => ids.some(id => (list.byId[id]?.retainedBy?.mainView ?? 0) > 0))
-  const running = useSessionStatus(map => ids.some(id => map.get(id)?.running === true))
-  const unread = useSessionStatus(map => ids.some(id => map.get(id)?.completionUnread === true || map.get(id)?.pendingInteraction !== undefined)) || (marked && !active)
-  const approval = useApproval(useWork, entry => kind === 'bot' ? entry.botId === item.id : entry.roomId === item.id)
-  useMarkedUnread(item.id, active, marked, actions)
-  const label = [item.name, t('Pinned'), running ? t('Working') : '', approval ? t('Waiting for your approval') : '', unread ? t('Unread activity') : ''].filter(Boolean).join(', ')
-  return h('button', {
-    type: 'button', className: 'bt-group-tile', draggable: false,
-    [kind === 'bot' ? 'data-bot-id' : kind === 'room' ? 'data-room-id' : 'data-agent-id']: item.id,
-    title: item.name, 'aria-label': label, 'aria-current': active ? 'page' : undefined,
-    'data-lifted': lifted || undefined, 'data-pin-drop': drop,
-    onClick: () => kind === 'agent' ? actions.openAgent(item.id) : actions.openSession(item.id),
-    onContextMenu: event => { event.preventDefault(); actions.openMenu({ kind, id: item.id, x: event.clientX, y: event.clientY }) },
-  }, kind === 'bot' ? h(BotAvatar, { bot: item, size: 48, state: botState(running, undefined, approval || roster.questions?.[ids[0]] !== undefined) })
-    : kind === 'room' ? h(RoomAvatar, { room: item, roster, size: 48 }) : h(FishLogo),
-  unread && !active ? h('span', { className: 'bt-unread', 'aria-hidden': true }) : null,
-  h('span', null, item.name))
-}
-
 function BotRow({ bot, roster, actions, useSessions, useSessionStatus, useSessionRetainInfo, useActivity, useWork, wide, marked }) {
   const id = bot.id
   const part = currentPart(bot)
   const preview = useSessions(list => previewOf(list, part, roster.exchangeTurns[part], bot.preview ?? ''))
-  const lastAt = useSessions(list => list.byId[part]?.updatedAt ?? 0)
+  const updatedAt = useSessions(list => list.byId[part]?.updatedAt ?? 0)
+  const lastAt = bot.lastAt || updatedAt
   const running = useSessionStatus(map => map.get(part)?.running === true)
   const active = useSessionRetainInfo(part, info => (info?.retainedBy?.mainView ?? 0) > 0)
   const unread = useSessionStatus(map => map.get(part)?.completionUnread === true || map.get(part)?.pendingInteraction !== undefined) || (marked && !active)
@@ -124,6 +104,8 @@ function BotRow({ bot, roster, actions, useSessions, useSessionStatus, useSessio
 function RoomRow({ room, roster, actions, useSessions, useSessionStatus, useSessionRetainInfo, useWork, wide, marked }) {
   const id = room.id
   const fallback = useSessions(list => previewOf(list, id))
+  const updatedAt = useSessions(list => list.byId[room.sessionId ?? id]?.updatedAt ?? 0)
+  const lastAt = room.lastAt || updatedAt
   const preview = room.preview?.replace(/\s+/g, ' ').trim() || fallback
   const active = useSessionRetainInfo(id, info => (info?.retainedBy?.mainView ?? 0) > 0)
   const unread = useSessionStatus(map => map.get(id)?.completionUnread === true) || (marked && !active)
@@ -134,7 +116,7 @@ function RoomRow({ room, roster, actions, useSessions, useSessionStatus, useSess
   const workingLine = first ? workLine(first.name, members[0], members.length - 1) : null
   if (room.hidden && !active) return null
   const pinned = room.pinned === true
-  const label = [room.name, pinned ? t('Pinned') : '', members.length > 0 ? t('Working') : '', approval ? t('Waiting for your approval') : ''].filter(Boolean).join(', ')
+  const label = [room.name, pinned ? t('Pinned') : '', members.length > 0 ? t('Working') : '', approval ? t('Waiting for your approval') : '', unread ? t('Unread activity') : ''].filter(Boolean).join(', ')
   return h('button', {
     type: 'button', className: 'bt-row', draggable: false, 'aria-label': label, 'aria-current': active ? 'page' : undefined,
     'data-room-id': id, title: wide ? undefined : room.name, onMouseEnter: wide ? nameIfCut : undefined, onClick: () => actions.openSession(id),
@@ -143,10 +125,12 @@ function RoomRow({ room, roster, actions, useSessions, useSessionStatus, useSess
   h(RoomAvatar, { room, roster, size: 36 }),
   pinned && !wide ? h(PinMark) : null,
   wide ? h('span', { className: 'bt-row-body' },
-    h('span', { className: 'bt-row-name' }, h('span', { className: 'bt-row-title' }, room.name), pinned ? h(PinMark) : null),
+    h('span', { className: 'bt-row-name' }, h('span', { className: 'bt-row-title' }, room.name), pinned ? h(PinMark) : null,
+      lastAt > 0 ? h('time', { className: 'bt-row-time', dateTime: new Date(lastAt).toISOString(), title: new Date(lastAt).toLocaleString() }, rowTime(lastAt)) : null),
     workingLine ? h('span', { className: 'bt-row-preview' }, workingLine) : preview ? h('span', { className: 'bt-row-preview' }, preview) : null) : null,
   wide && approval && !active ? h('span', { className: 'bt-unread bt-unread-wait', 'aria-hidden': true })
-    : wide && unread && !active ? h('span', { className: 'bt-unread', 'aria-hidden': true }) : null)
+    : wide && unread && !active ? h('span', { className: 'bt-unread', 'aria-hidden': true })
+      : !wide && !active && (approval || unread) ? h('span', { className: `bt-dot${approval ? ' bt-dot-wait' : ''}`, 'aria-hidden': true }) : null)
 }
 
 // One expanded DSH Agent Session row: title, relative stamp, rename field, and a
@@ -226,7 +210,8 @@ function AgentRow({ agent, actions, useSessions, useSessionStatus, useUi, wide, 
   const unread = sessions.some(session => session.unread) || (marked && !active)
   useMarkedUnread(agent.id, active, marked, actions)
   const preview = sessions[0]?.title ?? t('New session')
-  const label = ['DSH Agent', running ? t('Working') : '', unread ? t('Unread activity') : ''].filter(Boolean).join(', ')
+  const pinned = agent.pinned === true
+  const label = ['DSH Agent', pinned ? t('Pinned') : '', running ? t('Working') : '', unread ? t('Unread activity') : ''].filter(Boolean).join(', ')
   const open = active && wide
   return h('div', { className: 'bt-agent' },
     h('button', {
@@ -235,8 +220,9 @@ function AgentRow({ agent, actions, useSessions, useSessionStatus, useUi, wide, 
       onContextMenu: (event) => { event.preventDefault(); actions.openMenu({ kind: 'agent', id: agent.id, x: event.clientX, y: event.clientY }) },
     },
     h('span', { className: `bt-agent-ava${running ? ' bt-run' : ''}` }, h(FishLogo, { size: 22 })),
+    pinned && !wide ? h(PinMark) : null,
     wide ? h('span', { className: 'bt-row-body' },
-      h('span', { className: 'bt-row-name' }, 'DSH Agent'),
+      h('span', { className: 'bt-row-name' }, h('span', { className: 'bt-row-title' }, 'DSH Agent'), pinned ? h(PinMark) : null),
       preview ? h('span', { className: 'bt-row-preview' }, preview) : null) : null,
     wide && unread && !active ? h('span', { className: 'bt-unread', 'aria-hidden': true })
       : !wide && unread && !active ? h('span', { className: 'bt-dot', 'aria-hidden': true }) : null),
@@ -450,12 +436,6 @@ const bootHint = () => {
 export function TeamSidebar(props) {
   const { wide, expandSidebar, useRoster, useUi, useSessions, actions } = props
   const listRef = useRef(null)
-  const pinRef = useRef(null)
-  const dragged = useRef(null)
-  const suppressClickUntil = useRef(0)
-  const [dragSource, setDragSource] = useState(null)
-  const [overPins, setOverPins] = useState(false)
-  const [pinDrop, setPinDrop] = useState(null)
   const closing = useRef(false)
   useLayoutEffect(() => { closing.current = false })
   const roster = useRoster(value => value)
@@ -476,78 +456,11 @@ export function TeamSidebar(props) {
       // The Agent sorts by its most recent Session, falling back to when it was added.
       ...(roster.agents ?? []).map(agent => ({ kind: 'agent', item: agent, at: Math.max(0, ...agent.sessions.map(id => stamps[id] ?? 0)) || agent.createdAt })),
     ]
-    // Pinned entries follow the order the user dragged them into; ones never dragged
-    // keep the newest-pin-first rule behind those.
+    // Keep saved manual pin positions ahead of newer pins without a position.
     const slot = entry => entry.item.pinOrder ?? Number.MAX_SAFE_INTEGER
     return entries.sort((a, b) => Number(Boolean(b.item.pinned)) - Number(Boolean(a.item.pinned)) || (a.item.pinned ? slot(a) - slot(b) || (b.item.pinnedAt ?? 0) - (a.item.pinnedAt ?? 0) || a.item.createdAt - b.item.createdAt : b.at - a.at))
   }, [roster, updated])
   useReportReady(roster.ready, roster)
-  const pins = order.filter(entry => entry.item.pinned && !entry.item.hidden)
-  const inPins = event => {
-    const rect = pinRef.current?.getBoundingClientRect()
-    return Boolean(rect && event.clientX >= rect.left && event.clientX <= rect.right && event.clientY >= rect.top && event.clientY <= rect.bottom)
-  }
-  // The tile nearest the pointer, and which half of it: the drop lands before or after.
-  const pinSlotAt = event => {
-    const tiles = [...(pinRef.current?.querySelectorAll('.bt-pinned-grid .bt-group-tile') ?? [])]
-    if (tiles.length === 0) return null
-    let best = 0
-    let nearest = Infinity
-    tiles.forEach((tile, index) => {
-      const rect = tile.getBoundingClientRect()
-      const distance = (event.clientX - (rect.left + rect.width / 2)) ** 2 + (event.clientY - (rect.top + rect.height / 2)) ** 2
-      if (distance < nearest) { nearest = distance; best = index }
-    })
-    const rect = tiles[best].getBoundingClientRect()
-    return { index: best, after: event.clientX > rect.left + rect.width / 2 }
-  }
-  const dropPin = (id, slot) => {
-    const from = pins.findIndex(entry => entry.item.id === id)
-    if (from < 0) return
-    let to = slot.index + (slot.after ? 1 : 0)
-    if (to > from) to -= 1
-    if (to === from || to < 0) return
-    const ids = pins.map(entry => entry.item.id)
-    ids.splice(from, 1)
-    ids.splice(to, 0, id)
-    void Promise.resolve(actions.reorderPins(ids)).catch(error => actions.reportError(error, 'pin'))
-  }
-  const dragEnd = () => { dragged.current = null; setDragSource(null); setOverPins(false); setPinDrop(null) }
-  const pointerDown = event => {
-    if (event.button !== 0 || roster.readOnly) return
-    const row = event.target.closest('[data-bot-id],[data-room-id],[data-agent-id]')
-    const id = row?.dataset.botId ?? row?.dataset.roomId ?? row?.dataset.agentId
-    if (!id) return
-    // A tile in the pinned grid reorders; a row dragged up from the list pins.
-    dragged.current = { id, pointerId: event.pointerId, x: event.clientX, y: event.clientY, started: false, pinned: Boolean(row.closest('.bt-pinned-grid')) }
-  }
-  const pointerMove = event => {
-    const drag = dragged.current
-    if (!drag || event.pointerId !== drag.pointerId) return
-    if (!drag.started && Math.hypot(event.clientX - drag.x, event.clientY - drag.y) < 8) return
-    if (!drag.started) {
-      drag.started = true
-      event.currentTarget.setPointerCapture(event.pointerId)
-      setDragSource(drag.pinned ? 'pin' : 'list')
-    }
-    event.preventDefault()
-    const inside = inPins(event)
-    setOverPins(inside && !drag.pinned)
-    const slot = drag.pinned && inside ? pinSlotAt(event) : null
-    setPinDrop(last => (last && slot && last.index === slot.index && last.after === slot.after ? last : slot))
-  }
-  const pointerUp = event => {
-    const drag = dragged.current
-    if (!drag || event.pointerId !== drag.pointerId) return
-    const inside = inPins(event)
-    const slot = drag.started && drag.pinned && inside ? pinSlotAt(event) : null
-    const pin = drag.started && !drag.pinned && inside
-    if (drag.started) suppressClickUntil.current = Date.now() + 250
-    dragEnd()
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
-    if (slot) dropPin(drag.id, slot)
-    else if (pin) void Promise.resolve(actions.setFlags(drag.id, { pinned: true })).catch(error => actions.reportError(error, 'pin'))
-  }
   useListGlide(listRef, wide, order.map(entry => entry.item.id).join(','))
   useLandOnMainBot(roster, useSessions, actions)
   // The shell keeps wide content during its collapse fade. Normalize through its
@@ -577,10 +490,9 @@ export function TeamSidebar(props) {
     event.preventDefault()
     actions.openPalette(event.key)
   }
-  return h('div', { className: wide ? 'bt-side' : 'bt-side bt-rail', onKeyDown: event => { if (event.key === 'Escape' && dragged.current?.started) { event.preventDefault(); dragEnd() } else typeToSearch(event) },
-    onPointerDown: pointerDown, onPointerMove: pointerMove, onPointerUp: pointerUp, onPointerCancel: dragEnd, onLostPointerCapture: dragEnd,
-    onDragStart: event => event.preventDefault(),
-    onClickCapture: event => { if (Date.now() < suppressClickUntil.current) { event.preventDefault(); event.stopPropagation(); suppressClickUntil.current = 0 } } },
+  const sections = roster.sections ?? []
+  return h('div', { className: wide ? 'bt-side' : 'bt-side bt-rail', onKeyDown: typeToSearch,
+    onDragStart: event => event.preventDefault() },
     wide ? h('div', { className: 'bt-side-top' },
       h('span', { className: 'bt-brand' }, h(BrandMark, { size: 22 }), h(BrandName)),
       h(PluginsButton, { actions }),
@@ -591,21 +503,11 @@ export function TeamSidebar(props) {
           h(UpdateButton, { useUpdate: props.useUpdate, actions }),
           h('button', { type: 'button', className: 'bt-round', 'aria-label': t('New…'), title: t('New…'), onClick: () => actions.openNewChat('new') }, h(PlusIcon))),
 
-    h('div', {
-      ref: pinRef, className: 'bt-pinned-area', 'data-dragging': dragSource === 'list' || undefined, 'data-over': overPins || undefined,
-      role: 'region', 'aria-label': t('Pinned chats'),
-    },
-      pins.length ? h('div', { className: 'bt-group-grid bt-pinned-grid' }, pins.map((entry, index) => h(PinnedChat, {
-        key: entry.item.id, ...rowProps, entry, marked: markedUnread[entry.item.id] === true,
-        lifted: dragSource === 'pin' && dragged.current?.id === entry.item.id,
-        drop: pinDrop && pinDrop.index === index ? (pinDrop.after ? 'after' : 'before') : undefined,
-      }))) : null,
-      h('div', { className: 'bt-pin-drop', role: dragSource === 'list' ? 'status' : undefined }, t('Drop here to pin'))),
     wide && roster.readOnly ? h('div', { className: 'bt-hint bt-read-only', role: 'status' }, hostText(roster.readOnly)) : null,
     h('div', { ref: listRef, className: 'bt-list', role: 'region', 'aria-label': t('Bot list') },
       roster.ready ? null : h('div', { className: 'bt-hint', role: bootFailed ? 'alert' : 'status' }, bootFailed ? bootHint() : t('Setting up your Bots…')),
-      order.filter(entry => !entry.item.pinned && !(roster.sections ?? []).some(section => section.id === entry.item.sectionId)).map(entry => renderSidebarEntry(entry, rowProps, markedUnread)),
-      (roster.sections ?? []).map(section => h(SectionBlock, { key: section.id, section, entries: order.filter(entry => !entry.item.pinned && entry.item.sectionId === section.id), rowProps, markedUnread, renaming: renameSection === section.id }))))
+      order.filter(entry => entry.item.pinned || !sections.some(section => section.id === entry.item.sectionId)).map(entry => renderSidebarEntry(entry, rowProps, markedUnread)),
+      sections.map(section => h(SectionBlock, { key: section.id, section, entries: order.filter(entry => !entry.item.pinned && entry.item.sectionId === section.id), rowProps, markedUnread, renaming: renameSection === section.id }))))
 }
 
 // The update button at the sidebar's top right: a cloud while a newer DS Bot —
@@ -1239,25 +1141,6 @@ export const SIDEBAR_CSS = `
 .bt-side-top .bt-brand:hover{background:none}
 .bt-brand .bt-mark{flex:none}
 .bt-pin{flex:none;display:inline-flex;color:var(--bt-ink-3)}
-.bt-pinned-area{flex:none;margin:0 8px;border-radius:12px}
-.bt-pinned-area[data-dragging]{min-height:64px;background:var(--bt-hover);outline:1px dashed var(--bt-line-2)}
-.bt-pinned-area[data-over]{outline:2px solid var(--bt-accent);background:var(--bt-hover)}
-.bt-pin-drop{display:none;padding:18px 8px;text-align:center;font-size:13px;color:var(--bt-ink-2)}
-/* Dragging a pin lifts it out of the grid and marks the slot it would take. */
-.bt-pinned-grid .bt-group-tile[data-lifted]{opacity:.35}
-.bt-pinned-grid .bt-group-tile[data-pin-drop=before]{box-shadow:inset 2px 0 0 0 var(--bt-accent)}
-.bt-pinned-grid .bt-group-tile[data-pin-drop=after]{box-shadow:inset -2px 0 0 0 var(--bt-accent)}
-.bt-rail .bt-pinned-grid .bt-group-tile[data-pin-drop=before]{box-shadow:inset 0 2px 0 0 var(--bt-accent)}
-.bt-rail .bt-pinned-grid .bt-group-tile[data-pin-drop=after]{box-shadow:inset 0 -2px 0 0 var(--bt-accent)}
-.bt-pinned-area[data-dragging] .bt-pin-drop{display:block}
-.bt-pinned-grid{margin:0!important;max-height:36vh;overflow-y:auto}
-.bt-pinned-grid .bt-group-tile{position:relative}
-.bt-row>:is(.bt-mark,.bt-cluster),.bt-group-tile>:is(.bt-mark,.bt-cluster){touch-action:none}
-.bt-pinned-grid .bt-group-tile[aria-current=page]{background:var(--bt-hover)}
-.bt-pinned-grid .bt-unread{position:absolute;right:8px;top:8px}
-.bt-rail .bt-pinned-grid{grid-template-columns:1fr}
-.bt-rail .bt-pinned-grid .bt-group-tile{min-width:0;padding:6px 2px}
-.bt-rail .bt-pinned-grid .bt-group-tile>span:last-child{display:none}
 .bt-rail .bt-row{position:relative}
 .bt-rail .bt-pin{position:absolute;top:3px;left:calc(50% + 12px)}
 .bt-side .bt-read-only{margin:4px 8px 6px;padding:8px 10px;border-radius:10px;background:var(--bt-hover);font-size:12px;line-height:1.45;text-align:left}

@@ -1,12 +1,17 @@
 // German (de) localization for DS Bot client and DSH settings namespaces.
 
 export const DE = {
+  "No chat reply. Select the avatar to see the run record.": "Keine Chatantwort. Wähle den Avatar, um den Ausführungsverlauf anzuzeigen.",
+  "Recorded closing text": "Gespeicherter Abschlusstext",
   "Sending message": "Nachricht wird gesendet",
   "Rabi connection settings": "Rabi-Verbindungseinstellungen",
   "Rabi is not running. Start Rabi, then send your message again.": "Rabi läuft nicht. Starte Rabi und sende deine Nachricht erneut.",
   "Rabi is restoring its plan service. This turn has not finished synchronizing.": "Rabi stellt seinen Plandienst wieder her. Die Synchronisierung dieser Runde ist noch nicht abgeschlossen.",
   "Rabi did not confirm this operation. Check its original receipt before retrying.": "Rabi hat diesen Vorgang nicht bestätigt. Prüfe vor einem erneuten Versuch die ursprüngliche Bestätigung.",
-  "Could not complete the Rabi connection. Check Rabi and its storage connection.": "Die Verbindung zu Rabi konnte nicht hergestellt werden. Prüfe Rabi und seine Speicherverbindung.",
+  "Rabi could not access the persona data.": "Rabi konnte auf die Rollendaten nicht zugreifen.",
+  "Rabi timed out accessing the persona data. Try again.": "Zeitüberschreitung beim Zugriff auf die Rollendaten. Versuche es erneut.",
+  "Could not connect to Rabi. Check the connection settings.": "Die Verbindung zu Rabi ist fehlgeschlagen. Prüfe die Verbindungseinstellungen.",
+  "Rabi could not complete this request.": "Rabi konnte diese Anfrage nicht abschließen.",
   "Managed by Rabi": "Von Rabi verwaltet",
   "Work title": "Tätigkeitsbezeichnung",
   "Based on actual responsibilities.": "Anhand der tatsächlichen Aufgaben.",
@@ -79,8 +84,6 @@ export const DE = {
   "Times use the Rabi host time zone.": "Die Uhrzeiten verwenden die Zeitzone des Rabi-Hosts.",
   "Current rule in Rabi. Review before saving your edits.": "Aktuelle Regel in Rabi. Prüfe sie, bevor du deine Änderungen speicherst.",
   "DSH tasks": "DSH-Aufgaben",
-  "Pinned chats": "Angeheftete Chats",
-  "Drop here to pin": "Zum Anheften hier ablegen",
   "Setting up your Bots…": "Deine Bots werden eingerichtet…",
   "Yesterday": "Gestern",
   "User": "Benutzer",

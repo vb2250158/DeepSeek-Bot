@@ -42,6 +42,7 @@ export async function bundleClientApp() {
     target: 'es2022',
     external: PLATFORM_MODULES,
     treeShaking: false,
+    banner: { js: '"use strict";' },
     charset: 'utf8',
     write: false,
     logLevel: 'silent',

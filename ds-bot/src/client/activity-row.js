@@ -201,7 +201,9 @@ export function ActivityIndicator({ sessionId, useRoster, useSessionStatus, useL
   const host = useRunningHost(active || failure !== null)
   if (host && failure) return createPortal(h('div', { className: 'bt-rabi-hook-error', role: 'alert' },
     h('span', null, rabiFailureMessage(failure)),
-    h('button', { type: 'button', className: 'bt-link', onClick: () => actions.openSettings('rabi') }, t('Rabi connection settings'))), host)
+    ['host_stopped', 'connection_not_ready', 'request_failed'].includes(failure.code) && !failure.uncertain
+      ? h('button', { type: 'button', className: 'bt-link', onClick: () => actions.openSettings('rabi') }, t('Rabi connection settings'))
+      : null), host)
   if (!host || phase === null || !shown) return null
   return createPortal(h('div', { className: 'bt-typing', 'data-exiting': phase === 'out' ? '' : undefined, role: 'status', 'aria-live': 'polite', 'aria-atomic': true },
     bot ? h(BotMark, { bot, size: 28, state: markState.current, live: true, pokeable: true }) : h(RoomAvatar, { room, roster, size: 28 }),
@@ -215,6 +217,10 @@ export function ActivityIndicator({ sessionId, useRoster, useSessionStatus, useL
 export function rabiFailureMessage(status) {
   if (status.code === 'host_stopped') return t('Rabi is not running. Start Rabi, then send your message again.');
   if (status.code === 'PLAN_STORAGE_STARTUP_UNAVAILABLE') return t('Rabi is restoring its plan service. This turn has not finished synchronizing.');
+  if (status.code === 'ROLE_STORAGE_UNAVAILABLE') return t('Rabi could not access the persona data.');
   if (status.uncertain) return t('Rabi did not confirm this operation. Check its original receipt before retrying.');
-  return t('Could not complete the Rabi connection. Check Rabi and its storage connection.');
+  if (status.code === 'ROLE_BUSY') return t('Rabi could not access the persona data.');
+  if (status.code === 'ROLE_STORAGE_WAIT_TIMEOUT') return t('Rabi timed out accessing the persona data. Try again.');
+  if (status.code === 'connection_not_ready' || status.code === 'request_failed') return t('Could not connect to Rabi. Check the connection settings.');
+  return t('Rabi could not complete this request.');
 }

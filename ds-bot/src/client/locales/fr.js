@@ -1,12 +1,17 @@
 // French (fr) localization for DS Bot client and DSH settings namespaces.
 
 export const FR = {
+  "No chat reply. Select the avatar to see the run record.": "Aucune réponse dans le chat. Sélectionnez l’avatar pour consulter le journal d’exécution.",
+  "Recorded closing text": "Texte de conclusion enregistré",
   "Sending message": "Envoi du message",
   "Rabi connection settings": "Paramètres de connexion à Rabi",
   "Rabi is not running. Start Rabi, then send your message again.": "Rabi n’est pas en cours d’exécution. Démarrez Rabi, puis renvoyez votre message.",
   "Rabi is restoring its plan service. This turn has not finished synchronizing.": "Rabi restaure son service de plans. La synchronisation de ce tour n’est pas encore terminée.",
   "Rabi did not confirm this operation. Check its original receipt before retrying.": "Rabi n’a pas confirmé cette opération. Vérifiez son accusé de réception initial avant de réessayer.",
-  "Could not complete the Rabi connection. Check Rabi and its storage connection.": "La connexion à Rabi n’a pas pu être établie. Vérifiez Rabi et sa connexion au stockage.",
+  "Rabi could not access the persona data.": "Rabi n’a pas pu accéder aux données du personnage.",
+  "Rabi timed out accessing the persona data. Try again.": "Le délai d’accès aux données du personnage a expiré. Réessayez.",
+  "Could not connect to Rabi. Check the connection settings.": "Impossible de se connecter à Rabi. Vérifiez les paramètres de connexion.",
+  "Rabi could not complete this request.": "Rabi n’a pas pu traiter cette demande.",
   "Managed by Rabi": "Géré par Rabi",
   "Work title": "Fonction",
   "Based on actual responsibilities.": "Selon les responsabilités réelles.",
@@ -79,8 +84,6 @@ export const FR = {
   "Times use the Rabi host time zone.": "Les horaires utilisent le fuseau horaire de l’hôte Rabi.",
   "Current rule in Rabi. Review before saving your edits.": "Règle actuelle dans Rabi. Vérifiez-la avant d’enregistrer vos modifications.",
   "DSH tasks": "Tâches DSH",
-  "Pinned chats": "Discussions épinglées",
-  "Drop here to pin": "Déposez ici pour épingler",
   "Setting up your Bots…": "Configuration de vos Bots…",
   "Yesterday": "Hier",
   "User": "Utilisateur",
