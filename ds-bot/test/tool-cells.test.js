@@ -277,6 +277,19 @@ const BRANCHES = [
 ]
 const rosterFor = callId => team({ questions: { chief: question(callId) }, secretRequests: { chief: [request(callId)] } })
 
+test('Bot run history takes ordinary tool rows out of the chat but leaves questions visible', () => {
+  const root = program([
+    call('message_bot', 'program:ptc:1', { args: { to: 'Writer' } }),
+    call('ask_user', 'program:ptc:2'),
+  ])
+  const roster = rosterFor('program:ptc:2')
+  const options = { roster, actions: { turnHistory() {} } }
+  const botChat = shown(root, options)
+  assert.doesNotMatch(botChat, /Messaged/)
+  assert.match(botChat, /Which draft\?/)
+  assert.match(shown(root, { roster }), /Messaged.*Writer/)
+})
+
 test('every call ToolCell draws shows the same nested in a PTC program as on its own', () => {
   assert.equal(BRANCHES.length, 17)
   for (const [name, options, expected] of BRANCHES) {

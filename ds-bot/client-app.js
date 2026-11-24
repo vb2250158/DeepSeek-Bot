@@ -928,6 +928,32 @@ function convertHostErrors(pairs) {
 
 // src/client/locales/ja.js
 var JA = {
+  "Rabi message from {name}": "{name} からの Rabi メッセージ",
+  "View original delivery": "元の配信を表示",
+  "Several tasks have this name.": "同じ名前のタスクが複数あります。",
+  "This task is no longer available.": "このタスクは利用できなくなりました。",
+  "Task: {name}": "タスク：{name}",
+  "Resuming task…": "タスクを再開中…",
+  "Pausing task…": "タスクを一時停止中…",
+  "Resume not confirmed": "再開を確認できません",
+  "Pause not confirmed": "一時停止を確認できません",
+  "Could not resume task": "タスクを再開できませんでした",
+  "Could not pause task": "タスクを一時停止できませんでした",
+  "Retry resume": "再開を再試行",
+  "Retry pause": "一時停止を再試行",
+  "Task settings": "タスク設定",
+  "Checking task status…": "タスクの状態を確認中…",
+  "Call failed": "呼び出しに失敗",
+  "Call completed": "呼び出しが完了",
+  "Call in progress": "呼び出し中",
+  "Call arguments": "呼び出しの引数",
+  "Call result": "呼び出し結果",
+  "Total time: {time}": "合計時間：{time}",
+  "Total time unavailable": "合計時間は不明",
+  "No recorded tool calls.": "ツールの呼び出し記録がありません。",
+  "View run history": "実行履歴を表示",
+  "Run history": "実行履歴",
+  "This run is no longer available.": "この実行は利用できなくなりました。",
   "Sending message": "メッセージを送信中",
   "Rabi connection settings": "Rabi 接続設定",
   "Rabi is not running. Start Rabi, then send your message again.": "Rabi が起動していません。Rabi を起動してから、メッセージを再送信してください。",
@@ -3698,6 +3724,32 @@ var DSH_JA = {
 
 // src/client/locales/ko.js
 var KO = {
+  "Rabi message from {name}": "{name}의 Rabi 메시지",
+  "View original delivery": "원본 전달 메시지 보기",
+  "Several tasks have this name.": "이름이 같은 작업이 여러 개 있습니다.",
+  "This task is no longer available.": "이 작업은 더 이상 이용할 수 없습니다.",
+  "Task: {name}": "작업: {name}",
+  "Resuming task…": "작업 재개 중…",
+  "Pausing task…": "작업 일시 정지 중…",
+  "Resume not confirmed": "재개 확인 안 됨",
+  "Pause not confirmed": "일시 정지 확인 안 됨",
+  "Could not resume task": "작업을 재개하지 못했습니다",
+  "Could not pause task": "작업을 일시 정지하지 못했습니다",
+  "Retry resume": "재개 다시 시도",
+  "Retry pause": "일시 정지 다시 시도",
+  "Task settings": "작업 설정",
+  "Checking task status…": "작업 상태 확인 중…",
+  "Call failed": "호출 실패",
+  "Call completed": "호출 완료",
+  "Call in progress": "호출 진행 중",
+  "Call arguments": "호출 인수",
+  "Call result": "호출 결과",
+  "Total time: {time}": "총 소요 시간: {time}",
+  "Total time unavailable": "총 소요 시간 알 수 없음",
+  "No recorded tool calls.": "기록된 도구 호출이 없습니다.",
+  "View run history": "실행 기록 보기",
+  "Run history": "실행 기록",
+  "This run is no longer available.": "이 실행은 더 이상 이용할 수 없습니다.",
   "Sending message": "메시지 전송 중",
   "Rabi connection settings": "Rabi 연결 설정",
   "Rabi is not running. Start Rabi, then send your message again.": "Rabi가 실행 중이 아닙니다. Rabi를 시작한 뒤 메시지를 다시 보내세요.",
@@ -6513,6 +6565,32 @@ var DSH_KO = {
 
 // src/client/locales/es.js
 var ES = {
+  "Rabi message from {name}": "Mensaje de Rabi de {name}",
+  "View original delivery": "Ver la entrega original",
+  "Several tasks have this name.": "Hay varias tareas con este nombre.",
+  "This task is no longer available.": "Esta tarea ya no está disponible.",
+  "Task: {name}": "Tarea: {name}",
+  "Resuming task…": "Reanudando la tarea…",
+  "Pausing task…": "Pausando la tarea…",
+  "Resume not confirmed": "Reanudación sin confirmar",
+  "Pause not confirmed": "Pausa sin confirmar",
+  "Could not resume task": "No se pudo reanudar la tarea",
+  "Could not pause task": "No se pudo pausar la tarea",
+  "Retry resume": "Reintentar la reanudación",
+  "Retry pause": "Reintentar la pausa",
+  "Task settings": "Configuración de la tarea",
+  "Checking task status…": "Comprobando el estado de la tarea…",
+  "Call failed": "Error en la llamada",
+  "Call completed": "Llamada completada",
+  "Call in progress": "Llamada en curso",
+  "Call arguments": "Argumentos de la llamada",
+  "Call result": "Resultado de la llamada",
+  "Total time: {time}": "Tiempo total: {time}",
+  "Total time unavailable": "Tiempo total no disponible",
+  "No recorded tool calls.": "No hay llamadas a herramientas registradas.",
+  "View run history": "Ver el historial de ejecución",
+  "Run history": "Historial de ejecución",
+  "This run is no longer available.": "Esta ejecución ya no está disponible.",
   "Sending message": "Enviando mensaje",
   "Rabi connection settings": "Configuración de conexión con Rabi",
   "Rabi is not running. Start Rabi, then send your message again.": "Rabi no está en ejecución. Inicia Rabi y vuelve a enviar el mensaje.",
@@ -9328,6 +9406,32 @@ var DSH_ES = {
 
 // src/client/locales/fr.js
 var FR = {
+  "Rabi message from {name}": "Message Rabi de {name}",
+  "View original delivery": "Afficher l’envoi d’origine",
+  "Several tasks have this name.": "Plusieurs tâches portent ce nom.",
+  "This task is no longer available.": "Cette tâche n’est plus disponible.",
+  "Task: {name}": "Tâche : {name}",
+  "Resuming task…": "Reprise de la tâche…",
+  "Pausing task…": "Mise en pause de la tâche…",
+  "Resume not confirmed": "Reprise non confirmée",
+  "Pause not confirmed": "Pause non confirmée",
+  "Could not resume task": "Impossible de reprendre la tâche",
+  "Could not pause task": "Impossible de mettre la tâche en pause",
+  "Retry resume": "Réessayer de reprendre",
+  "Retry pause": "Réessayer de mettre en pause",
+  "Task settings": "Paramètres de la tâche",
+  "Checking task status…": "Vérification de l’état de la tâche…",
+  "Call failed": "Échec de l’appel",
+  "Call completed": "Appel terminé",
+  "Call in progress": "Appel en cours",
+  "Call arguments": "Arguments de l’appel",
+  "Call result": "Résultat de l’appel",
+  "Total time: {time}": "Durée totale : {time}",
+  "Total time unavailable": "Durée totale indisponible",
+  "No recorded tool calls.": "Aucun appel d’outil enregistré.",
+  "View run history": "Afficher l’historique d’exécution",
+  "Run history": "Historique d’exécution",
+  "This run is no longer available.": "Cette exécution n’est plus disponible.",
   "Sending message": "Envoi du message",
   "Rabi connection settings": "Paramètres de connexion à Rabi",
   "Rabi is not running. Start Rabi, then send your message again.": "Rabi n’est pas en cours d’exécution. Démarrez Rabi, puis renvoyez votre message.",
@@ -12098,6 +12202,32 @@ var DSH_FR = {
 
 // src/client/locales/de.js
 var DE = {
+  "Rabi message from {name}": "Rabi-Nachricht von {name}",
+  "View original delivery": "Ursprüngliche Zustellung anzeigen",
+  "Several tasks have this name.": "Mehrere Aufgaben haben diesen Namen.",
+  "This task is no longer available.": "Diese Aufgabe ist nicht mehr verfügbar.",
+  "Task: {name}": "Aufgabe: {name}",
+  "Resuming task…": "Aufgabe wird fortgesetzt…",
+  "Pausing task…": "Aufgabe wird pausiert…",
+  "Resume not confirmed": "Fortsetzung nicht bestätigt",
+  "Pause not confirmed": "Pause nicht bestätigt",
+  "Could not resume task": "Aufgabe konnte nicht fortgesetzt werden",
+  "Could not pause task": "Aufgabe konnte nicht pausiert werden",
+  "Retry resume": "Fortsetzen erneut versuchen",
+  "Retry pause": "Pausieren erneut versuchen",
+  "Task settings": "Aufgabeneinstellungen",
+  "Checking task status…": "Aufgabenstatus wird geprüft…",
+  "Call failed": "Aufruf fehlgeschlagen",
+  "Call completed": "Aufruf abgeschlossen",
+  "Call in progress": "Aufruf läuft",
+  "Call arguments": "Aufrufargumente",
+  "Call result": "Aufrufergebnis",
+  "Total time: {time}": "Gesamtdauer: {time}",
+  "Total time unavailable": "Gesamtdauer nicht verfügbar",
+  "No recorded tool calls.": "Keine Werkzeugaufrufe aufgezeichnet.",
+  "View run history": "Ausführungsverlauf anzeigen",
+  "Run history": "Ausführungsverlauf",
+  "This run is no longer available.": "Diese Ausführung ist nicht mehr verfügbar.",
   "Sending message": "Nachricht wird gesendet",
   "Rabi connection settings": "Rabi-Verbindungseinstellungen",
   "Rabi is not running. Start Rabi, then send your message again.": "Rabi läuft nicht. Starte Rabi und sende deine Nachricht erneut.",
@@ -42576,7 +42706,7 @@ function AssistantCell({ node, groupPart, useAssistantChat, sessionId, openFile,
   const running = data.status === "running";
   const textInteractionSource = data.status === "settled" && data.finalNode?.messageId !== void 0;
   const members = steps.length ? steps : [data];
-  const showWork = !roster.byId[sessionId] && groupPart !== "response";
+  const showWork = !(roster.byId[sessionId] && typeof actions.turnHistory === "function") && groupPart !== "response";
   const shown = showWork && thinkingShown(roster.prefs);
   const reasoning = shown ? turnReasoning(steps, data) : "";
   const thinking = groupPart === "response" || !shown ? void 0 : thinkingStep(members);
@@ -43165,10 +43295,12 @@ function TurnTailCell({ turn: location2, sessionId, useTurnClock, useUi, useRost
   });
   const bot = useRoster?.((roster) => isHiddenTurn(roster, sessionId, turn) ? void 0 : roster.byId[sessionId]);
   const assistantState = useAssistantChat?.((value) => value);
+  const showsRunHistory = bot && useTurnSteps && useTurnTools;
+  if (!showsRunHistory && !label && !fresh) return null;
   return (0, import_react66.createElement)(
     import_react66.Fragment,
     null,
-    bot && useTurnSteps && useTurnTools ? (0, import_react66.createElement)(SilentTurnHistory, { bot, actions, sessionId, turn, useTurnSteps, useTurnTools, assistantState }) : null,
+    showsRunHistory ? (0, import_react66.createElement)(SilentTurnHistory, { bot, actions, sessionId, turn, useTurnSteps, useTurnTools, assistantState }) : null,
     label ? (0, import_react66.createElement)("div", { className: "bt-time-sep", role: "separator" }, label) : null,
     fresh ? (0, import_react66.createElement)(NewDivider) : null
   );
@@ -43615,7 +43747,8 @@ function ToolCell({ node, useAssistantChat, inspectCall, sessionId, useRoster, u
   const closed = roster.closedCards?.[sessionId];
   const calls = hidden ? callTree(root).filter((call2) => (toolName(call2) === "ask_user" || toolName(call2) === "show_view") && call2.callId && closed?.[call2.callId] !== void 0) : callTree(root);
   const speaker = roster.byId[sessionId];
-  const drawn = calls.filter((call2) => (speaker ? CARDS : DRAWN).has(toolName(call2)) || isComputerCall(toolName(call2)));
+  const toolsInHistory = speaker && typeof actions.turnHistory === "function";
+  const drawn = calls.filter((call2) => (toolsInHistory ? CARDS : DRAWN).has(toolName(call2)) || isComputerCall(toolName(call2)));
   const running = root.kind === "tool-result" ? void 0 : calls.findLast((call2) => call2.kind !== "tool-result");
   const note = running ? toolActivity(toolName(running), toolArgs(running).text, findBot, roster.byId[sessionId]) : null;
   useLiveNote(actions, sessionId, `tool:${root.callId ?? node.key}`, note);

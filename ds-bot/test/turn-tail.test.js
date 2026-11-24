@@ -75,7 +75,8 @@ test('a steer starts an independent reply and keeps reasoning on its own side', 
     { turn: 3, step: 1, status: 'settled', finalNode: { seq: 10 }, blocks: [{ kind: 'reasoning', text: 'Before thought' }, { kind: 'text', text: 'Before reply' }] },
     { turn: 3, step: 2, status: 'running', blocks: [{ kind: 'reasoning', text: 'After thought' }] },
   ]
-  const render = (current, anchorSeq, prefs) => AssistantCell({ ...props,
+  const render = (current, anchorSeq, prefs, sessionId = 'agent') => AssistantCell({ ...props, sessionId,
+    actions: { ...props.actions, turnHistory() {} },
     node: { ...props.node, anchorSeq, data: current },
     useTurnSteps: () => steps,
     useTurnSteering: () => [{ seq: 12 }],
@@ -85,13 +86,15 @@ test('a steer starts an independent reply and keeps reasoning on its own side', 
   const after = render(steps[1], 15, { thinking: true })
   assert.equal(find(before, node => node.type === ThinkingRow)[0]?.props.text, 'Before thought')
   assert.equal(find(after, node => node.type === ThinkingRow)[0]?.props.text, 'After thought')
-  assert.equal(find(after, node => node.type?.name === 'SpeakerHead').length, 1)
+  assert.equal(find(after, node => node.type?.name === 'SpeakerReply').length, 0)
   assert.equal(find(before, node => node.type === ThinkingRow)[0]?.props.live, false)
   assert.notEqual(find(before, node => node.type === ThinkingRow)[0]?.props.viewKey,
     find(after, node => node.type === ThinkingRow)[0]?.props.viewKey)
   steps[1].blocks.push({ kind: 'text', text: 'After reply' })
   for (const prefs of [{}, { thinking: true }]) {
-    assert.equal(find(render(steps[1], 15, prefs), node => node.type?.name === 'SpeakerHead').length, 1)
+    const bot = render(steps[1], 15, prefs, 'b')
+    assert.equal(find(bot, node => node.type === ThinkingRow).length, 0)
+    assert.equal(find(bot, node => node.type?.name === 'SpeakerReply').length, 1)
   }
 })
 
@@ -160,15 +163,15 @@ test('a Bot reply in its own chat stays whole up to 20,000 characters', () => {
 // #465: the thinking row stays a switchable extra, and the one activity row is
 // never given up to it.
 test('the thinking row shows only with its switch on, and the activity row is never yielded to it', () => {
-  const cell = (prefs, blocks, steps) => {
+  const cell = (prefs, blocks, steps, sessionId = 'agent') => {
     effects.length = 0
     const noted = []
     const { props } = cellProps()
     props.node.data = { turn: 3, step: 1, seq: 10, status: 'running', finalNode: { seq: 10 }, blocks }
     props.useTurnSteps = () => steps
-    props.actions = { noteLive: (sessionId, id) => noted.push(id) }
+    props.actions = { noteLive: (sessionId, id) => noted.push(id), turnHistory() {} }
     const useRoster = select => select({ ...roster, prefs })
-    const out = expand(AssistantCell({ ...props, useRoster }), [])
+    const out = expand(AssistantCell({ ...props, sessionId, useRoster }), [])
     for (const run of effects) run()
     return { out, noted }
   }
@@ -183,6 +186,9 @@ test('the thinking row shows only with its switch on, and the activity row is ne
   assert.equal(find(on.out, node => node.type === ThinkingRow).length, 1)
   assert.equal(on.noted.filter(id => id.startsWith('think:')).length, 0)
   assert.deepEqual(on.noted, [])
+  const bot = cell({ thinking: true }, reason, [thinking], 'b')
+  assert.equal(bot.out.type, CellEmpty)
+  assert.deepEqual(bot.noted, [])
   // A reply streaming in does give the activity row its one note, on or off.
   const replying = { turn: 3, step: 1, status: 'running', blocks: [{ kind: 'reasoning', text: 'Weighing it' }, { kind: 'text', text: 'Done' }] }
   for (const prefs of [{}, { thinking: true }]) {

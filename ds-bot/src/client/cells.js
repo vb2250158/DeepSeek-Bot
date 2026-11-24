@@ -291,7 +291,7 @@ export function AssistantCell({ node, groupPart, useAssistantChat, sessionId, op
   const running = data.status === 'running'
   const textInteractionSource = data.status === 'settled' && data.finalNode?.messageId !== undefined
   const members = steps.length ? steps : [data]
-  const showWork = !roster.byId[sessionId] && groupPart !== 'response'
+  const showWork = !(roster.byId[sessionId] && typeof actions.turnHistory === 'function') && groupPart !== 'response'
   const shown = showWork && thinkingShown(roster.prefs)
   const reasoning = shown ? turnReasoning(steps, data) : ''
   // A live step of the same Turn keeps the row ticking even when it sits on an
@@ -905,8 +905,10 @@ export function TurnTailCell({ turn: location, sessionId, useTurnClock, useUi, u
   })
   const bot = useRoster?.(roster => isHiddenTurn(roster, sessionId, turn) ? undefined : roster.byId[sessionId])
   const assistantState = useAssistantChat?.(value => value)
+  const showsRunHistory = bot && useTurnSteps && useTurnTools
+  if (!showsRunHistory && !label && !fresh) return null
   return h(Fragment, null,
-    bot && useTurnSteps && useTurnTools ? h(SilentTurnHistory, { bot, actions, sessionId, turn, useTurnSteps, useTurnTools, assistantState }) : null,
+    showsRunHistory ? h(SilentTurnHistory, { bot, actions, sessionId, turn, useTurnSteps, useTurnTools, assistantState }) : null,
     label ? h('div', { className: 'bt-time-sep', role: 'separator' }, label) : null,
     fresh ? h(NewDivider) : null)
 }
@@ -1325,7 +1327,8 @@ export function ToolCell({ node, useAssistantChat, inspectCall, sessionId, useRo
     ? callTree(root).filter(call => (toolName(call) === 'ask_user' || toolName(call) === 'show_view') && call.callId && closed?.[call.callId] !== undefined)
     : callTree(root)
   const speaker = roster.byId[sessionId]
-  const drawn = calls.filter(call => (speaker ? CARDS : DRAWN).has(toolName(call)) || isComputerCall(toolName(call)))
+  const toolsInHistory = speaker && typeof actions.turnHistory === 'function'
+  const drawn = calls.filter(call => (toolsInHistory ? CARDS : DRAWN).has(toolName(call)) || isComputerCall(toolName(call)))
   // The newest call still running names the work, so a program reads as the tool it is in.
   const running = root.kind === 'tool-result' ? undefined : calls.findLast(call => call.kind !== 'tool-result')
   const note = running ? toolActivity(toolName(running), toolArgs(running).text, findBot, roster.byId[sessionId]) : null

@@ -986,11 +986,13 @@ test('room-chat adapter renders distinct group members and round events in ChatR
     assert.match(textOf(groupMsgs[1]), /Beta/)
     assert.match(textOf(groupMsgs[1]), /Beta reply/)
 
-    const events = findAll(tree, n => typeof n.props?.className === 'string' && n.props.className.includes('bt-event'))
-    assert.equal(events.length, 3, 'all 3 group events (done, failed, schedule) must render via RelayEvent')
+    const events = findAll(tree, n => ['bt-event', 'bt-event bt-event-error'].includes(n.props?.className))
+    assert.equal(events.length, 3, 'the three group events have separate rows')
     assert.match(textOf(events[0]), /Alpha finished its work/)
     assert.match(textOf(events[1]), /Beta stopped:/)
-    assert.match(textOf(events[2]), /Scheduled task: Daily digest/)
+    assert.equal(textOf(events[2]), 'Task: Daily digest')
+    const [scheduleButton] = findAll(events[2], node => node.type === 'button')
+    assert.equal(scheduleButton.props['aria-haspopup'], 'dialog')
     assert.doesNotMatch(fullText, /Message from/, 'group events must never misrender as 1:1 "Message from"')
     harness.unmount()
   } finally {
