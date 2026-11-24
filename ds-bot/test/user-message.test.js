@@ -81,7 +81,7 @@ const hostProps = (content, { sessionId = 'room', data = {} } = {}) => {
     },
   }
 }
-const render = (exports, props) => { at = 0; return expand(exports.UserMessageCell(props), ['UserText', 'ProjectedContent', 'HostContent']) }
+const render = (exports, props) => { at = 0; return expand(exports.UserMessageCell(props), ['UserMessageBubble', 'UserText', 'ProjectedContent', 'HostContent', 'RabiDeliveryCandidate', 'RabiDeliveryNotice']) }
 const fresh = () => { hooks = [] }
 
 test('the bubble mounts on a DSH with the old text projection or with a user-text registry', () => {
@@ -107,6 +107,43 @@ test('on a current DSH a long message folds, and the host draws only the part sh
   drawn.length = 0
   render(current, props)
   assert.equal(drawn.find(item => item.name === 'conversation.chat.user.content').input.content.text, text)
+})
+
+test('Rabi Agent delivery opens a notice and keeps body, attachment and original text available', () => {
+  fresh()
+  const body = 'Inspect the result.'
+  const raw = '## 消息源\n- 类型：Agent\n\n## 消息内容\n' + body
+  const file = { id: 'test-attachment' }
+  const { props, drawn } = hostProps([{ type: 'text', text: raw }, { type: 'file', attachment: file }])
+  const projected = { sourceType: 'agent', sender: { sessionName: 'Source Agent' }, body, raw }
+  let active = true
+  props.userTextRegistry = {
+    subscribe: () => () => {},
+    getSnapshot: () => Number(active),
+    createEvaluator: () => ({ text }) => {
+      assert.equal(text, raw)
+      return active ? [{ id: 'rabi-delivery-metadata', data: { part: 'source', envelope: projected } }] : []
+    },
+  }
+  for (const kind of ['user', 'steering']) {
+    fresh()
+    props.node.kind = kind
+    const tree = render(current, props)
+    const [notice] = find(tree, node => node.props?.['data-bt-rabi-delivery'] === '')
+    assert.equal(words(notice), 'Rabi message from Source Agent')
+    assert.equal(find(tree, node => node.props?.className === 'bt-umsg').length, 0)
+    assert.equal(find(tree, node => node.props?.text === body).length, 0)
+    notice.props.onClick()
+    const expanded = render(current, props)
+    assert.equal(find(expanded, node => node.props?.text === body).length, 1)
+    assert.equal(words(find(expanded, node => node.type === 'pre')[0]), raw)
+    assert.equal(drawn.at(-1).input.content.attachments[0].file, file)
+  }
+  active = false
+  fresh()
+  const fallback = render(current, props)
+  assert.equal(find(fallback, node => node.props?.className === 'bt-umsg').length, 1)
+  assert.equal(drawn.at(-1).input.content.text, raw)
 })
 
 test('a short message is drawn whole with no fold control', () => {

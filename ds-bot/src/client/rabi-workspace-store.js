@@ -9,7 +9,7 @@ export function createRabiWorkspaceStore(request, { capacity = 64, maxBytes = 4 
     let bytes = [...entries.values()].reduce((sum, entry) => sum + entry.bytes, 0)
     for (const [key, entry] of entries) {
       if (entries.size <= capacity && bytes <= maxBytes) break
-      if (entry.promise || entry.listeners.size || entry.write) continue
+      if (entry.promise || entry.listeners.size || entry.write || entry.activity) continue
       bytes -= entry.bytes; entries.delete(key)
     }
   }
@@ -77,6 +77,15 @@ export function createRabiWorkspaceStore(request, { capacity = 64, maxBytes = 4 
     },
     visit: scope => load(scope), more: scope => load(scope, true),
     write: scope => entryOf(scope).write ?? null,
+    writeActivity: scope => entryOf(scope).activity,
+    async runWrite(scope, activity, run) {
+      const entry = entryOf(scope)
+      if (entry.activity || lifetime.signal.aborted) return
+      const show = activity => { entry.activity = activity; notifyWrites(scope) }
+      show(activity)
+      try { await run(show) }
+      finally { show(undefined); prune() }
+    },
     retainWrite(scope, write) { const entry = entryOf(scope); entry.write ??= write; notifyWrites(scope); return entry.write },
     clearWrite(scope) { delete entryOf(scope).write; notifyWrites(scope) },
     writes(scope) { return [...entries.values()].filter(entry => entry.write && entry.scope.botId === scope.botId && entry.scope.roleId === scope.roleId).map(entry => ({ scope: entry.scope, operation: entry.write })) },
@@ -87,6 +96,18 @@ export function createRabiWorkspaceStore(request, { capacity = 64, maxBytes = 4 
       entry.pages = [value]; entry.bytes = JSON.stringify(value).length * 2
       entry.snapshot = { value, pending: false, error: null, updatedAt: Date.now() }
       notify(entry); prune()
+    },
+    updateSchedule(scope, item) {
+      const entry = entryOf(scope)
+      const { value } = entry.snapshot
+      if (!value?.items.some(current => current.id === item.id)) return
+      const update = page => ({ ...page, items: page.items.map(current => current.id === item.id ? item : current) })
+      entry.epoch = (entry.epoch ?? 0) + 1
+      entry.pages = entry.pages.map(update)
+      const next = update(value)
+      entry.bytes = JSON.stringify(next).length * 2
+      entry.snapshot = { ...entry.snapshot, value: next, updatedAt: Date.now() }
+      notify(entry)
     },
     async refresh(scope) {
       const entry = entryOf(scope)

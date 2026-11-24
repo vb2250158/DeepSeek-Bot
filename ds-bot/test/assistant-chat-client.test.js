@@ -35,12 +35,10 @@ const props = {
 const result = { kind: 'tool-result', seq: 4, callId: 'say', name: 'rabiroute_assistant_say', turn: 1,
   isError: false, content: [{ type: 'text', text: '{"text":"Hello"}' }], meta: { kind: 'rabi-assistant-say', text: 'Hello' }, subCalls: [] }
 
-test('native Assistant renderer keeps execution output inside collapsed task details', () => {
+test('assistant-mode execution narration stays out of a personal Bot chat', () => {
   const node = { anchorSeq: 3, key: 'step', data: { seq: 3, turn: 1, status: 'complete', blocks: [{ kind: 'text', text: 'Internal execution' }] } }
   const rendered = AssistantCell({ ...props, node })
-  assert.equal(rendered.type, 'details')
-  assert.equal(rendered.props.open, undefined)
-  assert.equal(rendered.children[0].type, 'summary')
+  assert.equal(rendered.type.name, 'CellEmpty')
   const legacy = AssistantCell({ ...props, node: { ...node, anchorSeq: 1 } })
   assert.equal(legacy.type, 'fragment')
   const plain = AssistantCell({ ...props, useAssistantChat: undefined, node })
@@ -49,19 +47,21 @@ test('native Assistant renderer keeps execution output inside collapsed task det
 
 test('native tool renderer shows only committed say text as full chat bubbles', () => {
   const rendered = ToolCell({ ...props, node: { data: { root: result } } })
-  assert.equal(rendered.type.name, 'Bubbles')
-  assert.deepEqual(Array.from(rendered.props.texts), ['Hello'])
-  assert.equal(rendered.props.fold.chars, Infinity)
-  assert.equal(rendered.props.fold.lines, Infinity)
+  assert.equal(rendered.type.name, 'SpeakerReply')
+  const [bubbles] = rendered.children
+  assert.equal(rendered.props.history.turn, 1)
+  assert.deepEqual(Array.from(bubbles.props.texts), ['Hello'])
+  assert.equal(bubbles.props.fold.chars, Infinity)
+  assert.equal(bubbles.props.fold.lines, Infinity)
   const pending = ToolCell({ ...props, node: { data: { root: { ...result, kind: 'tool-call' } } } })
   assert.equal(pending.type.name, 'CellEmpty')
   const failed = ToolCell({ ...props, node: { data: { root: { ...result, isError: true } } } })
-  assert.equal(failed.type, 'details')
+  assert.equal(failed.type.name, 'CellEmpty')
 })
 
-test('native task details open the supported tool inspector', () => {
+test('ordinary Agent task details open the supported tool inspector', () => {
   let opened
-  const rendered = ToolCell({ ...props, inspectCall: id => { opened = id }, node: { data: { root: { ...result, name: 'shell', meta: undefined } } } })
+  const rendered = ToolCell({ ...props, sessionId: 'ordinary', inspectCall: id => { opened = id }, node: { data: { root: { ...result, name: 'shell', meta: undefined } } } })
   assert.equal(rendered.type, 'details')
   const button = rendered.children[1].children.find(child => child?.type === 'button')
   button.props.onClick()
@@ -89,16 +89,13 @@ test('assistant sidebar preview uses the host chat tail and keeps narration in d
 })
 
 
-test('assistant background settlement and Agent messages remain complete inside closed Details', () => {
+test('personal Bot chat omits background details and uses the scheduled task entry', () => {
   const text = 'Private background execution. '.repeat(20)
   const triggerProps = { ...props, useSessions: select => select({ byId: {}, projectionsBySession: {} }), useTurnClock: select => select({}) }
   for (const kind of ['subagent-settled', 'agent-message']) {
     const node = { anchorSeq: 5, data: { seq: 5, turn: 1, source: { kind, senderSessionId: 'synthetic-worker-42' }, content: [{ type: 'text', text }] } }
     const rendered = TriggerCell({ ...triggerProps, node })
-    assert.equal(rendered.type, 'details')
-    assert.equal(rendered.props.open, undefined)
-    assert.equal(rendered.children[0].type, 'summary')
-    assert.equal(rendered.children[1].children[0].props.text, text)
+    assert.equal(rendered.type.name, 'CellEmpty')
     const ordinary = TriggerCell({ ...triggerProps, node, useAssistantChat: undefined })
     assert.equal(ordinary.props.className, 'bt-event')
     assert.equal(ordinary.children[0], text.slice(0, 80))
@@ -109,7 +106,7 @@ test('assistant background settlement and Agent messages remain complete inside 
     assert.equal(previous.props.className, 'bt-event')
   }
   const schedule = TriggerCell({ ...triggerProps, node: { data: { seq: 5, turn: 1, source: { kind: 'schedule' }, content: [{ type: 'text', text: 'Scheduled work' }] } } })
-  assert.equal(schedule.props.className, 'bt-event')
+  assert.equal(schedule.type.name, 'ScheduleTrigger')
   const kickoff = TriggerCell({ ...triggerProps, node: { data: { seq: 5, turn: 1, source: { kind: 'bot', role: 'kickoff' }, content: [] } } })
   assert.equal(kickoff.type.name, 'CellEmpty')
   const post = TriggerCell({ ...triggerProps, node: { data: { seq: 5, turn: 1, source: { kind: 'bot', role: 'post', senderSessionId: 'synthetic-worker-42' }, content: [{ type: 'text', text }] } } })
@@ -118,7 +115,7 @@ test('assistant background settlement and Agent messages remain complete inside 
 })
 
 
-test('background trigger Details retain full text in the rendered DOM', () => {
+test('ordinary Agent background details retain full text in the rendered DOM', () => {
   const uiRequire = createRequire(import.meta.resolve('@deepseek-ai/dsh-client-ui-primitives'))
   const hostRequire = createRequire(join(process.env.DSH_HARNESS, 'package.json'))
   const React = uiRequire('react')
@@ -134,7 +131,7 @@ test('background trigger Details retain full text in the rendered DOM', () => {
   for (const kind of ['subagent-settled', 'agent-message']) {
     const node = { data: { seq: 5, turn: 1, source: { kind, senderSessionId: 'synthetic-worker-42' }, content: [{ type: 'text', text }] } }
     const rendered = renderToStaticMarkup(React.createElement(actual.exports.TriggerCell, {
-      ...props, node, useSessions: select => select({ byId: {} }), useTurnClock: select => select({}),
+      ...props, sessionId: 'ordinary', node, useSessions: select => select({ byId: {} }), useTurnClock: select => select({}),
     }))
     const dom = new JSDOM(rendered)
     const details = dom.window.document.querySelector('details')

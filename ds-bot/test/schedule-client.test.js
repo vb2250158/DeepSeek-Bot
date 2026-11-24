@@ -33,10 +33,10 @@ const react = {
 const module = { exports: {} }
 runInNewContext(outputFiles[0].text, {
   module, exports: module.exports,
-  crypto: { randomUUID },
+  AbortSignal, crypto: { randomUUID },
   require: name => (name === 'react' ? react : name === 'react-dom' ? { createPortal: node => node } : { Button: 'button', Input: 'input', InlineEditor: 'textarea', Modal: 'dialog', Switch: 'switch', Menu: 'menu' }),
 })
-const { timingText, BotSchedules, RabiSchedules, ScheduleSummary, SchedulesPage, RabiScheduleForm, RabiScheduleRow, RabiPendingWrite, TaskForm } = module.exports
+const { scheduleRuns, resolveScheduleRun, timingText, BotSchedules, RabiSchedules, ScheduleSummary, SchedulesPage, RabiScheduleForm, RabiScheduleRow, RabiPendingWrite, TaskForm } = module.exports
 const text = node => node == null ? '' : Array.isArray(node) ? node.map(text).join('') : typeof node === 'object' ? text(node.props?.children) : String(node)
 const expand = node => node == null ? node : Array.isArray(node) ? node.map(expand) : typeof node !== 'object' ? node : typeof node.type === 'function' ? expand(node.type(node.props)) : { ...node, props: { ...node.props, children: expand(node.props.children) } }
 function all(node, className) {
@@ -53,6 +53,38 @@ const render = (component, props) => {
   }
 }
 const flush = () => new Promise(resolve => setImmediate(resolve))
+
+test('schedule history uses task names, preserves batch ids and opens the exact task', async () => {
+  const title = 'QA 验收'
+  const rabi = scheduleRuns('schedule_id_json: "occurrence-id"\nreminder_prompt_json: '
+    + JSON.stringify('定时计划触发：'+title+' [用户模板补充] 周一到六 09:00 核对表格'))[0]
+  assert.equal(rabi.title, title)
+  assert.equal(rabi.rabi, true)
+  const native = scheduleRuns('reminders_json: '+JSON.stringify([
+    { schedule_id: 'same-owner', reminder_prompt: 'Old title\nMore' },
+    { schedule_id: 'other', reminder_prompt: 'Other' },
+  ]))
+  assert.equal(native[0].title, 'Old title')
+  assert.equal(native[0].id, 'same-owner')
+  assert.equal(native[1].id, 'other')
+  const entry = await resolveScheduleRun({ entry: native[0], sessionId:'session', actions:{ schedules: async () => ({
+    tasks: [{ id:'other', sessionId:'session', title:'Old title' }, { id:'same-owner', sessionId:'session', title:'Renamed task' }],
+  }) } })
+  assert.equal(entry.task.title, 'Renamed task')
+  const task = { title, rawRuleId:'exact-rule', sourceRoleId:'exact-role' }
+  const calls = []
+  const actions = { rabiConnection: async (endpoint, body) => {
+    calls.push([endpoint, body])
+    if (endpoint === 'rabi-schedule-read') return { items:[task], revision:'current' }
+    return { items:body.cursor ? [task] : [], nextCursor:body.cursor ? null : 'next' }
+  } }
+  const opened = await resolveScheduleRun({ entry:rabi, bot:{ id:'bot' }, sessionId:'session', actions })
+  assert.equal(opened.task, task)
+  assert.equal(calls[2][1].id, 'exact-rule')
+  assert.equal(calls[2][1].sourceRoleId, 'exact-role')
+  actions.rabiConnection = async () => ({ items:[task, { ...task, rawRuleId:'other-rule' }] })
+  await assert.rejects(resolveScheduleRun({ entry:rabi, bot:{ id:'bot' }, sessionId:'session', actions }), /Several tasks/)
+})
 
 test('canonical recurrence rules remain visible in task descriptions', () => {
   const rrule = 'DTSTART;TZID=Asia/Shanghai:20300101T090000\nRRULE:FREQ=DAILY'
@@ -86,7 +118,7 @@ test('Rabi schedules appear beside local tasks with status and no DSH delete act
   const bot = { id: 'chief', name: 'Chief', rabiPersona: { roleId: 'fixture' } }
   const items = [{ id: 'same', source: 'rabi', title: 'Remote check', kind: 'rabi', status: 'paused', schedule: { type: 'daily_time', timeOfDay: '09:00' } }]
   const scopes = []
-  const actions = { rabiWorkspace: { write: () => null, writes: () => [], snapshot(scope) { scopes.push(scope); return { value: { items }, pending: false, error: null } }, subscribe: () => () => {} } }
+  const actions = { rabiWorkspace: { write: () => null, writeActivity: () => undefined, writes: () => [], snapshot(scope) { scopes.push(scope); return { value: { items }, pending: false, error: null } }, subscribe: () => () => {} } }
   view = { available: true, tasks: [{ id: 'same', botId: 'chief', title: 'Local check', kind: 'every', everySeconds: 600, status: 'active' }] }
   const summary = expand(ScheduleSummary({ bot, actions }))
   assert.match(text(summary), /Scheduled tasks · 2/)
@@ -111,17 +143,32 @@ test('Rabi switches write the original persona and retain the same request after
   const bot = { id: 'bot', rabiPersona: { roleId: 'fixture' } }
   const task = { id: 'one', rawRuleId: 'one', sourceRoleId: 'fixture', source: 'rabi', title: 'Check', status: 'active', kind: 'rabi', schedule: { type: 'daily_time', timeOfDay: '09:00' } }
   const store = createRabiWorkspaceStore(async () => ({ roleId: '', revision: 'r1', items: [task] }))
+  const scope = { botId: 'bot', roleId: '', resource: 'schedules' }
+  await store.visit(scope)
   const calls = []
+  let reply
+  const firstWrite = new Promise((_, reject) => { reply = reject })
   const actions = { rabiWorkspace: store, rabiConnection: async (endpoint, body) => {
     if (endpoint === 'rabi-schedule-read') return { revision: 'r1', items: [task] }
     calls.push({ endpoint, body })
-    if (calls.length === 1) throw Object.assign(new Error('unknown'), { code: 'bot/rabi-uncertain' })
+    if (calls.length === 1) return firstWrite
     return { roleId: '', revision: 'r2', items: [{ ...task, status: 'paused' }] }
   } }
-  const draw = render(RabiScheduleRow, { task, bot, actions, revision: 'r1', onView: async () => {}, onEdit() {} })
-  nodes(draw()).find(node => node.type === 'switch').props.onChange(false)
+  const props = { task, bot, actions, onView: async () => {}, onEdit() {} }
+  const draw = render(RabiScheduleRow, props)
+  const control = draw => nodes(draw()).find(node => node.type === 'switch')
+  control(draw).props.onChange(false)
+  assert.match(text(draw()), /Pausing task…/)
+  assert.equal(control(draw).props.checked, false)
+  const reopened = render(RabiScheduleRow, props)
+  assert.equal(control(reopened).props.disabled, true)
+  assert.equal(control(reopened).props.checked, false)
+  control(reopened).props.onChange(false)
+  reply(Object.assign(new Error('unknown'), { code: 'bot/rabi-uncertain' }))
   await flush()
-  const retry = nodes(draw()).find(node => node.type === 'button' && text(node) === 'Retry')
+  assert.match(text(reopened()), /Pause not confirmed/)
+  assert.equal(control(reopened).props.checked, false)
+  const retry = nodes(reopened()).find(node => node.type === 'button' && text(node) === 'Retry pause')
   assert.ok(retry)
   retry.props.onClick()
   await flush()
@@ -130,14 +177,71 @@ test('Rabi switches write the original persona and retain the same request after
   assert.equal(calls[0].body.expectedRoleId, 'fixture')
   assert.equal(calls[0].body.enabled, false)
   assert.equal(calls[0].body.operationId, calls[1].body.operationId)
-  assert.equal(store.snapshot({ botId: 'bot', roleId: '', resource: 'schedules' }).value.items[0].status, 'paused')
+  assert.equal(store.snapshot(scope).value.items[0].status, 'paused')
+  store.dispose()
+})
+
+test('an uncertain toggle reads the task before asking for a retry and preserves other rows', async () => {
+  const bot = { id: 'bot' }
+  const scope = { botId: 'bot', roleId: '', resource: 'schedules' }
+  const task = { id: 'one', rawRuleId: 'one', sourceRoleId: 'fixture', status: 'paused', kind: 'rabi', title: 'Check', schedule: { type: 'interval', intervalSeconds: 60 } }
+  const other = { ...task, id: 'two' }
+  const store = createRabiWorkspaceStore(async ({ cursor }) => ({ roleId: '', items: cursor ? [task] : [other], nextCursor: cursor ? null : 'second' }))
+  await store.visit(scope)
+  await store.more(scope)
+  let writes = 0
+  let confirm
+  const readback = new Promise(resolve => { confirm = resolve })
+  const actions = { rabiWorkspace: store, rabiConnection: async (endpoint, body, signal) => {
+    if (endpoint === 'rabi-schedule-read') return signal ? readback : { revision: 'r1', items: [task] }
+    writes++
+    assert.equal(body.enabled, true)
+    throw Object.assign(new Error('unknown'), { code: 'bot/rabi-uncertain' })
+  } }
+  const draw = render(RabiScheduleRow, { bot, task, actions, onEdit() {} })
+  const control = () => nodes(draw()).find(node => node.type === 'switch')
+  control().props.onChange(true)
+  assert.match(text(draw()), /Resuming task…/)
+  assert.equal(control().props.checked, true)
+  await flush()
+  assert.match(text(draw()), /Checking task status…/)
+  assert.equal(control().props.checked, true)
+  confirm({ revision: 'r2', items: [{ ...task, status: 'active' }] })
+  await flush()
+  assert.equal(writes, 1)
+  assert.equal(store.writes(scope).length, 0)
+  assert.deepEqual(store.snapshot(scope).value.items, [other, { ...task, status: 'active' }])
+  assert.doesNotMatch(text(draw()), /Retry/)
+  store.dispose()
+})
+
+test('a rejected toggle unlocks the switch and shows the action that failed', async () => {
+  const bot = { id: 'bot' }
+  const task = { id: 'one', rawRuleId: 'one', sourceRoleId: 'fixture', source: 'rabi', status: 'active', kind: 'rabi', title: 'Check', schedule: { type: 'interval', intervalSeconds: 60 } }
+  const store = createRabiWorkspaceStore(async () => ({ roleId: '', items: [task] }))
+  let reads = 0
+  let refreshes = 0
+  const actions = { rabiWorkspace: store, rabiConnection: async endpoint => {
+    if (endpoint === 'rabi-schedule-read') { reads++; return { revision: 'r1', items: [task] } }
+    throw Object.assign(new Error('stale configuration'), { code: 'bot/rabi-revision-conflict' })
+  } }
+  const draw = render(RabiScheduleRow, { bot, task, actions, onView: async () => { refreshes++ }, onEdit() {} })
+  const control = () => nodes(draw()).find(node => node.type === 'switch')
+  control().props.onChange(false)
+  assert.equal(control().props.checked, false)
+  await flush()
+  assert.match(text(draw()), /Could not pause task/)
+  assert.equal(control().props.disabled, false)
+  assert.equal(control().props.checked, true)
+  assert.equal(reads, 1)
+  assert.equal(refreshes, 1)
   store.dispose()
 })
 
 test('personal creation chooses Rabi and group creation keeps the DSH form', () => {
   const bot = { id: 'bot', name: 'Persona', rabiPersona: { roleId: 'fixture' } }
   const roster = { bots: [bot], rooms: [{ id: 'room', name: 'Group' }] }
-  const personal = TaskForm({ roster, actions: {}, start: 'bot' })
+  const personal = TaskForm({ roster, actions: { rabiWorkspace: {} }, start: 'bot' })
   assert.equal(personal.type.name, 'NewRabiSchedule')
   const group = TaskForm({ roster, actions: {}, start: 'room' })
   assert.equal(group.type, 'form')

@@ -146,6 +146,16 @@ test('stopped Rabi and incomplete plan recovery remain explicit after the run en
   assert.match(stopped.message({ uncertain: true }), /original receipt/)
 })
 
+test('persona storage errors explain the failed access without a connection settings action', () => {
+  const unavailable = fixture({ hook: { state: 'failed', code: 'ROLE_STORAGE_UNAVAILABLE', uncertain: true } })
+  assert.match(JSON.stringify(unavailable.view), /Rabi could not access the persona data/)
+  assert.doesNotMatch(JSON.stringify(unavailable.view), /connection settings/)
+  assert.match(unavailable.message({ code: 'ROLE_STORAGE_WAIT_TIMEOUT' }), /Rabi timed out accessing the persona data/)
+  assert.match(unavailable.message({ code: 'manager_rejected' }), /Rabi could not complete this request/)
+  const offline = fixture({ hook: { state: 'failed', code: 'connection_not_ready' } })
+  assert.match(JSON.stringify(offline.view), /Rabi connection settings/)
+})
+
 test('refresh does not replay an old Rabi Hook failure notice', () => {
   assert.equal(fixture({ hook: { state: 'failed', code: 'host_stopped', at: 1 } }).view, null)
   assert.equal(fixture({ hook: { state: 'failed', code: 'host_stopped', at: Date.now() + 1000 } }).view.node.props.role, 'alert')

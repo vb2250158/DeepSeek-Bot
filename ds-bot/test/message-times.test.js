@@ -63,16 +63,16 @@ const userProps = (data = {}, sessionId = 'b') => ({
 
 test('a user message shows when it was sent, in its own chat as in a group', () => {
   for (const [sessionId, where] of [['b', 'own chat'], ['room-1', 'group']]) {
-    const [when] = times(UserMessageCell(userProps({}, sessionId)))
+    const [when] = times(UserMessageCell(userProps({}, sessionId)), ['UserMessageBubble'])
     assert.equal(when.props.className, 'bt-utime', where)
     assert.equal(typeof when.props.title, 'string', where)
-    assert.equal(typeof when.children[0], 'string', where)
+    assert.equal(typeof find(when, node => node.props?.className === 'bt-uclock')[0].children[0], 'string', where)
   }
 })
 
 test('a user message without a real time draws no time node', () => {
-  assert.equal(times(UserMessageCell(userProps({ time: undefined }))).length, 0)
-  assert.equal(times(UserMessageCell(userProps({ time: 'later' }))).length, 0)
+  assert.equal(times(UserMessageCell(userProps({ time: undefined })), ['UserMessageBubble']).length, 0)
+  assert.equal(times(UserMessageCell(userProps({ time: 'later' })), ['UserMessageBubble']).length, 0)
 })
 
 const assistantProps = (data = {}, rosterPrefs) => ({
@@ -88,7 +88,7 @@ const assistantProps = (data = {}, rosterPrefs) => ({
   useTurnContext: () => [],
   actions: { noteLive() {} },
 })
-const bubbles = node => expand(node, ['Bubbles', 'Bubble', 'SpeakerHead'])
+const bubbles = node => expand(node, ['SpeakerReply', 'Bubbles', 'Bubble', 'SpeakerHead', 'TurnHistoryAvatar'])
 
 test('a Bot reply in its own chat shows no per-message clock', () => {
   const tree = bubbles(AssistantCell(assistantProps()))

@@ -8,6 +8,9 @@ import { dateLocale, t } from './i18n.js'
 import { noHover } from './motion.js'
 import { clockLabel, messageClock } from './text.js'
 import { useFold } from './fold.js'
+import { UserHead } from './user-identity.js'
+import { useMessageChains } from './message-chains.js'
+import { RabiDeliveryCandidate, hasRabiDeliveryHeader } from './rabi-delivery.js'
 
 // -------------------------------------------------------------------------
 // The user's own messages. DS Bot owns the row (fold, time, IM tag, copy, steering
@@ -189,7 +192,15 @@ function HostContent({ data, prepared, shown, folded, control, loadImage, render
 }
 
 // A sent message, or one that joined a running turn ("steering").
-export function UserMessageCell({ node, sessionId, useRoster, actions, renderMessageImages, openFile, openSkill, loadImage, renderFactorySlot }) {
+export function UserMessageCell(props) {
+  const head = props.node.data?.content?.[0]
+  if (props.userTextRegistry && head?.type === 'text' && hasRabiDeliveryHeader(head.text)) {
+    return h(RabiDeliveryCandidate, { ...props, prepare: hostContent, fallback: UserMessageBubble })
+  }
+  return h(UserMessageBubble, props)
+}
+
+function UserMessageBubble({ node, sessionId, useRoster, actions, renderMessageImages, openFile, openSkill, loadImage, renderFactorySlot }) {
   const roster = useRoster(value => value)
   const data = node.data ?? {}
   const prepared = projects ? undefined : hostContent(data.content, data)
@@ -208,22 +219,28 @@ export function UserMessageCell({ node, sessionId, useRoster, actions, renderMes
     window.addEventListener('touchstart', onDown)
     return () => { window.removeEventListener('mousedown', onDown); window.removeEventListener('touchstart', onDown) }
   }, [toolsOpen])
+  useMessageChains(row)
   const tapTools = (event) => {
     if (!noHover() || event.target instanceof Element && event.target.closest('a,button,input,textarea,select,pre,code,[role=button],[role=link]')) return
     setToolsOpen(value => !value)
   }
   const fold = { data, text, shown, folded, control, onClick: tapTools }
-  return h('div', { ref: row, className: 'bt-umsg', 'data-steering': steering || undefined },
+  const message = h('div', { ref: row, className: 'bt-umsg', 'data-steering': steering || undefined },
     h('div', { className: 'bt-ustack' },
       prepared === undefined
         ? h(ProjectedContent, { ...fold, roster, sessionId, actions, renderMessageImages, openFile, openSkill })
         : h(HostContent, { ...fold, prepared, loadImage, renderFactorySlot }),
-      (sentAt || via) ? h('div', { className: 'bt-utime', title: clockLabel(data.time) }, ...(via ? [h(ViaTag, { key: 'via', via })] : []), sentAt) : null),
+      (sentAt || via) ? h('div', { className: 'bt-utime', title: clockLabel(data.time) }, ...(via ? [h(ViaTag, { key: 'via', via })] : []), sentAt ? h('span', { className: 'bt-uclock' }, sentAt) : null) : null),
     text === '' ? null : h('div', { className: 'bt-utools', 'data-open': toolsOpen || undefined }, h(CopyButton, { text })))
+  const ownChat = roster.byId[sessionId] !== undefined || roster.roomsById[sessionId] !== undefined
+  const speaker = roster.byId[sessionId] !== undefined && !via ? 'user' : undefined
+  return ownChat ? h('div', { className: 'bt-urow bt-urow-me', 'data-bt-speaker': speaker }, h(UserHead, { actions }), message) : message
 }
 
 export const USER_MESSAGE_CSS = `
+.bt-rabi-delivery-raw{max-height:45vh;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere}
 .bt-umsg{display:flex;flex-direction:row-reverse;align-items:center;justify-content:flex-start;gap:4px}
+.bt-urow-me>.bt-umsg{width:100%}
 .bt-ustack{min-width:0;max-width:calc(var(--bt-msg-w) * 100%);display:flex;flex-direction:column;align-items:flex-end;gap:8px}
 .bt-ubody{max-width:100%;box-sizing:border-box;background:var(--bt-user);color:var(--bt-user-ink);border-radius:18px;padding:7px 12px;font-size:var(--dsh-content-font-size,14px);line-height:calc(var(--dsh-content-font-size,14px) + 10px);white-space:pre-wrap;word-break:break-word;text-wrap:pretty;text-autospace:normal}
 .bt-ubody a{color:inherit}

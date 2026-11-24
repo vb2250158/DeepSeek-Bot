@@ -3,6 +3,8 @@ import { test } from 'node:test'
 import { stackReplies } from '../src/shared/group-replies.js'
 import { fileURLToPath } from 'node:url'
 import { runInNewContext } from 'node:vm'
+import { createRequire } from 'node:module'
+import { join } from 'node:path'
 import { build } from 'esbuild'
 
 const bundle = await build({
@@ -32,7 +34,24 @@ const { Bubbles, ChatRows, ThinkingRow, syncGroupChains, claimLines, GroupMessag
 
 const roster = { byId: { b: { id: 'b', name: 'Writer' } }, roomsById: {} }
 const MINUTE = 60_000
-const shape = rows => [...rows].map(row => (row.props.className === 'bt-time-sep' ? 'clock' : row.type.name === 'Bubbles' ? `bot:${row.props.texts.join('+')}` : row.type.name))
+const shape = rows => [...rows].map(row => {
+  if (row.props.className === 'bt-time-sep') return 'clock'
+  const content = row.type.name === 'SpeakerReply' ? row.children[0] : row
+  return content.type.name === 'Bubbles' ? `bot:${content.props.texts.join('+')}` : content.type.name
+})
+
+test('a stored group schedule resolves with the current group roster', () => {
+  const actions = {}
+  const [event] = ChatRows({
+    items: [{ kind: 'relay', reply: { kind: 'schedule', botId: 'b', text: 'Inspect the workspace' } }],
+    sessionId: 'room', roster, actions,
+  })
+  const trigger = event.type(event.props)
+  assert.equal(trigger.type.name, 'ScheduleTrigger')
+  assert.equal(trigger.props.roster, roster)
+  assert.equal(trigger.props.sessionId, 'room')
+  assert.equal(trigger.props.actions, actions)
+})
 
 test('stored duplicate bubbles stay visible, with reactions on indexes 1 and 3', () => {
   const tree = Bubbles({
@@ -128,71 +147,63 @@ test('a settled reasoning row shows the turn’s thinking time when known', () =
   assert.equal(untimed.children[0].children.join(''), 'Thought it through')
 })
 
-test('consecutive group messages from the same Bot chain together, and cards or user rows break the chain', () => {
-  // A flow row is a real element here: the seam pass reads `data-chat-flow-kind`
-  // through getAttribute and looks for the speaker head by selector.
-  const node = (classes, botId, turn = {}, attrs = {}, children = {}) => ({
-    dataset: botId ? { botId } : {},
-    classList: { contains: name => classes.includes(name) },
-    closest: sel => (sel === '[data-chat-group-key]' ? turn : null),
-    getAttribute: name => attrs[name] ?? null,
-    querySelector: sel => children[sel] ?? null,
-  })
-  const t1 = { dataset: {} }, t2 = { dataset: {} }, t3 = { dataset: {} }, t4 = { dataset: {} }
-  const m1 = node(['bt-group-msg'], 'a', t1)
-  const m2 = node(['bt-group-msg'], 'a', t2)
-  const card = node(['bt-q-inline'])
-  const m3 = node(['bt-group-msg'], 'a', t3)
-  const hostUser = node([], undefined)
-  const m4 = node(['bt-group-msg'], 'a', t4)
-  syncGroupChains({ querySelectorAll: () => [m1, m2, card, m3, hostUser, m4] })
-  assert.equal(m1.dataset.chainPrev, undefined)
-  assert.equal(m1.dataset.chainNext, '')
-  assert.equal(t1.dataset.btChainNext, '')
-  assert.equal(m2.dataset.chainPrev, '')
-  assert.equal(m2.dataset.chainNext, undefined)
-  assert.equal(t2.dataset.btChainPrev, '')
-  assert.equal(m3.dataset.chainPrev, undefined)
-  assert.equal(m3.dataset.chainNext, undefined)
-  assert.equal(m4.dataset.chainPrev, undefined)
+const { JSDOM } = createRequire(join(process.env.DSH_HARNESS, 'package.json'))('jsdom')
+
+function chainFixture(html) {
+  const dom = new JSDOM('<main data-chat-flow>' + html + '</main>')
+  const flow = dom.window.document.querySelector('main')
+  syncGroupChains(flow)
+  return { dom, flow, row: id => flow.querySelector('#' + id) }
+}
+
+test('consecutive group messages keep group seams and stop at a card or user row', () => {
+  const { dom, row } = chainFixture(`
+    <section data-chat-group-key><div class="bt-group-msg" id="one" data-bot-id="a"></div></section>
+    <section data-chat-group-key><div class="bt-group-msg" id="two" data-bot-id="a"></div></section>
+    <aside class="bt-q-inline"></aside>
+    <div class="bt-group-msg" id="three" data-bot-id="a"></div>
+    <div data-chat-flow-kind="user"></div>
+    <div class="bt-group-msg" id="four" data-bot-id="a"></div>
+  `)
+  assert.ok(row('one').hasAttribute('data-chain-next'))
+  assert.ok(row('one').parentElement.hasAttribute('data-bt-chain-next'))
+  assert.ok(row('two').hasAttribute('data-chain-prev'))
+  assert.ok(row('two').parentElement.hasAttribute('data-bt-chain-prev'))
+  assert.ok(!row('three').hasAttribute('data-chain-prev'))
+  assert.ok(!row('three').hasAttribute('data-chain-next'))
+  assert.ok(!row('four').hasAttribute('data-chain-prev'))
+  dom.window.close()
 })
 
-test('head-less replies from one Bot meet at a seam, and the head opens a new one', () => {
-  const step = (headless) => ({
-    dataset: {},
-    classList: { contains: () => false },
-    closest: () => null,
-    getAttribute: name => (name === 'data-chat-flow-kind' ? 'assistant-step' : null),
-    querySelector: sel => (sel === '.bt-group-name' && !headless ? { head: true } : null),
-  })
-  const opening = step(false)
-  const second = step(true)
-  const third = step(true)
-  syncGroupChains({ querySelectorAll: () => [opening, second, third] })
-  assert.equal(opening.dataset.seamPrev, undefined)
-  assert.equal(opening.dataset.seamNext, '')
-  assert.equal(second.dataset.seamPrev, '')
-  assert.equal(second.dataset.seamNext, '')
-  assert.equal(third.dataset.seamPrev, '')
-  assert.equal(third.dataset.seamNext, undefined)
+test('two direct replies with their own heads join across an undrawn step', () => {
+  const { dom, row } = chainFixture(`
+    <div data-chat-flow-kind="assistant-step"><div id="one" data-bt-speaker="bot:a"><div class="bt-speaker"></div></div></div>
+    <div data-chat-flow-kind="assistant-step"></div>
+    <div data-chat-flow-kind="tool-call"><div id="two" data-bt-speaker="bot:a"><div class="bt-speaker"></div></div></div>
+    <div data-chat-flow-kind="assistant-step"><div id="three" data-bt-speaker="bot:b"></div></div>
+  `)
+  assert.ok(!row('one').hasAttribute('data-seam-prev'))
+  assert.ok(row('one').hasAttribute('data-seam-next'))
+  assert.ok(row('two').hasAttribute('data-seam-prev'))
+  assert.ok(!row('two').hasAttribute('data-seam-next'))
+  assert.ok(!row('three').hasAttribute('data-seam-prev'))
+  dom.window.close()
 })
 
-test('native and pending steering rows break assistant bubble seams', () => {
-  const assistant = () => ({
-    dataset: { seamPrev: '', seamNext: '' },
-    getAttribute: name => name === 'data-chat-flow-kind' ? 'assistant-step' : null,
-    querySelector: () => null,
-  })
-  for (const selector of ['[data-chat-flow-kind=steering]', '[data-pending-steering]']) {
-    const before = assistant(), after = assistant()
-    const input = { dataset: {}, getAttribute: () => null, classList: { contains: () => false } }
-    syncGroupChains({ querySelectorAll: selected => selected.includes(selector) ? [before, input, after] : [before, after] })
-    assert.equal(before.dataset.seamNext, undefined, selector)
-    assert.equal(after.dataset.seamPrev, undefined, selector)
-    syncGroupChains({ querySelectorAll: () => [before, after] })
-    assert.equal(before.dataset.seamNext, '')
-    assert.equal(after.dataset.seamPrev, '')
-  }
+test('consecutive user messages join, and an inserted divider clears their seams', () => {
+  const { dom, flow, row } = chainFixture(`
+    <div data-chat-flow-kind="user" id="host"><div id="one" data-bt-speaker="user"><div class="bt-umsg"></div></div></div>
+    <div data-chat-flow-kind="steering"><div id="two" data-bt-speaker="user"><div class="bt-umsg"></div></div></div>
+  `)
+  assert.ok(row('one').hasAttribute('data-seam-next'))
+  assert.ok(row('two').hasAttribute('data-seam-prev'))
+  const barrier = dom.window.document.createElement('div')
+  barrier.setAttribute('data-pending-steering', '')
+  row('host').after(barrier)
+  syncGroupChains(flow)
+  assert.ok(!row('one').hasAttribute('data-seam-next'))
+  assert.ok(!row('two').hasAttribute('data-seam-prev'))
+  dom.window.close()
 })
 
 test('a final reply with a missing file and no work running draws both markers', () => {

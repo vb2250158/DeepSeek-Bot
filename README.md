@@ -10,6 +10,10 @@ This fork integrates upstream 0.3.10 (0.3.10-rabi.1) with shared management for 
 
 Upstream group search, background tasks, motion controls and connector delivery changes are included. Legacy parallel conversation parts remain in the Bot’s history and their scheduled tasks move to its current chat. DSH keeps its own global settings in the source Web app, and the Bot entry opens Bot settings. The tested Core is b071839b9a76fd23a581541d0f3b2b4184430831 / 0.2.3-alpha.2.
 
+In a Bot chat, select a reply avatar to see that run's tool calls and timings. Select a scheduled task's name to open its settings.
+
+Direct Rabi Agent messages appear as a sender notice in Bot chats. Open it to read the message and attachments or inspect the original delivery.
+
 Bot-pair and group history now persists in append-only files under the team's `ledger/` directory, importing existing team history on first use. Group shutdown waits for owned rounds and their final ledger writes. Legacy group prefixes retain their declared length when their `group-lines/` whole-text file and `group-logs/` entry are unavailable, and reads report the missing remainder. Existing legacy source files remain available for recovery. Keep these books with the team when migrating or restoring a snapshot, and use a reader that supports this release's ledger.
 
 **[Download DS Bot for Windows 10/11 (64-bit) / 下载 Windows 10/11（64 位）版](https://github.com/Fei2411/DS-Bot/releases/latest)**, about 212 MB / 约 212 MB. A community project, not an official DeepSeek product. / 社区开源项目，不是 DeepSeek 官方产品。
@@ -130,7 +134,7 @@ DS Bot is a bot plugin for [DeepSeek Harness](https://github.com/deepseek-ai/dee
 
 ![Say one sentence to Chief, and it sets up the bots and the group chat](docs/images/team.png)
 
-**Harness integration:** DS Bot opens below automation in the native DSH sidebar. Its panel keeps the team list, shared conversation and details in separate columns. Native navigation stays available, and the floating title/memory-update pill is removed.
+**Harness integration:** DS Bot opens below automation in the native DSH sidebar and folds it to the icon rail. The team list, shared conversation and details stay in separate columns. Native navigation stays available, and the floating title/memory-update pill is removed.
 
 DS Bot follows the active DSH skin by default, including light and dark mode. **Settings → General → Theme** also keeps the standalone palettes and custom accents available.
 
@@ -146,7 +150,7 @@ Rabi automation reminders use the native DSH schedule message source and public 
 
 Drag either column divider to resize the conversation list or details. Widths stay on this browser; double-click resets a column, and the focused divider accepts arrow keys. Narrow panels hide details and then compact the list to keep the chat usable.
 
-Every Bot can create and change Bots and manage every group chat. Right-click a chat to pin or unpin it, or drag it to the pin region above the list. Pinned tiles are saved independently of permissions.
+Every Bot can create and change Bots and manage every group chat. Right-click a chat to pin or unpin it. Pinned chats stay at the top of the list and show the same message previews as other chats. Pinning is saved independently of permissions.
 
 The chat tail shows feedback as soon as a message is submitted, names active Rabi connection/synchronization waits and retains actionable failures. Bound Bots connect automatically; a stopped Rabi Host is reported explicitly and is never silently started. Hook progress requires adapter 0.13.36 or newer.
 

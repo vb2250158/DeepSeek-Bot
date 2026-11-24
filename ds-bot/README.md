@@ -28,6 +28,10 @@ Rabi-bound Bots are created with the `rabi-assistant` preset, including group co
 
 Bot creation waits at most 1000 ms for capabilities by default, then releases the UI while mounting continues. Set the bot plugin's `capabilityEnsureTimeoutMs` to an integer from 0 to 1000; 0 releases this creation wait on the next timer tick. Before sending a message, DS Bot waits for that conversation's attached capabilities to finish mounting; a failed mount reports the error instead of sending a request with missing tools. This creation budget does not bound model generation or tool execution.
 
+Bot reply avatars open run history with tool calls and timing. The scheduled-task notice opens the settings for the recorded task.
+
+Direct Agent messages from Rabi appear as a sender notice in Bot chats. Open the notice to read the message and its attachments or inspect the original delivery.
+
 ### Responsive chat (opt-in)
 
 Set `responsiveChat: true` on the Bot plugin to prefer a short acknowledgement followed by native background delegation for lengthy work. The existing default is false. This changes response strategy; normal and responsive Bot Sessions retain the tools supplied by their DSH preset and capabilities. There is no hidden delegation whitelist or global ban on subagents and workflows. Explicit deployment restrictions still apply.
@@ -72,7 +76,7 @@ Local agents settings read the request data directly. A failed settings page sta
 
 ## Harness panel
 
-In the maintenance fork, **DS Bot** appears below automation in the native DSH sidebar. Open it for the team and conversation list, shared DSH chat and the selected Bot or group's details. Native navigation remains available; leaving the panel restores native conversation presentation. The former floating title and memory-update pill is not mounted.
+In the maintenance fork, **DS Bot** appears below automation in the native DSH sidebar. Opening DS Bot folds the native sidebar to its icon rail. You can expand it again while using the team list, shared DSH chat and conversation details. Leaving DS Bot restores the native conversation view. The former floating title and memory-update pill is not mounted.
 
 ## Features
 
@@ -82,7 +86,7 @@ In the maintenance fork, **DS Bot** appears below automation in the native DSH s
 - **Bots work together**: `message_bot` sends a message to another Bot, `create_bot` and `update_bot` add and set up Bots (including a profile photo from a local image file or a data URL), and `ask_user` asks you a question without blocking the other Bots. `show_view` draws a card in a Bot's own chat — text, metrics, tables, charts, inputs with local formulas, progress, choices, confirmations, short forms and sandboxed HTML; an interactive card waits for your answer. `/side` (or **Side chat** in the panel's `···` menu) opens a side chat in the right panel that answers from a snapshot of the Bot's chat without running tools or interrupting its work. A Bot can also be marked **Private** in its settings: other Bots cannot read its working folder, memory or chat, and its outbound sharing needs your approval.
 - **Group chats**: in admin-first mode the admin answers first and calls in other members with `@Name`; in all-members mode members speak in order. Members `@`-mentioned in the same message start work in parallel. Type `@` to pick a member from a list, or use **+ → Reference a chat** to attach another Bot's chat as context. A member with nothing new to add stays quiet (`[PASS]`). For multi-stage work, the admin can align on and run a group **Goal** (`group_goal`), assigning tasks per stage and checking evidence before advancing. Each member has its own hidden Session per group, so a group never reads a Bot's private chat.
 - **Team management**: every Bot can create and change Bots, manage every group chat, and maintain shared capabilities and memories. Group admins still steer the reply order. User approval for folders and local MCP commands is unchanged.
-- **Pinned chats**: right-click any Bot or group chat and choose **Pin** or **Unpin**, or drag a chat to the pin region above the list. Pinned tiles remain above recent chats after reload; the former Main Bot has no automatic pin.
+- **Pinned chats**: right-click any Bot or group chat and choose **Pin** or **Unpin**. Pinned chats stay above recent chats after reload and keep their message previews.
 
 - **Long chats stay inside the model's window**: dsh's own compaction never runs on a Bot's Session. When a turn ends past the check line (a share of the model's context window), a small separate model call, the context steward, reads the latest messages of the chat and decides once. If the work is still under way, the chat is condensed in place into a checkpoint: a handoff summary plus your recent messages word for word. If the work has reached a stopping point, the Bot writes a handoff note and continues in a new part. Either way you still see one chat, with no marker. Earlier parts and condensed messages stay searchable in a full-text index (`node:sqlite` FTS5) through `read_own_chat`.
 - **Memory**: each Bot keeps notes across all its conversations, each group chat keeps its own for its members, and the team shares one more. See [Memory](#memory).
@@ -138,6 +142,8 @@ The doctor reads the profiles' `package.json` files only. If DSH still does not 
 **Bot settings → Rabi → Connect** binds one or all local personas through `dsh-rabiroute-agent` 0.13.34 or newer with Agent Hooks enabled. DS Bot verifies the original role binding and registers a required lifecycle subscription for each own or group conversation part. The adapter owns full persona, memory, plan, skill, tool and Stop context; DS Bot keeps only role references and a durable ownership notice. Native Hook failures stop required sessions. Bound Bots omit local memory tools, snapshots and automatic reviews. Avatar bytes are cached in `bot/rabi-avatars/` after a successful Rabi read. Startup and offline display use the saved image immediately, while stale images refresh in the background at most once per minute. Failed refreshes retain the saved image. A cancelled viewer stops waiting immediately. Other viewers and the disk cache share the ongoing Host refresh. Names and role references remain in the saved team. The avatar cache supplies display only. Paged library views are read from Rabi on demand. Unlink releases subscriptions, preserves the Bot and records that previous Rabi instructions no longer apply. Model execution and approvals remain with the original DSH owner.
 
 Rabi resources live in the right-hand Library; Details shows the model and schedules. A window-local cache separates Bot, persona, resource and item reads, keeps in-flight requests alive across navigation, and refreshes retained content in the background on return. Duplicate reads share one request. Pages append and resume; memory categories appear together without nested menus or manual refresh. The cache retains up to 64 views and about 4 MiB of inactive content, never enters browser storage, and never supplies Agent context.
+
+Each Rabi schedule switch moves immediately and shows the pending change in its task row. If the change fails, the switch returns to the known setting. When a response is uncertain, DS Bot reads the task from Rabi before offering a retry. A retry keeps the original request and operation ID.
 
 Options go in the profile's `cordis.patch.yml`, under the `bot` entry. All of them are optional.
 

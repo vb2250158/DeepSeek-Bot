@@ -1,10 +1,10 @@
 // Scheduled tasks: Settings → Scheduled tasks, a Bot's card in its settings, and the
 // line in its details panel. DSH runs the tasks (see src/host/schedules.js); a task
 // sends its prompt to the Bot's chat when it is due.
-import { createElement as h, Fragment, useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { createElement as h, Fragment, useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from 'react'
 import { Button, Input, InlineEditor, Menu, Modal, Switch } from '@deepseek-ai/dsh-client-ui-primitives'
 import { BotAvatar, RoomAvatar } from './mark.js'
-import { ClockIcon, PauseIcon, PencilIcon, PlusIcon, ResumeIcon, TrashIcon } from './icons.js'
+import { ClockIcon, ChevronRightIcon, PauseIcon, PencilIcon, PlusIcon, ResumeIcon, TrashIcon } from './icons.js'
 import { Segmented } from './motion.js'
 import { dateLocale, hostText, t } from './i18n.js'
 
@@ -99,9 +99,9 @@ export const nextText = (task) => {
 const lateOnce = task => (task.kind === 'at' || task.kind === 'after') && Date.parse(task.scheduledAt) <= Date.now()
 const canPauseTask = task => (task.status === 'active' || task.status === 'paused') && !lateOnce(task)
 
-function TaskRow({ task, actions, onView, showBot, roster, canPause }) {
+function TaskRow({ task, actions, onView, showBot, roster, canPause, initiallyExpanded = false }) {
   const [confirming, setConfirming] = useState(false)
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded] = useState(initiallyExpanded)
   const [busy, setBusy] = useState(false)
   useEffect(() => {
     if (!confirming) return undefined
@@ -144,6 +144,119 @@ function TaskRow({ task, actions, onView, showBot, roster, canPause }) {
       'aria-label': confirming ? t('Click again to delete') : t('Delete task'), title: confirming ? undefined : t('Delete task'), onClick: remove,
     }, confirming ? t('Delete') : h(TrashIcon))),
   failed ? h('div', { className: 'bt-set-row bt-task-failed', role: 'alert' }, h('span', { className: 'bt-danger bt-set-hint' }, failed)) : null)
+}
+
+function scheduleRunTitle(prompt) {
+  return prompt.trim().split(/\r?\n/, 1)[0].replace(/^定时计划触发[:：]\s*/u, '').split(/\s*\[用户模板补充\]/u, 1)[0].trim()
+}
+
+export function scheduleRuns(content, fallback) {
+  const single = /^reminder_prompt_json: (.*)$/m.exec(content ?? '')
+  const id = /^schedule_id_json: (.*)$/m.exec(content ?? '')
+  const batch = /^reminders_json: (.*)$/m.exec(content ?? '')
+  try {
+    const records = batch ? JSON.parse(batch[1]) : single
+      ? [{ schedule_id: id ? JSON.parse(id[1]) : undefined, reminder_prompt: JSON.parse(single[1]) }]
+      : [{ reminder_prompt: fallback }]
+    if (!Array.isArray(records)) return []
+    return records.filter(record => typeof record?.reminder_prompt === 'string' && record.reminder_prompt.trim())
+      .map(record => ({
+        id: typeof record.schedule_id === 'string' ? record.schedule_id : undefined,
+        title: scheduleRunTitle(record.reminder_prompt),
+        prompt: record.reminder_prompt,
+        rabi: /^定时计划触发[:：]/u.test(record.reminder_prompt.trimStart()),
+      }))
+  } catch { return [] }
+}
+
+export async function resolveScheduleRun({ entry, bot, sessionId, actions }) {
+  const owns = task => task.sessionId === sessionId || task.roomId === sessionId || (bot && task.botId === bot.id)
+  if (!entry.rabi) {
+    const view = await actions.schedules()
+    const ownerTasks = (view?.tasks ?? []).filter(owns)
+    const matches = ownerTasks.filter(task => entry.id ? task.id === entry.id : task.title === entry.title)
+    if (matches.length === 1) return { native: true, task: matches[0] }
+    if (matches.length > 1) throw new Error(t('Several tasks have this name.'))
+  }
+  if (bot && actions.rabiConnection) {
+    const matches = []
+    const cursors = new Set()
+    let cursor
+    do {
+      if (cursors.has(cursor)) throw new Error(t('This task is no longer available.'))
+      cursors.add(cursor)
+      const view = await actions.rabiConnection('rabi-bot-view', { botId: bot.id, resource: 'schedules', ...(cursor ? { cursor } : {}) })
+      if (view.warnings?.length) throw new Error(t('Some Rabi schedules could not be read. Check them in Rabi.'))
+      matches.push(...view.items.filter(task => task.title === entry.title || task.message === entry.prompt))
+      cursor = view.nextCursor
+    } while (cursor && matches.length < 2)
+    if (matches.length > 1) throw new Error(t('Several tasks have this name.'))
+    if (matches.length === 1) {
+      const { sourceRoleId, rawRuleId } = matches[0]
+      const detail = await actions.rabiConnection('rabi-schedule-read', { botId: bot.id, sourceRoleId, id: rawRuleId })
+      const task = detail.items.find(item => item.rawRuleId === rawRuleId && item.sourceRoleId === sourceRoleId)
+      if (task) return { task, revision: detail.revision, roles: detail.roles ?? [] }
+    }
+  }
+  throw new Error(t('This task is no longer available.'))
+}
+
+function ScheduleRunButton({ entry, bot, roster, sessionId, actions }) {
+  const [open, setOpen] = useState(false)
+  const label = t('Task: {name}', { name: entry.title || t('Scheduled task') })
+  return h('div', { className: 'bt-event' },
+    h('button', { type: 'button', className: 'bt-event-whole bt-scheduled-trigger', title: label,
+      'aria-haspopup': 'dialog', onClick: () => setOpen(true) },
+    h(ClockIcon), h('span', { className: 'bt-event-name' }, label), h(ChevronRightIcon)),
+    open ? h(ScheduleRunSettings, { entry, bot, roster, sessionId, actions, close: () => setOpen(false) }) : null)
+}
+
+function ScheduleRunSettings({ entry, bot, roster, sessionId, actions, close }) {
+  const [result, setResult] = useState(null)
+  useEffect(() => {
+    let active = true
+    void resolveScheduleRun({ entry, bot, sessionId, actions }).then(
+      value => { if (active) setResult(value) },
+      error => { if (active) setResult({ error: hostText(error.message) }) },
+    )
+    return () => { active = false }
+  }, [entry.id, entry.title, entry.prompt, entry.rabi, bot?.id, sessionId, actions])
+  return h(Modal, { open: true, title: t('Task settings'), closeLabel: t('Close Chat'), onClose: close },
+    result === null ? h('p', { role: 'status' }, t('Loading…'))
+      : result.error ? h('p', { role: 'alert' }, result.error)
+      : result.native ? h(TaskRow, { task: result.task, actions, roster, onView: close, initiallyExpanded: true })
+      : result.task.editable === false ? h(TaskRow, { task: result.task, actions, roster, onView: close, initiallyExpanded: true })
+      : h(RabiScheduleForm, { bot, actions, task: result.task, revision: result.revision, roles: result.roles, onDone: close, onCancel: close }))
+}
+
+const scheduleLookups = new WeakMap()
+function scheduleCatalog(actions) {
+  const cached = scheduleLookups.get(actions)
+  if (cached && Date.now() - cached.time < POLL_MS) return cached.pending
+  const pending = actions.schedules().catch(error => {
+    if (scheduleLookups.get(actions)?.pending === pending) scheduleLookups.delete(actions)
+    throw error
+  })
+  scheduleLookups.set(actions, { pending, time: Date.now() })
+  return pending
+}
+
+export function ScheduleTrigger({ content, fallback, roster, sessionId, actions }) {
+  const entries = scheduleRuns(content, fallback)
+  const resolveNames = entries.some(entry => !entry.rabi && entry.id)
+  const [tasks, setTasks] = useState([])
+  useEffect(() => {
+    if (!resolveNames || !actions.schedules) return undefined
+    let active = true
+    void scheduleCatalog(actions).then(view => { if (active) setTasks(view.tasks) }, () => {})
+    return () => { active = false }
+  }, [actions, resolveNames])
+  if (!entries.length) return h('div', { className: 'bt-event' }, t('Routine started'))
+  const bot = roster.byId[sessionId]
+  return entries.map((entry, index) => {
+    const task = !entry.rabi && tasks.find(task => task.id === entry.id && (task.sessionId === sessionId || task.roomId === sessionId || (bot && task.botId === bot.id)))
+    return h(ScheduleRunButton, { key: entry.id ?? index, entry: task ? { ...entry, title: task.title } : entry, bot, roster, sessionId, actions })
+  })
 }
 
 /** Reads schedules assigned to this Bot; source roles remain owned by Rabi. */
@@ -190,25 +303,25 @@ export function RabiSchedules({ bot, actions, tasks = [], roster, summary = fals
       onDone: () => setEditing(null), onCancel: () => setEditing(null) }) : null,
     value?.nextCursor ? h(Button, { variant: 'ghost', disabled: pending, onClick: () => void store.more(scope) }, t('Load more')) : null,
     h('div', { className: summary ? 'bt-task-list' : 'bt-set-card' }, all.map(task => task.source === 'rabi'
-      ? h(RabiScheduleRow, { key: `rabi:${task.id}`, task, bot, actions, revision: value.revision, summary, onView: refresh, onEdit: () => void openEditor(task) }) : summary
+      ? h(RabiScheduleRow, { key: `rabi:${task.id}`, task, bot, actions, summary, onView: refresh, onEdit: () => void openEditor(task) }) : summary
       ? h('button', { key: `${task.source ?? 'dsh'}:${task.id}`, type: 'button', className: 'bt-task-line', onClick: () => actions.openSettings('schedules', `bot:${bot.id}`) },
           h(ClockIcon), h('span', { className: 'bt-task-line-title' }, task.title), h('span', { className: 'bt-task-line-when' }, task.source === 'rabi' ? `${timingText(task)} · ${nextText(task)}` : timingText(task)))
       : h(TaskRow, { key: task.id, task, actions, roster, onView: publish }))))
 }
 
 export function RabiPendingWrite({ entry, actions }) {
-  const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const retry = async () => {
-    if (busy) return
-    setBusy(true); setError('')
+  const store = actions.rabiWorkspace
+  const busy = Boolean(store.writeActivity(entry.scope))
+  const retry = () => store.runWrite(entry.scope, { endpoint: entry.operation.endpoint, checking: true }, async () => {
+    if (store.write(entry.scope) !== entry.operation) return
+    setError('')
     try {
       const result = await actions.rabiConnection(entry.operation.endpoint, entry.operation.body)
-      actions.rabiWorkspace.accept({ ...entry.scope, itemId: undefined }, result)
-      actions.rabiWorkspace.clearWrite(entry.scope)
+      store.accept({ ...entry.scope, itemId: undefined }, result)
+      store.clearWrite(entry.scope)
     } catch (failure) { setError(hostText(failure.message)) }
-    finally { setBusy(false) }
-  }
+  })
   return h('div', { className: 'bt-set-card bt-rabi-pending', role: 'alert' },
     h('span', null, entry.operation.body.title ?? t('Scheduled task')),
     h('span', { className: 'bt-set-hint' }, error || t('This operation needs confirmation. Retry the original request.')),
@@ -216,44 +329,87 @@ export function RabiPendingWrite({ entry, actions }) {
 }
 
 export function RabiScheduleRow({ task, bot, actions, onView, onEdit, summary }) {
-  const [busy, setBusy] = useState(false)
   const [confirming, setConfirming] = useState(false)
-  const [error, setError] = useState('')
-  const scope = { botId: bot.id, roleId: '', resource: 'schedules', itemId: task.id }
-  const operation = useRef(actions.rabiWorkspace.write(scope))
-  const run = async (endpoint, extra) => {
-    if (busy) return
-    setBusy(true); setError('')
-    try {
-      if (!operation.current) {
-        const detail = await actions.rabiConnection('rabi-schedule-read', { botId: bot.id, sourceRoleId: task.sourceRoleId, id: task.rawRuleId })
-        operation.current = actions.rabiWorkspace.retainWrite(scope, { endpoint, body: { botId: bot.id, sourceRoleId: task.sourceRoleId, expectedRoleId: task.sourceRoleId, id: task.rawRuleId, revision: detail.revision, operationId: crypto.randomUUID(), ...extra } })
+  const [error, setError] = useState(null)
+  const statusId = useId()
+  const store = actions.rabiWorkspace
+  const listScope = { botId: bot.id, roleId: '', resource: 'schedules' }
+  const scope = { ...listScope, itemId: task.id }
+  const activity = store.writeActivity(scope)
+  const retained = store.write(scope)
+  const locked = Boolean(activity || retained)
+  const readBody = { botId: bot.id, sourceRoleId: task.sourceRoleId, id: task.rawRuleId }
+  const run = (endpoint, enabled) => {
+    const retained = store.write(scope)
+    if (endpoint ? retained : !retained) return
+    const intent = retained ? { endpoint: retained.endpoint, enabled: retained.body.enabled, checking: true, retrying: true } : { endpoint, enabled }
+    return store.runWrite(scope, intent, async show => {
+      const toggle = intent.endpoint === 'rabi-schedule-toggle'
+      let operation = retained
+      const confirmToggle = async () => {
+        // A read can settle the requested switch state without sending another write.
+        const detail = await actions.rabiConnection('rabi-schedule-read', readBody, AbortSignal.timeout(5000)).catch(() => null)
+        const item = detail?.items.find(item => item.id === task.id)
+        if (item?.status !== (intent.enabled ? 'active' : 'paused')) return false
+        store.updateSchedule(listScope, item)
+        store.clearWrite(scope)
+        return true
       }
-      const result = await actions.rabiConnection(operation.current.endpoint, operation.current.body)
-      actions.rabiWorkspace.accept({ botId: bot.id, roleId: scope.roleId, resource: 'schedules' }, result)
-      actions.rabiWorkspace.clearWrite(scope)
-      operation.current = null
-      setConfirming(false)
-    } catch (failure) {
-      if (['bot/rabi-revision-conflict', 'bot/rabi-validation', 'bot/rabi-binding-conflict', 'bot/rabi-method-not-allowed'].includes(failure.code)) {
-        actions.rabiWorkspace.clearWrite(scope); operation.current = null
-        await onView().catch(() => {})
+      setError(null)
+      try {
+        if (toggle && retained && await confirmToggle()) return
+        if (!operation) {
+          const detail = await actions.rabiConnection('rabi-schedule-read', readBody)
+          operation = store.retainWrite(scope, { endpoint, body: { ...readBody, expectedRoleId: task.sourceRoleId, revision: detail.revision, operationId: crypto.randomUUID(), ...(toggle ? { enabled } : {}) } })
+        }
+        const result = await actions.rabiConnection(operation.endpoint, operation.body)
+        const item = toggle && result.items.find(item => item.id === task.id)
+        if (item) store.updateSchedule(listScope, item)
+        else store.accept(listScope, result)
+        store.clearWrite(scope)
+        setConfirming(false)
+      } catch (failure) {
+        const rejected = ['bot/rabi-revision-conflict', 'bot/rabi-validation', 'bot/rabi-binding-conflict', 'bot/rabi-method-not-allowed'].includes(failure.code)
+        if (rejected) {
+          store.clearWrite(scope)
+          operation = null
+          void onView().catch(() => {})
+        }
+        if (toggle && operation) {
+          show({ ...intent, checking: true })
+          if (await confirmToggle()) return
+        }
+        setError({ message: hostText(failure.message), ...(toggle ? { enabled: intent.enabled } : {}) })
       }
-      setError(hostText(failure.message))
-    }
-    finally { setBusy(false) }
+    })
   }
+  const togglePending = (activity?.endpoint ?? retained?.endpoint) === 'rabi-schedule-toggle'
+  const requested = activity?.enabled ?? retained?.body.enabled
+  const toggleFailed = !locked && typeof error?.enabled === 'boolean'
+  let status
+  if (togglePending) {
+    if (!activity) status = t(requested ? 'Resume not confirmed' : 'Pause not confirmed')
+    else if (activity.checking) status = t('Checking task status…')
+    else status = t(requested ? 'Resuming task…' : 'Pausing task…')
+  } else if (toggleFailed) status = t(error.enabled ? 'Could not resume task' : 'Could not pause task')
+  else status = nextText(task)
   return h('div', { className: 'bt-rabi-task' },
     h('div', { className: summary ? 'bt-task-line' : 'bt-set-row bt-task bt-rabi-task-row' },
       h(ClockIcon),
-      h(Button, { variant: 'ghost', className: 'bt-rabi-task-copy', onClick: onEdit, disabled: busy || Boolean(operation.current) },
-        h('span', { className: 'bt-task-title' }, task.title),
-        h('span', { className: 'bt-set-hint' }, `${timingText(task)} · ${nextText(task)}`)),
+      h('div', { className: 'bt-rabi-task-main' },
+        h(Button, { variant: 'ghost', className: 'bt-rabi-task-copy', onClick: onEdit, disabled: locked, 'aria-label': task.title },
+          h('span', { className: 'bt-task-title' }, task.title),
+          h('span', { className: 'bt-set-hint' }, timingText(task), ' ',
+            h('span', { className: 'bt-rabi-task-status' },
+              h('span', { 'aria-hidden': true }, '· '),
+              h('span', { id: statusId, role: 'status', title: toggleFailed ? error.message : undefined }, status)))),
+        togglePending && retained && (!activity || activity.retrying)
+          ? h(Button, { variant: 'ghost', size: 'sm', className: 'bt-rabi-task-retry', disabled: Boolean(activity), onClick: () => void run() }, t(requested ? 'Retry resume' : 'Retry pause')) : null),
       h('div', { className: 'bt-rabi-task-actions' },
-        h(Switch, { checked: task.status === 'active', disabled: busy || Boolean(operation.current), label: t('Activate {name}', { name: task.title }), onChange: enabled => void run('rabi-schedule-toggle', { enabled }) }),
-        !summary ? h(Button, { variant: 'ghost', size: 'sm', disabled: busy || Boolean(operation.current), onClick: onEdit, 'aria-label': t('Edit task') }, h(PencilIcon)) : null,
-        !summary ? h(Button, { variant: 'ghost', size: 'sm', className: 'bt-rabi-task-delete', disabled: busy || Boolean(operation.current), onClick: () => confirming ? void run('rabi-schedule-delete') : setConfirming(true), 'aria-label': t('Delete task') }, confirming ? t('Click again to delete') : h(TrashIcon)) : null)),
-    error || operation.current ? h('div', { role: 'alert', className: 'bt-error' }, error || t('This operation needs confirmation. Retry the original request.'), operation.current ? h(Button, { disabled: busy, onClick: () => void run() }, t('Retry')) : null) : null)
+        h(Switch, { checked: togglePending ? requested : task.status === 'active', disabled: locked, label: t('Activate {name}', { name: task.title }), describedBy: statusId, onChange: enabled => void run('rabi-schedule-toggle', enabled) }),
+        !summary ? h(Button, { variant: 'ghost', size: 'sm', disabled: locked, onClick: onEdit, 'aria-label': t('Edit task') }, h(PencilIcon)) : null,
+        !summary ? h(Button, { variant: 'ghost', size: 'sm', className: 'bt-rabi-task-delete', disabled: locked, onClick: () => confirming ? void run('rabi-schedule-delete') : setConfirming(true), 'aria-label': t('Delete task') }, confirming ? t('Click again to delete') : h(TrashIcon)) : null)),
+    !togglePending && !toggleFailed && (error || retained) ? h('div', { role: 'alert', className: 'bt-error' }, error?.message || t('This operation needs confirmation. Retry the original request.'), retained ? h(Button, { disabled: Boolean(activity), onClick: () => void run() }, t('Retry')) : null) : null)
 }
 
 /** Saves the original request key on retries; timing remains interpreted by Rabi. */
@@ -563,11 +719,16 @@ export const SCHEDULE_CSS = `
 .bt-rabi-task-heading{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .bt-rabi-task-heading .bt-section-title{margin:0}
 .bt-rabi-task-row,.bt-rabi-task>.bt-task-line{display:grid;grid-template-columns:16px minmax(0,1fr) auto;align-items:start;gap:8px}
+.bt-rabi-task>.bt-task-line{box-sizing:border-box}
 .bt-rabi-task-row>svg,.bt-rabi-task>.bt-task-line>svg{width:16px;height:16px;margin-top:6px}
 .bt-rabi-task-actions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:6px;min-width:0;max-width:100%}
 .bt-rabi-task-delete{height:auto!important;min-height:28px;min-width:0;max-width:100%;white-space:normal!important;overflow-wrap:anywhere}
-.bt-rabi-task-copy{display:flex!important;flex:1;min-width:0;height:auto!important;min-height:36px;flex-direction:column;align-items:flex-start!important;text-align:left;white-space:normal!important;padding-block:4px!important}
+.bt-rabi-task-main{min-width:0}
+.bt-rabi-task-copy{display:flex!important;width:100%;min-width:0;height:auto!important;min-height:36px;flex-direction:column;align-items:flex-start!important;text-align:left;white-space:normal!important;padding-block:4px!important}
+.bt-rabi-task-copy:disabled{opacity:1}
 .bt-rabi-task-copy .bt-set-hint{font-size:12px;overflow-wrap:anywhere}
+.bt-rabi-task-status{display:inline-block;max-width:100%;vertical-align:top}
+.bt-rabi-task-retry{padding-inline:14px!important}
 .bt-rabi-task-form{display:flex;flex-direction:column;gap:12px}
 .bt-rabi-task-field{display:flex;flex-direction:column;gap:6px;min-width:0;font-size:13px}
 .bt-rabi-task-kinds,.bt-rabi-task-enabled{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}

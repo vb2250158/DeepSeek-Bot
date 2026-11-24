@@ -3,7 +3,7 @@ import { createElement as h, Fragment, useEffect, useLayoutEffect, useMemo, useR
 import { createPortal } from 'react-dom'
 import { MarkdownText, writeClipboard } from './dsh-primitives.js'
 import { inkText } from './inks.js'
-import { linkMentions, normalizeFileLinks, mentionTarget, dayLabel, contentText, stripHeader, stripToolCallTags, isHiddenTurn, isRelayContext, relaysBefore, relayPart, commRunOf, toolName, toolArgs, reminderPrompts, elapsedLabel, clockLabel, messageClock } from './text.js'
+import { linkMentions, normalizeFileLinks, mentionTarget, dayLabel, contentText, stripHeader, stripToolCallTags, isHiddenTurn, isRelayContext, relaysBefore, relayPart, commRunOf, toolName, toolArgs, elapsedLabel, clockLabel, messageClock } from './text.js'
 import { SmileIcon, ReplyIcon, DotsIcon, CheckIcon, DownloadIcon, CopyIcon, GoalIcon, MemoryIcon } from './icons.js'
 import { ChangesCard } from './changes-card.js'
 import { goalEventText } from './goal.js'
@@ -20,6 +20,7 @@ import { call } from './api.js'
 import { failureLabel } from './diagnostics.js'
 import { turnReasoning, thinkingStep, opensReply, stepActivity, replySegment } from './turn-reasoning.js'
 import { UserHead } from './user-identity.js'
+import { useMessageChains } from './message-chains.js'
 import { compressedRelayPreview, parseReplies, relayRange, stackReplies } from '../shared/group-replies.js'
 
 import { FOLD_AT, FOLD_HUGE, stripLongNote, useFold } from './fold.js'
@@ -29,6 +30,11 @@ import { BtwCardView } from './btw.js'
 import { partIndexOf, withBtwRows } from './btw-model.js'
 import { ViaTag } from './user-message.js'
 import { layoutOf, thinkingShown } from './themes.js'
+import { ScheduleTrigger } from './schedules.js'
+import { TurnHistoryAvatar, callTree } from './turn-history.js'
+
+export { callTree } from './turn-history.js'
+export { syncGroupChains } from './message-chains.js'
 
 export { clockLabel }
 
@@ -278,25 +284,20 @@ export function AssistantCell({ node, groupPart, useAssistantChat, sessionId, op
   const contexts = useTurnContext(String(data.turn))
   const mentions = useFileMentions({ node, openFile, fileMentions, useTurnData })
   const hidden = Boolean(roster.roomsById[sessionId]) || isHiddenTurn(roster, sessionId, data.turn)
-  const texts = groupPart === 'reasoning' ? [] : data.blocks
+  const texts = groupPart === 'reasoning' || (assistantMode && roster.byId[sessionId]) ? [] : data.blocks
     .filter(block => block.kind === 'text')
     .map(block => stripToolCallTags(block.text))
     .filter(text => text.trim() !== '')
   const running = data.status === 'running'
   const textInteractionSource = data.status === 'settled' && data.finalNode?.messageId !== undefined
   const members = steps.length ? steps : [data]
-  const shown = thinkingShown(roster.prefs)
-  const reasoning = groupPart === 'response' || !shown ? '' : turnReasoning(steps, data)
+  const showWork = !roster.byId[sessionId] && groupPart !== 'response'
+  const shown = showWork && thinkingShown(roster.prefs)
+  const reasoning = shown ? turnReasoning(steps, data) : ''
   // A live step of the same Turn keeps the row ticking even when it sits on an
   // earlier step's cell.
   const thinking = groupPart === 'response' || !shown ? undefined : thinkingStep(members)
   const ms = useThinkingMs({ sessionId, turn: data.turn, settledSteps: members.filter(step => step.status !== 'running').length, skip: hidden || reasoning === '', afterSeq: segment.afterSeq, beforeSeq: segment.beforeSeq })
-  // Steps are redrawn as a Turn streams; re-mark their seams after each commit so the
-  // spacing and squared corners follow the final order.
-  useLayoutEffect(() => {
-    const flow = document.querySelector('.bt-chat-column [data-chat-flow]')
-    if (flow) scheduleGroupChains(flow)
-  }, [sessionId, data.turn, node.key])
   // A streaming reply stands in for the activity row.
   useLiveNote(actions, sessionId, `text:${node.key ?? data.seq}`, !hidden && running && texts.length > 0 ? { text: true } : null)
   if (hidden) return h(CellEmpty)
@@ -304,15 +305,23 @@ export function AssistantCell({ node, groupPart, useAssistantChat, sessionId, op
   // DSH 0.2; the step that answers it shows the event line where it was read,
   // once, in the step's first cell.
   const relays = relayPart(data, groupPart) ? relaysBefore(contexts, turnSteps, data) : []
-  const activity = groupPart === 'response' ? [] : stepActivity(data)
+  const activity = showWork ? stepActivity(data) : []
   if (texts.length === 0 && !reasoning && relays.length === 0 && activity.length === 0) return h(CellEmpty)
   const selfId = roster.byId[sessionId]?.id ?? sessionId
-  // Every Bot reply is headed by who speaks, once per Turn, in the step that opens
-  // it. The bubble layout shows the avatar and name without a per-message clock;
-  // the flat layout keeps its own time in the head as before.
   const speaker = roster.byId[sessionId]
-  const head = speaker !== undefined && opensReply(steps, data, shown)
-    && (reasoning !== '' || (texts.length > 0 && !(groupPart === 'response' && shown && turnReasoning(steps, data) !== '')))
+  const firstInTurn = opensReply(steps, data, shown)
+  const flat = layoutOf(roster.prefs) === 'flat'
+  const head = speaker !== undefined && (flat
+    ? firstInTurn && (reasoning !== '' || (texts.length > 0 && !(groupPart === 'response' && shown && turnReasoning(steps, data) !== '')))
+    : texts.length > 0 || (reasoning !== '' && firstInTurn))
+  const message = h(Fragment, null,
+    activity.length ? h('div', { className: 'bt-agent-activity' }, activity.map((line, index) => h('div', { key: index, className: 'bt-agent-act', title: line }, h('span', { className: 'bt-agent-act-mark', 'aria-hidden': true }), h('span', { className: 'bt-agent-act-text' }, activityParts(line))))) : null,
+    reasoning ? h(ThinkingRow, {
+      text: reasoning, live: thinking !== undefined, viewKey: `${sessionId}:${data.turn}:${segment.afterSeq ?? 'start'}`, textInteractionSource,
+      // Backdate the live clock by settled work so it shows the whole elapsed time.
+      ...(thinking !== undefined ? { at: typeof thinking.time === 'number' ? thinking.time - (ms ?? 0) : undefined } : { ms }),
+    }) : null,
+    texts.length ? h(Bubbles, { texts, roster, selfId, actions, streaming: running, sessionId, msgKey: `${sessionId}:${data.turn}:${node.key ?? data.seq ?? ''}`, useUi, mentions, fold: FOLD_HUGE, time: speaker === undefined ? data.time : undefined, textInteractionSource }) : null)
   const content = h(Fragment, null,
     relays.map(relay => {
       const source = relay.source
@@ -325,18 +334,10 @@ export function AssistantCell({ node, groupPart, useAssistantChat, sessionId, op
         whole: true,
       })
     }),
-    head ? h(SpeakerHead, { bot: speaker }) : null,
-    activity.length ? h('div', { className: 'bt-agent-activity' }, activity.map((line, index) => h('div', { key: index, className: 'bt-agent-act', title: line }, h('span', { className: 'bt-agent-act-mark', 'aria-hidden': true }), h('span', { className: 'bt-agent-act-text' }, activityParts(line))))) : null,
-    reasoning ? h(ThinkingRow, {
-      text: reasoning, live: thinking !== undefined, viewKey: `${sessionId}:${data.turn}:${segment.afterSeq ?? 'start'}`, textInteractionSource,
-      // The live clock counts the settled steps too: backing `at` by the settled
-      // time makes one Elapsed show settled + running.
-      ...(thinking !== undefined ? { at: typeof thinking.time === 'number' ? thinking.time - (ms ?? 0) : undefined } : { ms }),
-    }) : null,
-    // Only a Bot chat gets the QQ treatment. An ordinary DSH Session has no Bot
-    // in the roster and keeps its own message clock, exactly as before.
-    texts.length ? h(Bubbles, { texts, roster, selfId, actions, streaming: running, sessionId, msgKey: `${sessionId}:${data.turn}:${node.key ?? data.seq ?? ''}`, useUi, mentions, fold: FOLD_HUGE, time: speaker === undefined ? data.time : undefined, textInteractionSource }) : null)
-  return assistantMode ? h('details', { className: 'bt-think' }, h('summary', null, t('Details')), content) : content
+    speaker && (head || texts.length > 0)
+      ? h(SpeakerReply, { bot: speaker, head, chain: texts.length > 0, history: { actions, sessionId, turn: data.turn } }, message)
+      : message)
+  return assistantMode && !speaker ? h('details', { className: 'bt-think' }, h('summary', null, t('Details')), content) : content
 }
 
 // `code` in an activity line is the command or path the agent works on.
@@ -361,51 +362,16 @@ function EventLine({ prefix, bots, joiner = t('and'), onOpen, whole = false }) {
 // QQ-style speaker head: a 36px avatar on the left and the name beside it,
 // with the bubbles below aligned to the same column. No per-message clock here
 // or under the bubbles — time lives in the shared separators and the list row.
-function SpeakerHead({ bot }) {
+function SpeakerHead({ bot, history }) {
   return h('div', { className: 'bt-group-name bt-speaker' },
-    h('span', { className: 'bt-lead' }, h(BotMark, { bot, size: 36 })), bot.name)
+    history ? h(TurnHistoryAvatar, { bot, ...history }) : h('span', { className: 'bt-lead' }, h(BotMark, { bot, size: 36 })), bot.name)
 }
 
-const CHAIN_BREAK_SEL = '.bt-group-msg, [data-chat-flow-kind=assistant-step], .bt-umsg, .bt-urow, [data-chat-flow-kind=user], [data-chat-flow-kind=steering], [data-pending-steering], [data-chat-flow-kind=command-input], .bt-q-inline, .bt-event, .bt-time-sep, .bt-new-sep, .bt-part-line, .bt-btw-card, .bt-learn-card'
-export function syncGroupChains(flow) {
-  const items = [...flow.querySelectorAll(CHAIN_BREAK_SEL)]
-  for (let i = 0; i < items.length; i += 1) {
-    const curr = items[i]
-    const prev = items[i - 1]
-    const next = items[i + 1]
-    // A one-to-one Bot reply is an assistant step, not a group message: only the
-    // step that opens a Turn carries the speaker head, so a head-less step after
-    // another step is the same Bot speaking again.
-    if (curr.getAttribute('data-chat-flow-kind') === 'assistant-step') {
-      const step = node => node?.getAttribute('data-chat-flow-kind') === 'assistant-step' ? node : undefined
-      const sameAsPrev = step(prev) !== undefined && curr.querySelector('.bt-group-name') === null
-      const sameAsNext = step(next) !== undefined && next.querySelector('.bt-group-name') === null
-      if (sameAsPrev) curr.dataset.seamPrev = ''; else delete curr.dataset.seamPrev
-      if (sameAsNext) curr.dataset.seamNext = ''; else delete curr.dataset.seamNext
-      continue
-    }
-    if (!curr.classList.contains('bt-group-msg')) continue
-    const botId = curr.dataset.botId
-    const chainPrev = Boolean(botId && prev?.classList.contains('bt-group-msg') && prev.dataset.botId === botId)
-    const chainNext = Boolean(botId && next?.classList.contains('bt-group-msg') && next.dataset.botId === botId)
-    if (chainPrev) curr.dataset.chainPrev = ''; else delete curr.dataset.chainPrev
-    if (chainNext) curr.dataset.chainNext = ''; else delete curr.dataset.chainNext
-    const turn = curr.closest('[data-chat-group-key]')
-    if (turn) {
-      if (chainPrev) turn.dataset.btChainPrev = ''; else delete turn.dataset.btChainPrev
-      if (chainNext) turn.dataset.btChainNext = ''; else delete turn.dataset.btChainNext
-    }
-  }
-}
-
-const pendingFlows = new WeakSet()
-function scheduleGroupChains(flow) {
-  if (!flow || pendingFlows.has(flow)) return
-  pendingFlows.add(flow)
-  queueMicrotask(() => {
-    pendingFlows.delete(flow)
-    if (flow.isConnected !== false) syncGroupChains(flow)
-  })
+function SpeakerReply({ bot, head = true, chain = true, history, children }) {
+  const ref = useRef(null)
+  useMessageChains(ref)
+  return h('div', { ref, className: 'bt-speaker-reply', 'data-bt-speaker': chain ? 'bot:' + bot.id : undefined },
+    head ? h(SpeakerHead, { bot, history }) : null, children)
 }
 
 // One Bot message inside a group chat: avatar, name (with its group role), when it ran
@@ -429,14 +395,7 @@ export function claimLines(claims) {
 
 export function GroupMessage({ bot, text, texts = [text], room, sessionId, roster, actions, msgKey, useUi, whole, time, duration, claims, changes }) {
   const ref = useRef(null)
-  useLayoutEffect(() => {
-    const el = ref.current
-    if (!el?.closest) return undefined
-    const flow = el.closest('[data-chat-flow]')
-    if (!flow) return undefined
-    scheduleGroupChains(flow)
-    return () => scheduleGroupChains(flow)
-  }, [bot.id])
+  useMessageChains(ref)
   const lead = h('button', { type: 'button', className: 'bt-lead', 'aria-label': t("Open {name}'s chat", { name: bot.name }), onClick: () => actions.openSession(bot.id) },
     h(BotMark, { bot, size: 22 }))
   const flat = layoutOf(roster.prefs) === 'flat'
@@ -538,17 +497,19 @@ const scrollParent = (node) => {
   return null
 }
 
-function EarlierUser({ row, actions }) {
+function EarlierUser({ row, actions, direct }) {
+  const ref = useRef(null)
+  useMessageChains(ref)
   const { shown, folded, control, code, codeHead } = useFold(row.text ?? '')
   const body = row.text && shown !== '' ? h(MarkdownText, { text: shown, labels: mdLabels(), variant: 'compact' }) : null
   const area = foldArea(body, code, codeHead, actions)
-  return h('div', { className: 'bt-urow bt-urow-me' },
+  return h('div', { ref, className: 'bt-urow bt-urow-me', 'data-bt-speaker': direct && !row.via ? 'user' : undefined },
     h(UserHead, { actions }),
     h('div', { className: 'bt-ububble', 'data-folded': folded || undefined, 'data-text-interaction-source': body || code !== undefined ? '' : undefined },
     control ? h('div', { className: 'bt-fold-body' }, area) : area,
     control,
     row.images ? h('span', { className: 'bt-uimages', 'data-text-interaction-exclude': '' }, row.images === 1 ? t('1 image') : t('{count} images', { count: row.images })) : null),
-    row.via ? h('div', { className: 'bt-utime' }, h(ViaTag, { via: row.via }), Number.isFinite(row.time) ? messageClock(row.time) : null) : null)
+    row.via ? h('div', { className: 'bt-utime' }, h(ViaTag, { via: row.via }), Number.isFinite(row.time) ? h('span', { className: 'bt-uclock' }, messageClock(row.time)) : null) : null)
 }
 
 // The earlier parts of a Bot's own chat, above its current part as one conversation.
@@ -664,7 +625,7 @@ export function ChatRows({ items, sessionId, roster, actions, useUi, clock = fal
 function chatRow(row, key, { sessionId, selfId, roster, actions, useUi, onBtwDelete }) {
   switch (row.kind) {
     case 'divider': return h(PartLine, { key, time: row.time })
-    case 'user': return h(EarlierUser, { key, row, actions })
+    case 'user': return h(EarlierUser, { key, row, actions, direct: roster.byId[selfId] !== undefined })
     case 'answer': return h(AnsweredReply, { key, node: { data: row } })
     // A question or view card closed without an answer on it.
     case 'closed': return row.view === undefined
@@ -674,8 +635,8 @@ function chatRow(row, key, { sessionId, selfId, roster, actions, useUi, onBtwDel
     case 'view': return h(WidgetCell, { key, sessionId, callId: row.callId, args: { text: name => name === 'title' ? row.title : undefined, value: name => name === 'view' ? row.view : undefined }, done: true, isError: false, roster, actions })
     case 'bot': {
       const bubbles = h(Bubbles, { key, texts: row.texts, roster, selfId, actions, sessionId: useUi ? sessionId : undefined, msgKey: useUi ? `${sessionId}:${row.time}` : undefined, useUi, fold: FOLD_HUGE, textInteractionSource: true })
-      const speaker = layoutOf(roster.prefs) === 'flat' ? roster.byId[selfId] : undefined
-      return speaker ? h(Fragment, { key }, h(SpeakerHead, { bot: speaker, time: row.time }), bubbles) : bubbles
+      const speaker = roster.byId[selfId]
+      return speaker ? h(SpeakerReply, { key, bot: speaker }, bubbles) : bubbles
     }
     case 'btw': return h(BtwCardView, { key, card: row.card, sessionId, actions, onDeleted: onBtwDelete })
     case 'post': {
@@ -692,7 +653,7 @@ function chatRow(row, key, { sessionId, selfId, roster, actions, useUi, onBtwDel
       // live chat draws for it.
       const reply = row.reply
       const speaker = roster.byId[reply.botId] ?? { id: reply.botId, name: reply.name ?? t('a Bot'), color: reply.color ?? 'gray' }
-      return h(RelayEvent, { key, reply, bot: speaker, sessionId, actions })
+      return h(RelayEvent, { key, reply, bot: speaker, roster, sessionId, actions })
     }
     case 'event': {
       if (row.role === 'report') return h(GroupEvent, { key, prefix: t('Replies from'), room: roster.roomsById[row.roomId], name: t('a group chat'), roster, actions })
@@ -818,11 +779,11 @@ export function TriggerCell({ node, sessionId, useAssistantChat, useRoster, useS
       })
     }
     if (source.kind === 'schedule') {
-      const prompts = reminderPrompts(contentText(data.content))
-      return h('div', { className: 'bt-event' }, prompts.length > 0 ? t('Scheduled task: {text}', { text: prompts.join(' · ').slice(0, 80) }) : t('Routine started'))
+      return h(ScheduleTrigger, { content: contentText(data.content), roster, sessionId, actions })
     }
     if (source.kind === 'user-question-reply' || source.kind === 'goal') return null
     if (assistantMode && (source.kind === 'subagent-settled' || source.kind === 'agent-message')) {
+      if (roster.byId[sessionId]) return null
       return h('details', { className: 'bt-think' }, h('summary', null, t('Details')),
         h('div', { className: 'bt-think-text', role: 'region', 'aria-label': t('Details'), tabIndex: 0 }, h(MarkdownText, { text: contentText(data.content), labels: mdLabels(), variant: 'compact' })))
     }
@@ -925,7 +886,7 @@ export const unseenSince = (visit, time) => typeof visit?.seen === 'number' && t
 // An entry in DSH's own turn tail, after what other plugins put there (the cards of
 // the files a turn delivered). The tail sits right before the next turn's first row,
 // so the separator for a pause between turns renders here.
-export function TurnTailCell({ turn: location, sessionId, useTurnClock, useUi, actions }) {
+export function TurnTailCell({ turn: location, sessionId, useTurnClock, useUi, useRoster, useAssistantChat, useTurnSteps, useTurnTools, actions }) {
   const turn = location.turn
   // DSH builds the tail from the turn's end, so it is there.
   const time = location.end.time
@@ -942,10 +903,22 @@ export function TurnTailCell({ turn: location, sessionId, useTurnClock, useUi, a
     const start = nextTurnStart(state[sessionId], turn)
     return start !== undefined && start > visit.seen && start <= visit.entered
   })
-  if (!label && !fresh) return null
+  const bot = useRoster?.(roster => isHiddenTurn(roster, sessionId, turn) ? undefined : roster.byId[sessionId])
+  const assistantState = useAssistantChat?.(value => value)
   return h(Fragment, null,
+    bot && useTurnSteps && useTurnTools ? h(SilentTurnHistory, { bot, actions, sessionId, turn, useTurnSteps, useTurnTools, assistantState }) : null,
     label ? h('div', { className: 'bt-time-sep', role: 'separator' }, label) : null,
     fresh ? h(NewDivider) : null)
+}
+
+function SilentTurnHistory({ bot, actions, sessionId, turn, useTurnSteps, useTurnTools, assistantState }) {
+  const steps = useTurnSteps(String(turn))
+  const tools = useTurnTools(String(turn))
+  const hasReply = steps.some(step => !assistantChatActive(assistantState, step.finalNode?.seq ?? step.seq)
+    && step.blocks.some(block => block.kind === 'text' && stripToolCallTags(block.text).trim()))
+    || tools.some(({ root }) => root.kind === 'tool-result' && assistantSayText(root, root.meta) !== undefined)
+  if (hasReply) return null
+  return h('div', { className: 'bt-silent-run' }, h(TurnHistoryAvatar, { bot, actions, sessionId, turn }))
 }
 
 export function Shimmer({ children }) {
@@ -1060,7 +1033,7 @@ function helperFailureReason(reply) {
 // One non-message row of a group round: the same event line the live view draws
 // for a reply that is not a member's message or the user's own line. `bot` is the
 // resolved member the reply names.
-function RelayEvent({ reply, bot, sessionId, actions }) {
+function RelayEvent({ reply, bot, roster, sessionId, actions }) {
   if (reply.kind === 'failed') {
     return h('div', { className: 'bt-event bt-event-error', role: 'status', title: [reply.code, reply.status, reply.text].filter(Boolean).join(' · ') },
       t('{name} stopped: {reason}. Switch its model or ask it to go on.', { name: bot.name, reason: failureLabel(reply.code, reply.text) }))
@@ -1102,7 +1075,7 @@ function RelayEvent({ reply, bot, sessionId, actions }) {
     return h('div', { className: 'bt-event' }, reply.text)
   }
   if (reply.kind === 'schedule') {
-    return h('div', { className: 'bt-event' }, reply.text ? t('Scheduled task: {text}', { text: reply.text.slice(0, 80) }) : t('Routine started'))
+    return h(ScheduleTrigger, { fallback: reply.text, roster, sessionId, actions })
   }
   if (reply.kind === 'stopped') {
     return h('div', { className: 'bt-event' }, t("You stopped {name}'s work", { name: bot.name }))
@@ -1215,7 +1188,7 @@ function GroupReplies({ sessionId, callId, done, content, roster, actions, useUi
           h('span', { className: 'bt-event-ico', 'aria-hidden': true }, h(GoalIcon)), goalEventText(reply))
       }
       if (reply.kind !== undefined) {
-        return h(RelayEvent, { key: `${reply.botId ?? reply.kind}-${index}`, reply, bot, sessionId, actions })
+        return h(RelayEvent, { key: `${reply.botId ?? reply.kind}-${index}`, reply, bot, roster, sessionId, actions })
       }
       return h(GroupMessage, { key: `${reply.botId}-${index}`, bot, texts, room, sessionId, roster, actions, msgKey: callId ? `${sessionId}:${callId}:${index}` : undefined, useUi, time, duration, claims, changes })
     }),
@@ -1235,21 +1208,6 @@ const isComputerCall = name => name === 'cua' || name?.startsWith('cua_driver_na
 const DRAWN = new Set(['message_bot', 'stop_bot', 'create_bot', 'update_bot', 'group_relay', 'create_group', 'update_group', 'delete_group', 'post_to_group', 'ask_user', 'request_secret', 'request_connector', 'mail_send', 'ask_user_question', 'show_view', 'browser_handoff', 'read_group_chat', 'bot_remember', 'bot_forget', 'remember', 'forget'])
 // Calls whose card a dock above the composer carries when the call is not drawn.
 const CARDS = new Set(['ask_user', 'request_secret', 'request_connector', 'mail_send', 'show_view', 'browser_handoff', 'computer_handoff'])
-
-// The root and its sub-calls in dispatch order, each call once.
-export function callTree(root) {
-  const calls = []
-  const seen = new Set()
-  const visit = (call) => {
-    const id = call.callId ?? call
-    if (seen.has(id)) return
-    seen.add(id)
-    calls.push(call)
-    for (const child of call.subCalls ?? []) visit(child)
-  }
-  visit(root)
-  return calls
-}
 
 // Tells the docks which card calls the transcript draws, so a card shows in one place.
 // A layout effect: an untouched dock drops its copy before the first paint.
@@ -1366,7 +1324,8 @@ export function ToolCell({ node, useAssistantChat, inspectCall, sessionId, useRo
   const calls = hidden
     ? callTree(root).filter(call => (toolName(call) === 'ask_user' || toolName(call) === 'show_view') && call.callId && closed?.[call.callId] !== undefined)
     : callTree(root)
-  const drawn = calls.filter(call => DRAWN.has(toolName(call)) || isComputerCall(toolName(call)))
+  const speaker = roster.byId[sessionId]
+  const drawn = calls.filter(call => (speaker ? CARDS : DRAWN).has(toolName(call)) || isComputerCall(toolName(call)))
   // The newest call still running names the work, so a program reads as the tool it is in.
   const running = root.kind === 'tool-result' ? undefined : calls.findLast(call => call.kind !== 'tool-result')
   const note = running ? toolActivity(toolName(running), toolArgs(running).text, findBot, roster.byId[sessionId]) : null
@@ -1375,10 +1334,15 @@ export function ToolCell({ node, useAssistantChat, inspectCall, sessionId, useRo
   useShownCards(actions, sessionId, drawn.filter(call => (CARDS.has(toolName(call)) || isComputerCall(toolName(call))) && call.callId).map(call => call.callId))
   if (assistantMode && !hidden) {
     const text = root.kind === 'tool-result' ? assistantSayText(root, root.meta) : undefined
-    if (text !== undefined) return h(Bubbles, { texts: [text], roster, selfId: roster.byId[sessionId]?.id ?? sessionId,
-      actions, sessionId, msgKey: `${sessionId}:say:${root.seq}`, useUi, fold: { chars: Infinity, lines: Infinity } })
+    if (text !== undefined) {
+      const bubbles = h(Bubbles, { texts: [text], roster, selfId: speaker?.id ?? sessionId,
+        actions, sessionId, msgKey: `${sessionId}:say:${root.seq}`, useUi, fold: { chars: Infinity, lines: Infinity } })
+      if (!speaker) return bubbles
+      const history = { actions, sessionId, turn }
+      return h(SpeakerReply, { bot: speaker, history }, bubbles)
+    }
     if (toolName(root) === 'rabiroute_assistant_say' && root.kind !== 'tool-result') return h(CellEmpty)
-    return h('details', { className: 'bt-think' },
+    if (!speaker) return h('details', { className: 'bt-think' },
       h('summary', null, toolName(root) || t('Details')),
       h('div', { className: 'bt-think-text' },
         root.kind === 'tool-result' ? h(MarkdownText, { text: contentText(root.content), labels: mdLabels(), variant: 'compact' }) : null,

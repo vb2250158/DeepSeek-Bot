@@ -191,16 +191,20 @@ body[data-bt-motion=quiet] .bt-mark[data-poke]{cursor:default}
 @media (prefers-reduced-motion:reduce){.bt-pill,.bt-pill-go,.bt-pill-go svg{transition:none!important}.bt-pill-go{filter:none}.bt-pill:active{transform:none}}
 
 /* The width settings: the share of the column a bubble may take, and the flat text. */
-body{--bt-msg-w:.8;--bt-flat-w:1;--bt-gap-same:4px;--bt-gap-turn:16px;--bt-radius-seam:6px;--bt-avatar-col:36px}
+body{--bt-msg-w:.8;--bt-flat-w:1;--bt-gap-same:4px;--bt-gap-turn:16px;--bt-radius-seam:6px;--bt-avatar-col:46px}
 .bt-astack{display:flex;flex-direction:column;align-items:flex-start;gap:var(--bt-gap-same);margin:0}
 
 .bt-bubble{max-width:min(calc(var(--bt-msg-w) * 100%),calc(100% - 82px));background:var(--bt-bubble);color:var(--bt-ink);border-radius:18px;padding:7px 12px;font-size:var(--dsh-content-font-size,14px);line-height:calc(var(--dsh-content-font-size,14px) + 10px);box-sizing:border-box;overflow-wrap:anywhere;text-wrap:pretty;text-autospace:normal}
-/* One Bot chat has exactly one speaker: a step without a speaker head continues the
-   previous step, and syncGroupChains marks both ends so the seam closes to 2px and
-   squares off. A card between two steps keeps them apart. */
-[data-chat-flow-kind=assistant-step][data-seam-prev]{margin-top:var(--bt-gap-same)!important}
-[data-chat-flow-kind=assistant-step][data-seam-prev] .bt-msg:first-child>.bt-msg-line>.bt-bubble{border-start-start-radius:var(--bt-radius-seam)}
-[data-chat-flow-kind=assistant-step][data-seam-next] .bt-msg:last-child>.bt-msg-line>.bt-bubble{border-end-start-radius:var(--bt-radius-seam)}
+/* Keep the avatar column and join the facing corners of adjacent messages. */
+body:not([data-bt-layout=flat]) [data-bt-speaker][data-seam-prev]>:is(.bt-speaker,.bt-uhead){display:none}
+body:not([data-bt-layout=flat]) :is([data-chat-flow-kind=assistant-step],[data-chat-flow-kind=user],[data-chat-flow-kind=steering],[data-chat-flow-kind=tool-call]):has([data-bt-speaker][data-seam-prev]){margin-top:var(--bt-gap-same)!important}
+body:not([data-bt-layout=flat]) .bt-speaker-reply[data-seam-prev] .bt-msg:first-child>.bt-msg-line>.bt-bubble{border-start-start-radius:var(--bt-radius-seam)}
+body:not([data-bt-layout=flat]) .bt-speaker-reply[data-seam-next] .bt-msg:last-child>.bt-msg-line>.bt-bubble{border-end-start-radius:var(--bt-radius-seam)}
+body:not([data-bt-layout=flat]) .bt-urow-me[data-seam-prev]{margin-top:0}
+body:not([data-bt-layout=flat]) .bt-urow-me[data-seam-next]{margin-bottom:0}
+body:not([data-bt-layout=flat]) .bt-urow-me[data-seam-prev] :is(.bt-ububble,.bt-ubody,[class*="_bubble"]){border-start-end-radius:var(--bt-radius-seam)!important}
+body:not([data-bt-layout=flat]) .bt-urow-me[data-seam-next] :is(.bt-ububble,.bt-ubody,[class*="_bubble"]){border-end-end-radius:var(--bt-radius-seam)!important}
+.bt-chat-column .bt-urow-me .bt-uclock,.bt-chat-column .bt-urow-me .bt-utime:not(:has(.bt-uvia)){display:none}
 /* Two bubbles of one speaker meet flat: the facing corners square off so the pair
    reads as one block instead of two separate cards. */
 .bt-msg:not(:first-child)>.bt-msg-line>.bt-bubble{border-start-start-radius:var(--bt-radius-seam)}
@@ -229,18 +233,18 @@ body:not([data-bt-layout=flat]) .bt-group-msg[data-chain-next]>.bt-astack>.bt-ms
 [data-chat-flow]>[data-chat-group-key][data-bt-chain-prev]{padding-top:0!important;margin-top:0!important}
 .bt-lead{flex:none;display:flex;margin-bottom:1px}
 button.bt-lead{border:0;background:none;padding:0;cursor:pointer}
-/* The speaker's avatar sits in the head above the bubbles, so every row of the turn
-   starts in the same 46px column and nothing shifts right for the thumbnail. */
-[data-chat-flow-kind=assistant-step] .bt-astack{margin-left:var(--bt-avatar-col)}
+.bt-speaker-reply{min-width:0;padding-inline-start:var(--bt-avatar-col)}
 .bt-group-name{font-size:12px;line-height:16px;font-weight:500;margin-left:42px}
 .bt-group-name:has(>.bt-lead){display:flex;align-items:center;gap:8px;margin:0 0 2px;font-size:13px;line-height:22px;font-weight:600;color:var(--bt-ink)}
 .bt-group-name>.bt-lead{margin:0}
 /* QQ-style speaker head, as Rabi's qq-message-row/qq-sender/qq-bubble-line: the name
    is a single 18px line, the avatar hangs beside it instead of stretching the row to
    36px, and the bubbles start one 4px margin under the name in the same 46px column. */
-.bt-group-name.bt-speaker{position:relative;display:block;min-height:18px;padding-left:46px;margin:14px 0 4px;font-size:12px;line-height:18px;font-weight:500;color:var(--bt-ink-2)}
-.bt-group-name.bt-speaker>.bt-lead{position:absolute;left:0;top:0;margin:0}
-.bt-group-name.bt-speaker~.bt-astack{margin-left:var(--bt-avatar-col)}
+.bt-group-name.bt-speaker{position:relative;display:block;min-height:18px;margin:14px 0 4px;font-size:12px;line-height:18px;font-weight:500;color:var(--bt-ink-2)}
+.bt-group-name.bt-speaker>.bt-lead{position:absolute;inset-inline-start:calc(-1 * var(--bt-avatar-col));top:0;margin:0}
+body[data-bt-layout=flat] .bt-speaker-reply{padding-inline-start:0}
+body[data-bt-layout=flat] .bt-group-name.bt-speaker{display:flex;align-items:center;gap:8px}
+body[data-bt-layout=flat] .bt-group-name.bt-speaker>.bt-lead{position:static}
 .bt-group-time,.bt-group-took{margin-left:6px;font-size:11px;line-height:16px;font-weight:400;color:var(--bt-ink-2);font-variant-numeric:tabular-nums;white-space:nowrap}
 .bt-claim{margin-left:30px;font-size:11px;line-height:16px;color:var(--bt-ink-2)}
 body[data-bt-layout=flat] .bt-claim{margin-left:0}
@@ -1398,6 +1402,14 @@ body[data-bt-layout=flat] .bt-think{max-width:calc(var(--bt-flat-w) * 100%)}
 .bt-think-text[data-fade=top]{mask-image:linear-gradient(to bottom,transparent,#000 18px)}
 .bt-think-text[data-fade=bottom]{mask-image:linear-gradient(to top,transparent,#000 18px)}
 .bt-think-text[data-fade=both]{mask-image:linear-gradient(to bottom,transparent,#000 18px,#000 calc(100% - 18px),transparent)}
+.bt-turn-avatar{display:inline-flex;align-items:center;justify-content:center;flex:none;padding:0;border:0;background:transparent;color:inherit;cursor:pointer}
+.bt-turn-avatar:focus-visible{outline:1px solid var(--bt-accent);outline-offset:2px}
+.bt-silent-run{display:flex;align-items:center;min-height:36px;margin:4px 0}
+.bt-run-history{display:grid;gap:10px;max-height:65vh;overflow:auto}
+.bt-history-call{min-width:0;overflow-wrap:anywhere}
+.bt-history-call>summary{cursor:pointer}
+.bt-history-call>summary .bt-set-hint{margin-inline-start:10px}
+.bt-history-call pre{max-height:28vh;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere}
 .bt-event{display:flex;justify-content:center;align-items:center;gap:2px;min-height:24px;margin:2px 0;font-size:12px;line-height:16px;color:var(--bt-ink-2);flex-wrap:wrap}
 .bt-event>span{padding:0 2px}
 .bt-event button:not(.bt-soft){border:0;background:none;color:inherit;font:inherit;display:inline-flex;align-items:center;gap:4px;cursor:pointer;height:24px;padding:4px 6px 4px 4px;border-radius:999px;box-sizing:border-box;transition:background-color .12s ease}
@@ -1409,6 +1421,7 @@ body[data-bt-layout=flat] .bt-think{max-width:calc(var(--bt-flat-w) * 100%)}
 .bt-event-whole>span:first-child{margin-right:2px}
 /* One button cannot wrap like separate parts, so a long name is cut to fit the chat. */
 .bt-event-whole>.bt-event-name{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bt-event button.bt-event-whole.bt-scheduled-trigger{max-width:min(50vw,100%)}
 /* Keep message tools outside paint containment. */
 .bt-bubble,.bt-ububble{content-visibility:auto;contain-intrinsic-size:auto 160px}
 .bt-time-sep{display:flex;justify-content:center;align-items:center;height:28px;margin:14px 0 8px;font-size:12px;line-height:16px;color:var(--bt-ink-2);white-space:nowrap}

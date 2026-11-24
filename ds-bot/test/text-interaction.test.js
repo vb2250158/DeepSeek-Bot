@@ -37,7 +37,7 @@ runInNewContext(bundle.outputFiles[0].text, {
 })
 const { AssistantCell, Bubbles, ChatRows, ThinkingRow, ToolCell, UserMessageCell } = module.exports
 
-const renderers = ['Bubbles', 'Bubble', 'ChatRows', 'EarlierUser', 'GroupMessage', 'GroupReplies', 'SpeakerHead', 'ThinkingRow', 'ToolCell', 'ProjectedContent']
+const renderers = ['Bubbles', 'Bubble', 'ChatRows', 'EarlierUser', 'GroupMessage', 'GroupReplies', 'UserMessageBubble', 'SpeakerReply', 'SpeakerHead', 'ThinkingRow', 'ToolCell', 'ProjectedContent']
 const expand = (node) => {
   if (Array.isArray(node)) return node.flatMap(expand)
   if (node === null || typeof node !== 'object') return node
@@ -86,7 +86,7 @@ test('only a persistent settled Assistant reply exposes its text to the native q
 
 test('settled reasoning joins the interaction only after its live stream ends', () => {
   const props = assistantProps({ blocks: [{ kind: 'reasoning', text: 'Check the evidence.' }] }, { thinking: true })
-  const cell = AssistantCell(props)
+  const cell = AssistantCell({ ...props, sessionId: 'ordinary' })
   const row = findAll(cell, node => node.type === ThinkingRow)[0]
   assert.equal(row.props.textInteractionSource, true)
   const box = findAll(expand(row), node => withClass(node, 'bt-think-text'))[0]
