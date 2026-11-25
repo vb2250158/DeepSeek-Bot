@@ -144,7 +144,7 @@ export const BOT_CHAT_TABS_CSS = `
 .bt-chat-tab{position:relative;box-sizing:border-box;min-height:35px;margin:-10px -10px 0;padding:10px 10px 9px;border:0;background:transparent;font:500 13px/16px var(--dsw-font-family,inherit);color:var(--dsw-alias-label-tertiary);white-space:nowrap;cursor:pointer}
 .bt-chat-tab:is(:hover,:focus-visible){color:var(--dsw-alias-label-primary)}
 .bt-chat-tab[aria-selected=true]{color:var(--dsw-alias-state-business-primary)}
-.bt-chat-tab[aria-selected=true]::after{content:'';position:absolute;inset:auto 10px -1px;height:2px;border-radius:2px;background:currentColor}
+.bt-chat-tab[aria-selected=true]::after{content:'';position:absolute;inset:auto 10px -1px;height:2px;border-radius:999px;background:currentColor}
 [data-conversation-header-leading] [data-bot-chat-launcher]{margin:0 8px 0 0;padding:5px 8px;min-height:30px}
 header:has([data-bot-chat-launcher]):has([data-conversation-tabs]) [data-conversation-header-leading]{grid-row:2;align-self:start;margin:10px 24px 0 8px}
 header:has([data-conversation-tabs]) [data-conversation-header-leading] [data-bot-chat-launcher]{margin:-10px -10px 0;padding:10px 10px 9px;min-height:35px}
