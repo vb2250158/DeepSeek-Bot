@@ -30,8 +30,10 @@ async function fixture(t) {
       }
     },
     sendUser: async request => {
-      calls.push(request)
       const sessionId = bot.sessionId
+      assert.equal(request.sessionId, bot.id)
+      await rt.ensureCapabilities(sessionId)
+      calls.push({ ...request, sessionId })
       logs.get(sessionId).push({ seq: logs.get(sessionId).length, type: 'agent/inbox/spliced', data: { inserted: [{ source: { kind: 'user', rpcId: request.requestId }, content: request.content }] } })
       return { sessionId, requestId: request.requestId }
     },
@@ -190,9 +192,22 @@ test('long Unicode-role automation IDs enter the native queue unchanged and reco
 })
 
 
+test('Rabi forwards QQ chat as a plain user message without schedule framing', async t => {
+  const f = await fixture(t)
+  const body = { ...f.body, message: '在吗' }
+  const accepted = await f.call('deliver', body)
+  assert.equal(accepted.state, 'accepted')
+  assert.deepEqual(f.logs.get('part2')[0].data.inserted[0], {
+    source: { kind: 'user', rpcId: body.deliveryId },
+    content: [{ type: 'text', text: body.message }],
+  })
+  assert.deepEqual(await f.call('deliver', body), accepted)
+  assert.equal(f.calls.length, 1)
+})
+
 test('Rabi reminders enter with native schedule source and public reminder framing', async t => {
   const f = await fixture(t)
-  await f.call('deliver')
+  await f.call('deliver', { ...f.body, scheduledAt: '2030-01-01T09:30:00.000Z' })
   const message = f.logs.get('part2')[0].data.inserted[0]
   assert.deepEqual(message.source, { kind: 'schedule' })
   assert.match(message.content[0].text, /^\[SCHEDULE REMINDER\]/)
@@ -236,12 +251,11 @@ test('broken schedule JSON cannot acknowledge or repeat an unknown reminder', as
 })
 
 
-test('native admission-time receipts accept a later request carrying the original earlier occurrence', async t => {
+test('legacy schedule-framed chat receipts survive the upgrade without sending another message', async t => {
   const f = await fixture(t)
-  await f.call('deliver')
-  const originalCalls = f.calls.length
-  const timedBody = { ...f.body, scheduledAt: '2020-01-01T09:30:00.000Z' }
-  assert.equal((await f.call('reconcile', timedBody)).state, 'accepted')
-  assert.equal((await f.call('deliver', timedBody)).state, 'accepted')
-  assert.equal(f.calls.length, originalCalls)
+  await f.call('deliver', { ...f.body, scheduledAt: '2030-01-01T09:30:00.000Z' })
+  install(f.rt)
+  assert.equal((await f.call('reconcile')).state, 'accepted')
+  assert.equal((await f.call('deliver')).state, 'accepted')
+  assert.equal(f.calls.length, 1)
 })

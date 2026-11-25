@@ -65,7 +65,7 @@ export function install(rt) {
               prompt = textOf(message)
             }
             const outcome = prompt === body.message ? 'accepted' : 'conflict'
-            if (outcome === 'accepted' && !await ctx.sessions.flush(session)) throw new Error('Session persistence did not acknowledge the reminder')
+            if (outcome === 'accepted' && !await ctx.sessions.flush(session)) throw new Error('Session persistence did not acknowledge the delivery')
             return { schemaVersion: 1, state: outcome, botScopeId: target.botScopeId, botId: target.botId, deliveryId: target.deliveryId, requestId: target.requestId, sessionId, runtimeId }
           }
         }
@@ -94,15 +94,25 @@ export function install(rt) {
       if (previous.state !== 'not_found') return previous
       signal?.throwIfAborted()
       try {
-        const sessionId = rt.chatOf(target.botId)
-        await rt.ensureCapabilities(sessionId)
+        const { scheduledAt, message } = body
+        let sessionId
+        if (scheduledAt === undefined) {
+          ({ sessionId } = await rt.sendUser({
+            sessionId: target.botId, requestId: target.requestId, content: [{ type: 'text', text: message }],
+          }))
+        } else {
+          sessionId = rt.chatOf(target.botId)
+          await rt.ensureCapabilities(sessionId)
+        }
         const agent = await rt.resolveAgent(sessionId)
-        const text = renderReminderFraming({ id: ScheduleId(target.deliveryId), prompt: body.message, scheduledAt: body.scheduledAt ?? new Date().toISOString() })
-        agent.followup(createUserMessage({ content: [{ type: 'text', text }], source: { kind: 'schedule' } }))
-        if (!await ctx.sessions.flush(agent.session)) throw new Error('Session persistence did not acknowledge the reminder')
+        if (scheduledAt !== undefined) {
+          const text = renderReminderFraming({ id: ScheduleId(target.deliveryId), prompt: message, scheduledAt })
+          agent.followup(createUserMessage({ content: [{ type: 'text', text }], source: { kind: 'schedule' } }))
+        }
+        if (!await ctx.sessions.flush(agent.session)) throw new Error('Session persistence did not acknowledge the delivery')
         return { schemaVersion: 1, state: 'accepted', botScopeId: target.botScopeId, botId: target.botId, deliveryId: target.deliveryId, requestId: target.requestId, sessionId, runtimeId }
       } catch {
-        // Failed outcomes remain fenced for this runtime; accepted ticks add no team-state receipts.
+        // Failed outcomes remain fenced for this runtime; accepted deliveries add no team-state receipts.
         uncertain.set(key, body.message)
         return { schemaVersion: 1, state: 'uncertain', botScopeId: target.botScopeId, botId: target.botId, deliveryId: target.deliveryId, requestId: target.requestId, runtimeId }
       }
