@@ -1,16 +1,81 @@
-import { createElement as h, Fragment, useEffect, useRef } from 'react'
+import { createElement as h, Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { TeamSidebar, BotSettingsLauncher } from './sidebar.js'
 import { DetailsDrawer } from './details-drawer.js'
 import { ActivityIndicator } from './activity-row.js'
 import { GoalIsland, goalView } from './goal.js'
-import { FishLogo } from '@deepseek-ai/dsh-client-ui-primitives'
+import { FishLogo } from './dsh-primitives.js'
 import { t } from './i18n.js'
 import { ColumnResizer, useColumnWidth } from './column-resizer.js'
+import { PanelMenu } from './browser-pane.js'
 
 export const BOT_PANEL = 'ds-bot'
 
 export function BotPanelIcon({ size = 18 }) {
   return h(FishLogo, { size })
+}
+
+export function BotChatLauncher({ actions }) {
+  return h('button', {
+    type: 'button', className: 'bt-chat-tab', 'data-bot-chat-launcher': '',
+    onClick: () => actions.selectPanel(BOT_PANEL),
+  }, t('Bot chat'))
+}
+
+function BotChatViews({ renderSlot }) {
+  return renderSlot('conversation.session', { view: 'chat' })
+}
+
+const BOT_CHAT_SLOTS = { views: BotChatViews }
+const emptyViews = select => select([])
+const noEntryActions = select => select(false)
+const noIcon = () => null
+
+export function BotChatTabs(props) {
+  return props.selectView ? h(ConversationTabs, props) : null
+}
+
+function ConversationTabs({ actions, useStore, useConversationViews = emptyViews, useEntryPins = emptyViews, useEntryActions = noEntryActions, selectView }) {
+  const views = useConversationViews(value => value)
+  const unpinned = useEntryPins(value => value)
+  const hasMenu = useEntryActions(value => value)
+  const row = useRef(null)
+  const request = useStore(value => value.viewRequest)
+  const previousRequest = useRef(request)
+  const [limit, setLimit] = useState(1)
+  useEffect(() => {
+    // In-chat inspection requests carry a focus target that the native View consumes.
+    if (request && request !== previousRequest.current && request.view !== 'chat') actions.selectPanel(null)
+    previousRequest.current = request
+  }, [request, actions])
+  useLayoutEffect(() => {
+    const element = row.current
+    const measure = () => setLimit(Math.max(1, Math.floor((element.clientWidth - 110) / 120)))
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
+  const preferred = [
+    ...views.filter(view => view.id === 'chat'),
+    ...views.filter(view => view.id !== 'chat' && !unpinned.includes(view.id)),
+  ]
+  const visible = hasMenu ? preferred.slice(0, limit) : preferred
+  const hidden = hasMenu ? views.filter(view => !visible.includes(view)) : []
+  const open = (id) => {
+    selectView(id)
+    actions.selectPanel(null)
+  }
+  return h('div', { className: 'bt-chat-tabs', ref: row },
+    h('div', { className: 'bt-chat-tab-list', role: 'tablist', 'aria-label': t('Bot chat') },
+      h('button', { type: 'button', role: 'tab', className: 'bt-chat-tab', 'aria-selected': true }, t('Bot chat')),
+      visible.map(view => h('button', {
+        key: view.id, type: 'button', role: 'tab', className: 'bt-chat-tab', 'aria-selected': false,
+        onClick: () => open(view.id),
+      }, view.label))),
+    h(PanelMenu, {
+      items: hidden.map(view => ({ key: view.id, icon: noIcon, label: view.label, onPick: () => open(view.id) })),
+      className: 'bt-chat-tab bt-chat-tab-more', 'aria-label': t('More'),
+    }))
 }
 
 export function BotWorkbench({ renderSlot }) {
@@ -28,7 +93,7 @@ export function BotTeam(props) {
 }
 
 export function BotConversation(props) {
-  const { sessionId, renderFactorySlot, useRoster, useUi, actions } = props
+  const { sessionId, renderFactorySlot, renderSlot, useRoster, useUi, actions } = props
   const roster = useRoster(value => value)
   const ui = useUi(value => value)
   const [width, onChange] = useColumnWidth('details')
@@ -62,8 +127,11 @@ export function BotConversation(props) {
   }, [sessionId, actions])
   return h(Fragment, null,
     h('section', { ref: chatRef, className: 'bt-chat-column', 'aria-label': t('Message'), style: { '--bt-placeholder': JSON.stringify(name ? t('Message {name}', { name }) : t('Message')) } },
+      known ? renderSlot('bot.conversation.tabs', {}) : null,
       ...(showGoal ? [h(GoalIsland, { key: `goal:${room.id}`, room, goal, view, open: ui.goalOpen === id, composing, roomWork, roster, actions })] : []),
-      h(Fragment, { key: 'conversation' }, renderFactorySlot('conversation.content', { variant: 'embedded', phase: 'active', hero: false, ...(known ? { busyEnterOverride: 'steer' } : {}) })),
+      h(Fragment, { key: 'conversation' }, renderFactorySlot('conversation.content',
+        { variant: 'embedded', phase: 'active', hero: false, ...(known ? { busyEnterOverride: 'steer' } : {}) },
+        known ? { slots: BOT_CHAT_SLOTS } : undefined)),
       known ? h(ActivityIndicator, { ...props, key: `activity:${sessionId}`, sessionId }) : null),
     known ? h('aside', { className: 'bt-info-column', 'aria-label': t('View conversation details'), style: { '--bt-details-width': `${width}px` } },
       h(DetailsDrawer, { ...props, key: `${id}:${ui.details === id && ui.renaming ? 'rename' : ''}:${ui.details === id ? ui.tab ?? '' : ''}`, sessionId: id, roster, hasStrip: true, compact: true,
@@ -71,6 +139,21 @@ export function BotConversation(props) {
         actions: { ...actions, closeDetails: () => actions.closeDetails() } }),
       h(ColumnResizer, { side: 'details', width, onChange })) : null)
 }
+
+export const BOT_CHAT_TABS_CSS = `
+.bt-chat-tab{position:relative;box-sizing:border-box;min-height:35px;margin:-10px -10px 0;padding:10px 10px 9px;border:0;background:transparent;font:500 13px/16px var(--dsw-font-family,inherit);color:var(--dsw-alias-label-tertiary);white-space:nowrap;cursor:pointer}
+.bt-chat-tab:is(:hover,:focus-visible){color:var(--dsw-alias-label-primary)}
+.bt-chat-tab[aria-selected=true]{color:var(--dsw-alias-state-business-primary)}
+.bt-chat-tab[aria-selected=true]::after{content:'';position:absolute;inset:auto 10px -1px;height:2px;border-radius:2px;background:currentColor}
+[data-conversation-header-leading] [data-bot-chat-launcher]{margin:0 8px 0 0;padding:5px 8px;min-height:30px}
+header:has([data-bot-chat-launcher]):has([data-conversation-tabs]) [data-conversation-header-leading]{grid-row:2;align-self:start;margin:10px 24px 0 8px}
+header:has([data-conversation-tabs]) [data-conversation-header-leading] [data-bot-chat-launcher]{margin:-10px -10px 0;padding:10px 10px 9px;min-height:35px}
+header:has(> [data-conversation-header-leading] [data-bot-chat-launcher]) :has(> [data-conversation-tabs]){grid-row:2;grid-column:2}
+header:has([data-bot-chat-launcher]):has([data-conversation-tabs]) :has(> [data-conversation-header-corner]){grid-row:1;grid-column:1/-1}
+.bt-chat-tabs{display:flex;flex:none;align-items:flex-start;gap:20px;min-width:0;padding:12px 28px 0;border-bottom:.5px solid var(--dsw-alias-border-l3)}
+.bt-chat-tab-list{display:flex;flex-wrap:wrap;gap:12px 32px;min-width:0;min-height:25px}
+.bt-chat-tab-more{display:grid;place-items:center}
+`
 
 export const WORKBENCH_CSS = `
 .bt-workbench{display:flex;position:relative;container-type:inline-size;height:100%;min-height:0;min-width:0;overflow:hidden;background:var(--bt-main);color:var(--bt-ink)}

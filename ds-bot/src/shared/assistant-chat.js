@@ -1,5 +1,7 @@
 export const ASSISTANT_MODE_EVENT = 'rabiroute/assistant-mode'
 export const ASSISTANT_CHAT_KEY = 'dsBotAssistantChat'
+export const ASSISTANT_NATIVE_REPLY_EVENT = 'rabiroute/assistant-native-reply'
+export const ASSISTANT_NATIVE_REPLY_KEY = 'dsBotAssistantNativeReply'
 export const ASSISTANT_SCHEDULE_REPLY_EVENT = 'rabiroute/assistant-schedule-reply'
 export const ASSISTANT_SCHEDULE_REPLY_KEY = 'dsBotAssistantScheduleReply'
 
@@ -34,4 +36,23 @@ export function visibleScheduleReply(location, state, reply = location.data?.get
 
 export function assistantChatActive(state, seq = Infinity) {
   return state?.since !== null && state?.since !== undefined && seq >= state.since
+}
+
+export function assistantNativeReplyStep(event) {
+  if (event.type !== ASSISTANT_NATIVE_REPLY_EVENT) return undefined
+  const { turn, step } = event.data ?? {}
+  return Number.isSafeInteger(turn) && turn > 0 && Number.isSafeInteger(step) && step > 0 ? { turn, step } : undefined
+}
+
+export function addAssistantNativeStep(state, { turn, step }) {
+  if (state?.turn !== turn) return { turn, steps: [step] }
+  return state.steps.includes(step) ? state : { turn, steps: [...state.steps, step] }
+}
+
+export function assistantNativeReplyVisible(reply, step, tail) {
+  if (reply?.steps === undefined) return false
+  if (reply.steps.includes(step.step)) return true
+  return step.status === 'settled' && step.finalNode?.messageId !== undefined
+    && tail?.branchUnavailable === false && tail.closing?.finalNode?.seq === step.finalNode.seq
+    && !step.blocks.some(block => block.kind === 'tool-call')
 }

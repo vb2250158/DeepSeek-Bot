@@ -204,6 +204,8 @@ Point an HTTP MCP client at `http://127.0.0.1:8797/mcp` with the header `Authori
 
 ### Bot
 
+The leftmost **Bot chat** tab opens the Bot workspace. Select **Chat** or another session tab to open that DSH view for the same Bot session.
+
 Messages sent while a Bot is working separate the surrounding replies. Each reply keeps its own speaker heading, reasoning disclosure and thinking time, including after reloading the chat.
 
 You can do all your talking and work with one bot, in one window. You don't need to worry about the context behind it. The bot's details page shows its info, and there you can pick the model and thinking level you want it to use. You can switch models at any time, but I still recommend that you keep one model for a bot for a long time, and switch only when you really need to.

@@ -1665,7 +1665,7 @@ test('Rabi Assistant reads its registered projection for live and refresh paths'
   let definition
   const rt = earlierParts([])
   rt.ctx.get = name => name === 'sessionProjections' ? {
-    async register(value) { definition = value; return { stateOf: () => assistantRows.reduce(value.apply, value.init()) } },
+    async register(value) { if (value.key === 'dsBotAssistantChat') definition = value; return { stateOf: () => assistantRows.reduce(value.apply, value.init()) } },
     stateOf() { return assistantRows.reduce(definition.apply, definition.init()) },
   } : undefined
   installParts(rt)
@@ -1675,6 +1675,46 @@ test('Rabi Assistant reads its registered projection for live and refresh paths'
   const state = await rt.loadAssistantChat('b1', session)
   assert.deepEqual(definition.stateSchema.parse(state), { since: 2 })
   assert.equal(rt.displayItems('b1', assistantRows.slice(6), session)[0].text, 'Hello there')
+})
+
+test('settled native replies match live delivery and a rotated page cut inside the turn', async () => {
+  const row = (type, seq, data) => ({ type, seq, time: seq, data })
+  const assistant = (seq, step, text, withTool = false, turn = 1, extra = {}) => row('assistant/message', seq, { turn, step, ...extra,
+    message: { content: [{ type: 'text', text }, ...(withTool ? [{ type: 'tool-call', id: `call-${seq}` }] : [])] },
+  })
+  const events = [
+    row('rabiroute/assistant-mode', 1, { version: 2 }), row('turn/start', 2, { turn: 1 }),
+    row('rabiroute/assistant-native-reply', 3, { turn: 1, step: 1 }),
+    assistant(4, 1, 'I will move it.', true), assistant(5, 2, 'Looking up coordinates', true),
+    assistant(6, 3, 'It moved.'), row('turn/end', 7, { turn: 1 }), row('turn/start', 8, { turn: 2 }),
+    assistant(9, 1, 'Private scheduled work', false, 2), row('turn/end', 10, { turn: 2 }),
+    row('turn/start', 11, { turn: 3 }), row('rabiroute/assistant-native-reply', 12, { turn: 3, step: 1 }),
+    assistant(13, 1, 'Interrupted prefix', false, 3, { interrupted: true }), row('turn/end', 14, { turn: 3 }),
+  ]
+  const live = earlierParts([])
+  const session = { id: 'b1' }
+  const rows = events.flatMap(event => live.displayItems('b1', [event], session))
+  assert.deepEqual(rows.map(item => [item.seq, item.text]), [[4, 'I will move it.'], [6, 'It moved.']])
+
+  const archive = earlierParts([])
+  archive.resolveAgent = async () => { throw new Error('Archived') }
+  archive.ctx.sessionController.projections = async () => ({ kind: 'sequenced', values: { dsBotAssistantChat: { since: 1, nativeSince: 1 } } })
+  archive.ctx.sessionController.page = async ({ beforeSeq }) => beforeSeq === undefined
+    ? { records: events.slice(4).map(event => ({ event })), hasMore: true }
+    : { records: events.slice(0, 4).map(event => ({ event })), hasMore: false }
+  const latest = await archive.earlierPage('b2')
+  assert.deepEqual(latest.items.map(item => [item.seq, item.text]), [[6, 'It moved.'], [13, 'Interrupted prefix']])
+  const older = await archive.earlierPage('b2', latest.cursor)
+  assert.deepEqual(older.items.filter(item => item.kind === 'bot').map(item => [item.seq, item.text]), [[4, 'I will move it.']])
+
+  const user = row('user/message', 7, { source: { kind: 'user' }, content: [{ type: 'text', text: 'Move it.' }] })
+  archive.eventsBackwards = async function* () {
+    const turns = events.slice(0, 6).map(event => ({ ...event, seq: event.seq * 2 }))
+    turns.splice(3, 0, user)
+    yield* turns.reverse()
+  }
+  const lines = await Array.fromAsync(archive.partLines('b1', AbortSignal.timeout(1000)))
+  assert.deepEqual(lines.map(line => line.text), ['You: It moved.', 'You: I will move it.', 'User: Move it.'])
 })
 
 test('a deferred later result follows the rolling foreground Session without entering an earlier Session', async (t) => {

@@ -29,6 +29,8 @@ module.exports = __toCommonJS(index_exports);
 // src/shared/assistant-chat.js
 var ASSISTANT_MODE_EVENT = "rabiroute/assistant-mode";
 var ASSISTANT_CHAT_KEY = "dsBotAssistantChat";
+var ASSISTANT_NATIVE_REPLY_EVENT = "rabiroute/assistant-native-reply";
+var ASSISTANT_NATIVE_REPLY_KEY = "dsBotAssistantNativeReply";
 var ASSISTANT_SCHEDULE_REPLY_EVENT = "rabiroute/assistant-schedule-reply";
 var ASSISTANT_SCHEDULE_REPLY_KEY = "dsBotAssistantScheduleReply";
 function assistantSayText(message, meta) {
@@ -59,6 +61,20 @@ function visibleScheduleReply(location2, state, reply = location2.data?.get(ASSI
 function assistantChatActive(state, seq = Infinity) {
   return state?.since !== null && state?.since !== void 0 && seq >= state.since;
 }
+function assistantNativeReplyStep(event) {
+  if (event.type !== ASSISTANT_NATIVE_REPLY_EVENT) return void 0;
+  const { turn, step } = event.data ?? {};
+  return Number.isSafeInteger(turn) && turn > 0 && Number.isSafeInteger(step) && step > 0 ? { turn, step } : void 0;
+}
+function addAssistantNativeStep(state, { turn, step }) {
+  if (state?.turn !== turn) return { turn, steps: [step] };
+  return state.steps.includes(step) ? state : { turn, steps: [...state.steps, step] };
+}
+function assistantNativeReplyVisible(reply, step, tail) {
+  if (reply?.steps === void 0) return false;
+  if (reply.steps.includes(step.step)) return true;
+  return step.status === "settled" && step.finalNode?.messageId !== void 0 && tail?.branchUnavailable === false && tail.closing?.finalNode?.seq === step.finalNode.seq && !step.blocks.some((block) => block.kind === "tool-call");
+}
 
 // src/client/assistant-schedule-reply.js
 var assistantScheduleReplyDefinition = {
@@ -77,6 +93,24 @@ var assistantScheduleReplyDefinition = {
     return { kind: "turn", turn: state.turn, key: ASSISTANT_SCHEDULE_REPLY_KEY, value: state };
   },
   buildViewNode: () => null
+};
+
+// src/client/assistant-native-reply.js
+var assistantNativeReplyDefinition = {
+  kind: ASSISTANT_NATIVE_REPLY_KEY,
+  match: {
+    [ASSISTANT_NATIVE_REPLY_EVENT]: (event) => {
+      const reply = assistantNativeReplyStep(event);
+      return reply ? { id: String(reply.turn), role: "start" } : null;
+    }
+  },
+  start: (_context, match) => addAssistantNativeStep(void 0, assistantNativeReplyStep(match.event)),
+  update: ({ state }, match) => addAssistantNativeStep(state, assistantNativeReplyStep(match.event)),
+  buildLocationData: ({ start, state }, scope) => {
+    const location2 = start?.location;
+    if (scope !== "turn" || !state || location2?.kind !== "turn" && location2?.kind !== "step" || location2.turn.turn !== state.turn) return null;
+    return { kind: "turn", turn: state.turn, key: ASSISTANT_NATIVE_REPLY_KEY, value: state };
+  }
 };
 
 // src/client/dsh-primitives.js
@@ -15086,6 +15120,7 @@ var DSH_DE = {
 // src/client/i18n.js
 var NAMESPACE = "ds-bot";
 var ZH = {
+  "Bot chat": "聊天",
   "User": "用户",
   "Group folder": "群资料文件夹",
   "Back to library": "返回资料库",
@@ -17385,6 +17420,7 @@ var HOST_ZH = {
 Object.assign(ZH, HOST_ZH);
 var SUPPLEMENTAL_COPY = {
   ja: {
+    "Bot chat": "Bot とのチャット",
     "No matching Bots": "一致する Bot はありません",
     "All Bots are already members": "すべての Bot がすでに参加しています",
     "Use a plain .md, .txt, .csv, .json or .yaml file name": ".md、.txt、.csv、.json、.yaml の通常のファイル名を使用してください",
@@ -17470,6 +17506,7 @@ var SUPPLEMENTAL_COPY = {
     "Window end": "時間枠の終了"
   },
   ko: {
+    "Bot chat": "Bot 대화",
     "No matching Bots": "일치하는 Bot이 없습니다",
     "All Bots are already members": "모든 Bot이 이미 참여 중입니다",
     "Use a plain .md, .txt, .csv, .json or .yaml file name": "일반적인 .md, .txt, .csv, .json 또는 .yaml 파일 이름을 사용하세요",
@@ -17555,6 +17592,7 @@ var SUPPLEMENTAL_COPY = {
     "Window end": "시간 구간 종료"
   },
   es: {
+    "Bot chat": "Chat con el Bot",
     "No matching Bots": "No hay Bots coincidentes",
     "All Bots are already members": "Todos los Bots ya son miembros",
     "Use a plain .md, .txt, .csv, .json or .yaml file name": "Usa un nombre de archivo simple con extensión .md, .txt, .csv, .json o .yaml",
@@ -17640,6 +17678,7 @@ var SUPPLEMENTAL_COPY = {
     "Window end": "Fin del intervalo"
   },
   fr: {
+    "Bot chat": "Discussion avec le Bot",
     "No matching Bots": "Aucun Bot correspondant",
     "All Bots are already members": "Tous les Bots sont déjà membres",
     "Use a plain .md, .txt, .csv, .json or .yaml file name": "Utilisez un nom de fichier simple avec une extension .md, .txt, .csv, .json ou .yaml",
@@ -17725,6 +17764,7 @@ var SUPPLEMENTAL_COPY = {
     "Window end": "Fin de la plage"
   },
   de: {
+    "Bot chat": "Bot-Chat",
     "No matching Bots": "Keine passenden Bots",
     "All Bots are already members": "Alle Bots sind bereits Mitglieder",
     "Use a plain .md, .txt, .csv, .json or .yaml file name": "Verwenden Sie einen einfachen Dateinamen mit .md, .txt, .csv, .json oder .yaml",
@@ -42731,8 +42771,7 @@ function ThinkingRow({ text, live, at, ms, viewKey, textInteractionSource }) {
     (0, import_react66.createElement)("div", { ref: box, className: "bt-think-text", role: "region", "aria-label": title, tabIndex: 0, "data-fade": fade, "data-text-interaction-source": textInteractionSource && !live ? "" : void 0, onScroll: measure }, text)
   );
 }
-function useFileMentions({ node, openFile, fileMentions, useTurnData }) {
-  const tail = useTurnData?.("turn-tail");
+function useFileMentions({ node, openFile, fileMentions, tail }) {
   const location2 = node.location;
   const turn = location2?.kind === "turn" || location2?.kind === "step" ? location2.turn : void 0;
   const seq = node.data.finalNode?.seq;
@@ -42745,14 +42784,17 @@ function AssistantCell({ node, groupPart, useAssistantChat, sessionId, openFile,
   const roster = useRoster((value) => value);
   const data = node.data;
   const assistantMode = assistantChatActive(useAssistantChat?.((value) => value), node.anchorSeq ?? data.seq);
+  const nativeReply = useTurnData?.(ASSISTANT_NATIVE_REPLY_KEY);
+  const tail = useTurnData?.("turn-tail");
   const turnSteps = useTurnSteps(String(data.turn));
   const steering = useTurnSteering?.(String(data.turn)) ?? [];
   const segment = replySegment(turnSteps, data, steering, node.anchorSeq);
   const steps = segment.steps;
   const contexts = useTurnContext(String(data.turn));
-  const mentions = useFileMentions({ node, openFile, fileMentions, useTurnData });
+  const mentions = useFileMentions({ node, openFile, fileMentions, tail });
   const hidden = Boolean(roster.roomsById[sessionId]) || isHiddenTurn(roster, sessionId, data.turn);
-  const texts2 = groupPart === "reasoning" || assistantMode && roster.byId[sessionId] ? [] : data.blocks.filter((block) => block.kind === "text").map((block) => stripToolCallTags(block.text)).filter((text) => text.trim() !== "");
+  const showText = !assistantMode || !roster.byId[sessionId] || assistantNativeReplyVisible(nativeReply, data, tail);
+  const texts2 = groupPart === "reasoning" || !showText ? [] : data.blocks.filter((block) => block.kind === "text").map((block) => stripToolCallTags(block.text)).filter((text) => text.trim() !== "");
   const running = data.status === "running";
   const textInteractionSource = data.status === "settled" && data.finalNode?.messageId !== void 0;
   const members = steps.length ? steps : [data];
@@ -43363,14 +43405,16 @@ function SilentTurnHistory({ bot, actions, sessionId, location: location2, useRo
   const tools = useTurnTools(String(turn));
   const schedule = location2.data?.source?.(ASSISTANT_SCHEDULE_REPLY_KEY) ?? emptyReply;
   const recordedReply = (0, import_react66.useSyncExternalStore)(schedule.subscribe, schedule.getSnapshot);
-  const hasReply = steps.some((step) => !assistantChatActive(assistantState, step.finalNode?.seq ?? step.seq) && step.blocks.some((block) => block.kind === "text" && stripToolCallTags(block.text).trim())) || tools.some(({ root }) => root.kind === "tool-result" && assistantSayText(root, root.meta) !== void 0);
+  const native = location2.data?.source?.(ASSISTANT_NATIVE_REPLY_KEY) ?? emptyReply;
+  const nativeReply = (0, import_react66.useSyncExternalStore)(native.subscribe, native.getSnapshot);
+  const tail = location2.data?.get("turn-tail");
+  const hasReply = steps.some((step) => (!assistantChatActive(assistantState, step.finalNode?.seq ?? step.seq) || assistantNativeReplyVisible(nativeReply, step, tail)) && step.blocks.some((block) => block.kind === "text" && stripToolCallTags(block.text).trim())) || tools.some(({ root }) => root.kind === "tool-result" && assistantSayText(root, root.meta) !== void 0);
   if (hasReply) return null;
   const reply = visibleScheduleReply(location2, assistantState, recordedReply);
   const history = { actions, sessionId, turn };
   if (reply) {
     return (0, import_react66.createElement)(SpeakerReply, { bot, history }, (0, import_react66.createElement)(ScheduledReply, { reply, bot, actions, sessionId, useRoster, useUi }));
   }
-  const tail = location2.data?.get("turn-tail");
   const closing = tail?.closing;
   const conclusion = end.data?.reason?.kind === "completed" && tail?.branchUnavailable === false && closing?.status === "settled" && closing.finalNode?.messageId !== void 0 && assistantChatActive(assistantState, closing.finalNode.seq) ? closing.blocks.filter((block) => block.kind === "text").map((block) => stripToolCallTags(block.text).trim()).filter(Boolean).join("\n\n") : "";
   return (0, import_react66.createElement)(
@@ -49516,10 +49560,80 @@ function ColumnResizer({ side, width, onChange }) {
 
 // src/client/workbench.js
 var import_react79 = require("react");
-var import_dsh_client_ui_primitives8 = require("@deepseek-ai/dsh-client-ui-primitives");
 var BOT_PANEL = "ds-bot";
 function BotPanelIcon({ size = 18 }) {
-  return (0, import_react79.createElement)(import_dsh_client_ui_primitives8.FishLogo, { size });
+  return (0, import_react79.createElement)(import_dsh_client_ui_primitives.FishLogo, { size });
+}
+function BotChatLauncher({ actions }) {
+  return (0, import_react79.createElement)("button", {
+    type: "button",
+    className: "bt-chat-tab",
+    "data-bot-chat-launcher": "",
+    onClick: () => actions.selectPanel(BOT_PANEL)
+  }, t("Bot chat"));
+}
+function BotChatViews({ renderSlot }) {
+  return renderSlot("conversation.session", { view: "chat" });
+}
+var BOT_CHAT_SLOTS = { views: BotChatViews };
+var emptyViews = (select) => select([]);
+var noEntryActions = (select) => select(false);
+var noIcon = () => null;
+function BotChatTabs(props) {
+  return props.selectView ? (0, import_react79.createElement)(ConversationTabs, props) : null;
+}
+function ConversationTabs({ actions, useStore, useConversationViews = emptyViews, useEntryPins = emptyViews, useEntryActions = noEntryActions, selectView }) {
+  const views = useConversationViews((value) => value);
+  const unpinned = useEntryPins((value) => value);
+  const hasMenu = useEntryActions((value) => value);
+  const row = (0, import_react79.useRef)(null);
+  const request = useStore((value) => value.viewRequest);
+  const previousRequest = (0, import_react79.useRef)(request);
+  const [limit, setLimit] = (0, import_react79.useState)(1);
+  (0, import_react79.useEffect)(() => {
+    if (request && request !== previousRequest.current && request.view !== "chat") actions.selectPanel(null);
+    previousRequest.current = request;
+  }, [request, actions]);
+  (0, import_react79.useLayoutEffect)(() => {
+    const element = row.current;
+    const measure = () => setLimit(Math.max(1, Math.floor((element.clientWidth - 110) / 120)));
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+  const preferred = [
+    ...views.filter((view) => view.id === "chat"),
+    ...views.filter((view) => view.id !== "chat" && !unpinned.includes(view.id))
+  ];
+  const visible = hasMenu ? preferred.slice(0, limit) : preferred;
+  const hidden = hasMenu ? views.filter((view) => !visible.includes(view)) : [];
+  const open = (id) => {
+    selectView(id);
+    actions.selectPanel(null);
+  };
+  return (0, import_react79.createElement)(
+    "div",
+    { className: "bt-chat-tabs", ref: row },
+    (0, import_react79.createElement)(
+      "div",
+      { className: "bt-chat-tab-list", role: "tablist", "aria-label": t("Bot chat") },
+      (0, import_react79.createElement)("button", { type: "button", role: "tab", className: "bt-chat-tab", "aria-selected": true }, t("Bot chat")),
+      visible.map((view) => (0, import_react79.createElement)("button", {
+        key: view.id,
+        type: "button",
+        role: "tab",
+        className: "bt-chat-tab",
+        "aria-selected": false,
+        onClick: () => open(view.id)
+      }, view.label))
+    ),
+    (0, import_react79.createElement)(PanelMenu, {
+      items: hidden.map((view) => ({ key: view.id, icon: noIcon, label: view.label, onPick: () => open(view.id) })),
+      className: "bt-chat-tab bt-chat-tab-more",
+      "aria-label": t("More")
+    })
+  );
 }
 function BotWorkbench({ renderSlot }) {
   return (0, import_react79.createElement)(
@@ -49544,7 +49658,7 @@ function BotTeam(props) {
   );
 }
 function BotConversation(props) {
-  const { sessionId, renderFactorySlot, useRoster, useUi, actions } = props;
+  const { sessionId, renderFactorySlot, renderSlot, useRoster, useUi, actions } = props;
   const roster = useRoster((value) => value);
   const ui = useUi((value) => value);
   const [width, onChange] = useColumnWidth("details");
@@ -49580,8 +49694,13 @@ function BotConversation(props) {
     (0, import_react79.createElement)(
       "section",
       { ref: chatRef, className: "bt-chat-column", "aria-label": t("Message"), style: { "--bt-placeholder": JSON.stringify(name ? t("Message {name}", { name }) : t("Message")) } },
+      known ? renderSlot("bot.conversation.tabs", {}) : null,
       ...showGoal ? [(0, import_react79.createElement)(GoalIsland, { key: `goal:${room3.id}`, room: room3, goal, view, open: ui.goalOpen === id, composing, roomWork, roster, actions })] : [],
-      (0, import_react79.createElement)(import_react79.Fragment, { key: "conversation" }, renderFactorySlot("conversation.content", { variant: "embedded", phase: "active", hero: false, ...known ? { busyEnterOverride: "steer" } : {} })),
+      (0, import_react79.createElement)(import_react79.Fragment, { key: "conversation" }, renderFactorySlot(
+        "conversation.content",
+        { variant: "embedded", phase: "active", hero: false, ...known ? { busyEnterOverride: "steer" } : {} },
+        known ? { slots: BOT_CHAT_SLOTS } : void 0
+      )),
       known ? (0, import_react79.createElement)(ActivityIndicator, { ...props, key: `activity:${sessionId}`, sessionId }) : null
     ),
     known ? (0, import_react79.createElement)(
@@ -49602,6 +49721,20 @@ function BotConversation(props) {
     ) : null
   );
 }
+var BOT_CHAT_TABS_CSS = `
+.bt-chat-tab{position:relative;box-sizing:border-box;min-height:35px;margin:-10px -10px 0;padding:10px 10px 9px;border:0;background:transparent;font:500 13px/16px var(--dsw-font-family,inherit);color:var(--dsw-alias-label-tertiary);white-space:nowrap;cursor:pointer}
+.bt-chat-tab:is(:hover,:focus-visible){color:var(--dsw-alias-label-primary)}
+.bt-chat-tab[aria-selected=true]{color:var(--dsw-alias-state-business-primary)}
+.bt-chat-tab[aria-selected=true]::after{content:'';position:absolute;inset:auto 10px -1px;height:2px;border-radius:2px;background:currentColor}
+[data-conversation-header-leading] [data-bot-chat-launcher]{margin:0 8px 0 0;padding:5px 8px;min-height:30px}
+header:has([data-bot-chat-launcher]):has([data-conversation-tabs]) [data-conversation-header-leading]{grid-row:2;align-self:start;margin:10px 24px 0 8px}
+header:has([data-conversation-tabs]) [data-conversation-header-leading] [data-bot-chat-launcher]{margin:-10px -10px 0;padding:10px 10px 9px;min-height:35px}
+header:has(> [data-conversation-header-leading] [data-bot-chat-launcher]) :has(> [data-conversation-tabs]){grid-row:2;grid-column:2}
+header:has([data-bot-chat-launcher]):has([data-conversation-tabs]) :has(> [data-conversation-header-corner]){grid-row:1;grid-column:1/-1}
+.bt-chat-tabs{display:flex;flex:none;align-items:flex-start;gap:20px;min-width:0;padding:12px 28px 0;border-bottom:.5px solid var(--dsw-alias-border-l3)}
+.bt-chat-tab-list{display:flex;flex-wrap:wrap;gap:12px 32px;min-width:0;min-height:25px}
+.bt-chat-tab-more{display:grid;place-items:center}
+`;
 var WORKBENCH_CSS = `
 .bt-workbench{display:flex;position:relative;container-type:inline-size;height:100%;min-height:0;min-width:0;overflow:hidden;background:var(--bt-main);color:var(--bt-ink)}
 .bt-team-column{display:flex;position:relative;box-sizing:border-box;flex-direction:column;flex:0 1 var(--bt-team-width,280px);min-width:200px;max-width:520px;min-height:0;border-right:.5px solid var(--bt-line);background:var(--bt-sidebar)}
@@ -50595,19 +50728,25 @@ function closingReplyText(chat, turn, presentation) {
   if (location2 === void 0) return void 0;
   if (assistantChatActive(presentation, location2.end?.seq)) {
     if (location2.end === void 0) return void 0;
+    const native = location2.data?.get(ASSISTANT_NATIVE_REPLY_KEY);
+    const tail = location2.data?.get("turn-tail");
+    const closing2 = tail?.closing;
+    const nativeText = closing2 && assistantNativeReplyVisible(native, closing2, tail) ? replyText(closing2) : "";
+    if (nativeText && !closing2.blocks.some((block) => block.kind === "tool-call")) return nativeText;
     const tools = chat.nodes?.turnDataSource(turn, "tool-call").getSnapshot();
     if (tools === void 0) return void 0;
     const said = tools.flatMap(({ root }) => {
       const text = root.kind === "tool-result" && assistantChatActive(presentation, root.seq) ? assistantSayText(root, root.meta) : void 0;
       return text === void 0 ? [] : [text];
     }).join("\n\n");
-    return said || visibleScheduleReply(location2, presentation)?.text || "";
+    return said || nativeText || visibleScheduleReply(location2, presentation)?.text || "";
   }
   const closing = location2.data?.get("turn-tail")?.closing;
   if (closing === void 0) return void 0;
   if (closing === null) return "";
-  return (closing.blocks ?? []).filter((block) => block.kind === "text" && block.text.trim() !== "").map((block) => block.text).join("\n\n");
+  return replyText(closing);
 }
+var replyText = (step) => (step.blocks ?? []).filter((block) => block.kind === "text" && block.text.trim() !== "").map((block) => block.text).join("\n\n");
 function turnDetector({ loud = 0.12, quiet = 0.06, quietMs = 1200 } = {}) {
   let spokeAt = 0;
   let quietSince = 0;
@@ -50735,19 +50874,23 @@ function headerNavigation(entries2, face) {
     }
   };
 }
-function installHeaderNavigation(slots, face, component, priority) {
-  const name = "conversation.session.header";
+var HEADER_SLOT = "conversation.session.header";
+function installHeaderNavigation(slots, face, component, priority, name = HEADER_SLOT) {
   let source;
   let dispose;
   const refresh = () => {
-    const entries2 = slots.entries(name).filter((entry) => entry.component !== component);
-    const next = navigationEntry(entries2);
+    const entries2 = slots.entries(HEADER_SLOT).filter((entry) => entry.component !== component);
+    const next = name === HEADER_SLOT ? navigationEntry(entries2) : entries2.find((entry) => entry.children?.["conversation.session.header.views.actions"]);
     if (dispose && source === next) return;
     dispose?.();
     source = next;
-    dispose = slots.register({ name, priority: freePriority(entries2, { priority }), ...headerNavigation(entries2, face) }, component);
+    dispose = slots.register({
+      name,
+      priority: freePriority(name === HEADER_SLOT ? entries2 : slots.entries(name), { priority }),
+      ...headerNavigation(next ? [next] : [], face)
+    }, component);
   };
-  const unsubscribe = slots.subscribe(name, refresh);
+  const unsubscribe = slots.subscribe(HEADER_SLOT, refresh);
   try {
     refresh();
   } catch (error) {
@@ -55799,6 +55942,7 @@ var WINDOWS = globalThis.navigator?.userAgentData?.platform === "Windows" || /^W
 function apply(ctx) {
   ctx.effect(() => installLocale(ctx.get("locale")), "ds-bot: interface copy");
   ctx.effect(() => ctx.uiConversation.events.register(assistantScheduleReplyDefinition), "ds-bot: scheduled assistant replies");
+  ctx.effect(() => ctx.uiConversation.events.register(assistantNativeReplyDefinition), "ds-bot: native assistant replies");
   const rabiWorkspace = createRabiWorkspaceStore((payload, signal) => call("rabi-bot-view", payload, signal));
   ctx.effect(() => () => rabiWorkspace.dispose(), "ds-bot: Rabi resource reads");
   migrateStorage();
@@ -57067,7 +57211,13 @@ function apply(ctx) {
     "bot.conversation": { kind: "single", scope: "session-maybe" }
   } }, BotWorkbench);
   shadow("bot.team", { inject: face }, BotTeam);
-  shadow("bot.conversation", { inject: face }, BotConversation);
+  shadow("bot.conversation", { inject: face, children: { "bot.conversation.tabs": { kind: "single", scope: "session" } } }, BotConversation);
+  ctx.slots.inject("bot.conversation.tabs", () => installHeaderNavigation(ctx.slots, face, BotChatTabs, BOT_PRIORITY, "bot.conversation.tabs"));
+  shadow("conversation.header.leading", { inject: face }, BotChatLauncher);
+  ctx.effect(() => {
+    const style = installStyles(BOT_CHAT_TABS_CSS, "chat-tabs");
+    return () => style.remove();
+  }, "ds-bot: chat tabs");
   shadow("sidebar.panellist", { id: BOT_PANEL, order: 30, label: () => "DS Bot" }, BotPanelIcon);
   ctx.effect(() => {
     let wasSelected = false;

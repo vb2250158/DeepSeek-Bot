@@ -14,7 +14,8 @@
 // The next part opens with the handoff package: the note, the latest messages word for
 // word, and where the rest is. Input that arrives meanwhile waits and moves along.
 // read_own_chat searches every part, the condensed messages included.
-import { assistantChatActive, assistantChatText, installAssistantChat } from './assistant-chat.js'
+import { assistantChatActive, assistantChatText, foldAssistantNativeReply, installAssistantChat } from './assistant-chat.js'
+import { assistantNativeReplyStep } from '../shared/assistant-chat.js'
 import { randomUUID } from 'node:crypto'
 import { LlmError, createUserMessage, isContextWindowExceededError } from '@deepseek-ai/dsh-llm'
 import { openTurnAt } from './btw.js'
@@ -139,12 +140,13 @@ export function replyText(text) {
   }).join('\n\n')
 }
 
-export function historyEntry(event, group, presentation) {
+export function historyEntry(event, group, presentation, nativeReply) {
   const said = assistantChatText(event, presentation)
   if (said !== undefined) return { answer: true, text: said }
   if (event.type === 'assistant/message') {
-    if (assistantChatActive(presentation, event.seq)) return undefined
-    const text = textOf(event.data?.message?.content)
+    const content = event.data?.message?.content ?? []
+    if (assistantChatActive(presentation, event.seq) && !nativeReplyVisible(event, presentation, nativeReply, content, true)) return undefined
+    const text = textOf(content)
     return text === '' ? undefined : { answer: true, text }
   }
   // Cards only show in an own chat. A PTC program's sub-call asks too.
@@ -163,6 +165,42 @@ export function historyEntry(event, group, presentation) {
   const skipped = (ours && (source.handoff === true || source.role === 'kickoff' || source.role === 'goal' || source.role === 'task-handoff')) || (!group && text.startsWith('[Group chat'))
   // A turn that went on after a handoff did real work, so its answers stay.
   return { answer: false, who: ours ? 'bot' : 'user', text: skipped ? '' : text, keepAnswers: !skipped || (ours && source.resume === true) }
+}
+
+function nativeReplyVisible(event, presentation, reply, content, includeInterrupted) {
+  if (presentation.nativeSince === undefined || event.seq < presentation.nativeSince || !reply || reply.turn !== event.data.turn) return false
+  const marked = reply.steps.includes(event.data.step)
+  if (event.data.interrupted === true) return includeInterrupted && marked
+  return marked || !content.some(block => block?.type === 'tool-call')
+}
+
+function* nativeTurnHistory(events, group, presentation) {
+  let reply = null
+  const entries = []
+  for (let index = events.length - 1; index >= 0; index--) {
+    const event = events[index]
+    reply = foldAssistantNativeReply(reply, event)
+    const entry = historyEntry(event, group, presentation, reply)
+    if (entry !== undefined) entries.push({ event, entry })
+  }
+  yield* entries.reverse()
+}
+
+async function* partHistory(events, group, presentation) {
+  let turn = []
+  for await (const event of events) {
+    if (event.seq >= (presentation.nativeSince ?? Infinity) && event.type !== 'turn/start') {
+      if (event.type === 'assistant/message' || assistantNativeReplyStep(event) || historyEntry(event, group, presentation)) turn.push(event)
+      continue
+    }
+    if (turn.length > 0) {
+      yield* nativeTurnHistory(turn, group, presentation)
+      turn = []
+    }
+    const entry = historyEntry(event, group, presentation)
+    if (entry !== undefined) yield { event, entry }
+  }
+  yield* nativeTurnHistory(turn, group, presentation)
 }
 
 // A note with every heading in order but some translated (e.g. "## 目标" for "## Goals")
@@ -446,9 +484,8 @@ export function install(rt) {
     let answers = []
     const agent = await rt.resolveAgent(sessionId).catch(() => undefined)
     const presentation = await rt.loadAssistantChat(sessionId, agent?.session, signal)
-    for await (const event of rt.eventsBackwards(sessionId, signal, pages, read)) {
-      const entry = historyEntry(event, group, presentation)
-      if (entry === undefined) continue
+    const events = rt.eventsBackwards(sessionId, signal, pages, read)
+    for await (const { event, entry } of partHistory(events, group, presentation)) {
       if (entry.answer) {
         answers.push({ text: `You: ${entry.text}`, time: event.time, seq: event.seq, who: 'you' })
         continue
@@ -1856,6 +1893,8 @@ export function install(rt) {
   function displayItems(partId, events, session, seedTurn, options = {}) {
     const hidden = options.taskView === true ? new Set() : new Set(state.exchangeTurns[partId] ?? [])
     const presentation = rt.assistantChatState(partId, events, session)
+    let nativeReply = options.nativeHistory ? options.nativeSeed
+      : presentation.nativeSince === undefined ? null : rt.assistantNativeReplyState(session, events)
     // Files a turn presented, attached to its closing Bot row so the phone can save
     // them: the card shows name and type, the save action names seq and index.
     const presented = []
@@ -1876,6 +1915,7 @@ export function install(rt) {
       items.push(item)
     }
     for (const event of events) {
+      if (options.nativeHistory) nativeReply = foldAssistantNativeReply(nativeReply, event)
       if (event.type === 'turn/start') {
         if (typeof event.data?.turn === 'number' && Number.isInteger(event.data.turn)) turn = event.data.turn
         continue
@@ -1891,10 +1931,10 @@ export function install(rt) {
         continue
       }
       if (event.type === 'assistant/message') {
-        if (assistantChatActive(presentation, event.seq)) continue
         if (hidden.has(event.data?.turn)) continue
         // One entry per text block: the chat shows each block in a bubble of its own.
         const content = Array.isArray(event.data?.message?.content) ? event.data.message.content : []
+        if (assistantChatActive(presentation, event.seq) && !nativeReplyVisible(event, presentation, nativeReply, content, options.nativeHistory)) continue
         for (const block of content) {
           if (block?.type === 'text' && typeof block.text === 'string' && block.text.trim() !== '') stamp(event, { kind: 'bot', text: block.text, time: event.time })
         }
@@ -2025,9 +2065,11 @@ export function install(rt) {
       ? rawEvents
       : rawEvents.filter(event => !Number.isInteger(event?.seq) || event.seq >= minSeq)
     const hitFloor = minSeq !== undefined && (rawEvents.length === 0 || (Number.isInteger(rawEvents[0]?.seq) && rawEvents[0].seq <= minSeq))
-    await rt.loadAssistantChat(part.sessionId, agent?.session, signal)
+    const presentation = await rt.loadAssistantChat(part.sessionId, agent?.session, signal)
     let seedTurn
-    if (agent === undefined) {
+    let needNativeSeed = presentation.nativeSince !== undefined && events[0]?.seq >= presentation.nativeSince && events[0]?.type !== 'turn/start'
+    const nativeSteps = new Set()
+    if (agent === undefined || needNativeSeed) {
       // Without the live session's projection, rows on a page that does not
       // hold its own turn/start would lose their turn; walk back for it.
       let before = events[0]?.seq
@@ -2037,17 +2079,29 @@ export function install(rt) {
           beforeSeq: before,
           maxMessages: EARLIER_PAGE,
         }, signal)
-        const starts = back.records.map(record => record.event).filter(event => event.type === 'turn/start')
-        if (starts.length > 0) {
-          const last = starts.at(-1).data?.turn
-          if (Number.isInteger(last)) seedTurn = last
+        const prior = back.records.map(record => record.event)
+        const start = prior.findLastIndex(event => event.type === 'turn/start')
+        if (needNativeSeed) {
+          for (let index = prior.length - 1; index > start; index--) {
+            if (prior[index].type === 'turn/end') {
+              needNativeSeed = false
+              break
+            }
+            const reply = assistantNativeReplyStep(prior[index])
+            if (reply) nativeSteps.add(reply.step)
+          }
+        }
+        if (start !== -1) {
+          const turn = prior[start].data?.turn
+          if (Number.isInteger(turn)) seedTurn = turn
           break
         }
         if (!back.hasMore) break
         before = back.records[0]?.event?.seq
       }
     }
-    const items = displayItems(part.sessionId, events, agent?.session, seedTurn, options)
+    const nativeSeed = nativeSteps.size > 0 && seedTurn !== undefined ? { turn: seedTurn, steps: [...nativeSteps] } : null
+    const items = displayItems(part.sessionId, events, agent?.session, seedTurn, { ...options, nativeHistory: true, nativeSeed })
     if (options.taskView === true) {
       for (const item of items) {
         if (item.sessionId === undefined) item.sessionId = part.sessionId
@@ -2178,7 +2232,7 @@ export function install(rt) {
           maxMessages: EARLIER_PAGE,
         }, AbortSignal.timeout(HISTORY_TIMEOUT_MS))
         const events = page.records.map(record => record.event)
-        const last = [...displayItems(sessionId, events)].reverse().find(item => PREVIEWABLE.has(item.kind))
+        const last = displayItems(sessionId, events, undefined, undefined, { nativeHistory: true }).findLast(item => PREVIEWABLE.has(item.kind))
         if (last !== undefined) {
           if (tails.get(sessionId) === null) applyTail(sessionId, last)
           return

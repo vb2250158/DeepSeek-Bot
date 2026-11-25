@@ -2070,7 +2070,7 @@ export function install(rt) {
       return
     }
     const origin = originOf(session.id)
-    for (const item of rt.displayItems(session.id, [event])) {
+    for (const item of rt.displayItems(session.id, [event], session)) {
       if (item.kind !== 'bot' && item.kind !== 'view') continue
       if (origin === undefined) {
         warnWithheldOrigin(session.id)

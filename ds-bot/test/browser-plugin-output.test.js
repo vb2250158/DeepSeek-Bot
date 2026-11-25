@@ -3,6 +3,7 @@ import { test } from 'node:test'
 import { Context } from '@deepseek-ai/cordis'
 import { createToolResultMessage, ToolCallId } from '@deepseek-ai/dsh-llm'
 import { Session } from '@deepseek-ai/dsh-session'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { defineTool } from '@deepseek-ai/dsh-tools'
 import { mountBrowserPlugin } from '../src/host/browser/mount.js'
@@ -22,6 +23,7 @@ async function executeOne(ctx, input) {
 
 test('browser handoff and resume return valid DSH outputs and clear the Bot hold', async t => {
   const ctx = new Context()
+  await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
   if (typeof ctx.tools.setExecutor === 'function') await ctx.plugin(await import('@deepseek-ai/dsh-tool-executor-native'))
@@ -101,6 +103,7 @@ test('browser handoff and resume return valid DSH outputs and clear the Bot hold
 
 test('a screenshot degrades to text when no attachments service is mounted', async t => {
   const ctx = new Context()
+  await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
   if (typeof ctx.tools.setExecutor === 'function') await ctx.plugin(await import('@deepseek-ai/dsh-tool-executor-native'))
@@ -137,6 +140,7 @@ test('a screenshot degrades to text when no attachments service is mounted', asy
 
 test('a stored browser screenshot is repaired before the next step and survives reload', async t => {
   const ctx = new Context()
+  await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
   if (typeof ctx.tools.setExecutor === 'function') await ctx.plugin(await import('@deepseek-ai/dsh-tool-executor-native'))
@@ -175,6 +179,7 @@ test('a stored browser screenshot is repaired before the next step and survives 
 
 test('browser tools refuse every operation while a user hold is active', async t => {
   const ctx = new Context()
+  await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
   if (typeof ctx.tools.setExecutor === 'function') await ctx.plugin(await import('@deepseek-ai/dsh-tool-executor-native'))
@@ -219,6 +224,7 @@ test('browser tools refuse every operation while a user hold is active', async t
 
 test('browser endpoint connection uses the execution Bot identity, not tool arguments', async t => {
   const ctx = new Context()
+  await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
   if (typeof ctx.tools.setExecutor === 'function') await ctx.plugin(await import('@deepseek-ai/dsh-tool-executor-native'))
@@ -255,6 +261,7 @@ test('browser endpoint connection uses the execution Bot identity, not tool argu
 
 test('a channel user hold closes the cached Playwright session and give-back reconnects', async t => {
   const ctx = new Context()
+  await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
   if (typeof ctx.tools.setExecutor === 'function') await ctx.plugin(await import('@deepseek-ai/dsh-tool-executor-native'))

@@ -11,6 +11,7 @@ import { DSH_DE, HOST_ERRORS_DE, DE } from './locales/de.js'
 export const NAMESPACE = 'ds-bot'
 
 const ZH = {
+  'Bot chat': '聊天',
   'User': '用户',
   'Group folder': '群资料文件夹',
   'Back to library': '返回资料库',
@@ -2311,6 +2312,7 @@ Object.assign(ZH, HOST_ZH)
 // Fork features supplement only keys absent from the upstream locale dictionaries.
 const SUPPLEMENTAL_COPY = {
   ja: {
+    'Bot chat': 'Bot とのチャット',
     'No matching Bots': '一致する Bot はありません',
     'All Bots are already members': 'すべての Bot がすでに参加しています',
     'Use a plain .md, .txt, .csv, .json or .yaml file name': '.md、.txt、.csv、.json、.yaml の通常のファイル名を使用してください',
@@ -2396,6 +2398,7 @@ const SUPPLEMENTAL_COPY = {
     'Window end': '時間枠の終了',
   },
   ko: {
+    'Bot chat': 'Bot 대화',
     'No matching Bots': '일치하는 Bot이 없습니다',
     'All Bots are already members': '모든 Bot이 이미 참여 중입니다',
     'Use a plain .md, .txt, .csv, .json or .yaml file name': '일반적인 .md, .txt, .csv, .json 또는 .yaml 파일 이름을 사용하세요',
@@ -2481,6 +2484,7 @@ const SUPPLEMENTAL_COPY = {
     'Window end': '시간 구간 종료',
   },
   es: {
+    'Bot chat': 'Chat con el Bot',
     'No matching Bots': 'No hay Bots coincidentes',
     'All Bots are already members': 'Todos los Bots ya son miembros',
     'Use a plain .md, .txt, .csv, .json or .yaml file name': 'Usa un nombre de archivo simple con extensión .md, .txt, .csv, .json o .yaml',
@@ -2566,6 +2570,7 @@ const SUPPLEMENTAL_COPY = {
     'Window end': 'Fin del intervalo',
   },
   fr: {
+    'Bot chat': 'Discussion avec le Bot',
     'No matching Bots': 'Aucun Bot correspondant',
     'All Bots are already members': 'Tous les Bots sont déjà membres',
     'Use a plain .md, .txt, .csv, .json or .yaml file name': 'Utilisez un nom de fichier simple avec une extension .md, .txt, .csv, .json ou .yaml',
@@ -2651,6 +2656,7 @@ const SUPPLEMENTAL_COPY = {
     'Window end': 'Fin de la plage',
   },
   de: {
+    'Bot chat': 'Bot-Chat',
     'No matching Bots': 'Keine passenden Bots',
     'All Bots are already members': 'Alle Bots sind bereits Mitglieder',
     'Use a plain .md, .txt, .csv, .json or .yaml file name': 'Verwenden Sie einen einfachen Dateinamen mit .md, .txt, .csv, .json oder .yaml',

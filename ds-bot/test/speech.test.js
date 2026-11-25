@@ -135,3 +135,24 @@ test('assistant voice uses a completed schedule reply when the turn has no expli
   location.end.data.reason.kind = 'aborted'
   assert.equal(closingReplyText(chat, 1, { since: 2 }), '')
 })
+
+test('assistant voice speaks a settled native conclusion in a marked user turn', () => {
+  const closing = { step: 3, status: 'settled', finalNode: { seq: 10, messageId: 'complete' }, blocks: [{ kind: 'text', text: 'The task finished.' }] }
+  const tail = { closing, branchUnavailable: false }
+  const data = new Map([['dsBotAssistantNativeReply', { turn: 1, steps: [1] }], ['turn-tail', tail]])
+  const chat = { timeline: { turns: new Map([[1, { end: { seq: 12 }, data }]]) }, nodes: { turnDataSource: () => ({ getSnapshot: () => [] }) } }
+  assert.equal(closingReplyText(chat, 1, { since: 2 }), 'The task finished.')
+  data.delete('dsBotAssistantNativeReply')
+  assert.equal(closingReplyText(chat, 1, { since: 2 }), '')
+})
+
+
+test('voice uses the confirmed action result when the same step started with native text', () => {
+  const closing = { step: 1, status: 'settled', finalNode: { seq: 10, messageId: 'tool-step' },
+    blocks: [{ kind: 'text', text: 'Doing that now.' }, { kind: 'tool-call' }] }
+  const data = new Map([['dsBotAssistantNativeReply', { turn: 1, steps: [1] }], ['turn-tail', { closing, branchUnavailable: false }]])
+  const text = 'The renderer confirmed it moved.'
+  const root = { kind: 'tool-result', seq: 11, isError: false, content: [{ type: 'text', text: JSON.stringify({ status: 'applied', text }) }], meta: { kind: 'rabi-assistant-say', text } }
+  const chat = { timeline: { turns: new Map([[1, { end: { seq: 12 }, data }]]) }, nodes: { turnDataSource: () => ({ getSnapshot: () => [{ root }] }) } }
+  assert.equal(closingReplyText(chat, 1, { since: 2 }), 'The renderer confirmed it moved.')
+})

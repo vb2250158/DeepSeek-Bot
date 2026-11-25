@@ -1,4 +1,4 @@
-import { assistantChatActive, assistantSayText, visibleScheduleReply } from '../shared/assistant-chat.js'
+import { ASSISTANT_NATIVE_REPLY_KEY, assistantChatActive, assistantNativeReplyVisible, assistantSayText, visibleScheduleReply } from '../shared/assistant-chat.js'
 // The recognizer of DSH's Voice Input plugin (local SenseVoice, or a cloud
 // provider such as deepseek-asr). Its `speech` Remote exists only while that
 // plugin is on; the browser's own speech service stays the fallback. The
@@ -150,19 +150,26 @@ export function closingReplyText(chat, turn, presentation) {
   if (location === undefined) return undefined
   if (assistantChatActive(presentation, location.end?.seq)) {
     if (location.end === undefined) return undefined
+    const native = location.data?.get(ASSISTANT_NATIVE_REPLY_KEY)
+    const tail = location.data?.get('turn-tail')
+    const closing = tail?.closing
+    const nativeText = closing && assistantNativeReplyVisible(native, closing, tail) ? replyText(closing) : ''
+    if (nativeText && !closing.blocks.some(block => block.kind === 'tool-call')) return nativeText
     const tools = chat.nodes?.turnDataSource(turn, 'tool-call').getSnapshot()
     if (tools === undefined) return undefined
     const said = tools.flatMap(({ root }) => {
       const text = root.kind === 'tool-result' && assistantChatActive(presentation, root.seq) ? assistantSayText(root, root.meta) : undefined
       return text === undefined ? [] : [text]
     }).join('\n\n')
-    return said || visibleScheduleReply(location, presentation)?.text || ''
+    return said || nativeText || visibleScheduleReply(location, presentation)?.text || ''
   }
   const closing = location.data?.get('turn-tail')?.closing
   if (closing === undefined) return undefined
   if (closing === null) return ''
-  return (closing.blocks ?? []).filter(block => block.kind === 'text' && block.text.trim() !== '').map(block => block.text).join('\n\n')
+  return replyText(closing)
 }
+
+const replyText = step => (step.blocks ?? []).filter(block => block.kind === 'text' && block.text.trim() !== '').map(block => block.text).join('\n\n')
 
 // Voice activity on the loudness of each animation frame: speech starts above
 // `loud`, and the turn ends after `quietMs` below `quiet`.

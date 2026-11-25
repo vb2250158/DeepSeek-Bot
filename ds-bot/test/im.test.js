@@ -8,7 +8,9 @@ import { test } from 'node:test'
 import { Context } from '@deepseek-ai/cordis'
 import LocalJobRegistry from '@deepseek-ai/dsh-jobs-local'
 import { createScope } from '@deepseek-ai/dsh-scope'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
+import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import * as toolJobs from '@deepseek-ai/dsh-tool-jobs'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
 import { createRuntime } from '../index.js'
@@ -1324,6 +1326,7 @@ test('own-chat form codes persist across restart and do not reuse a settled code
   const id = s.rt.state.views.a.id
   await s.flush()
   const code = /Card (V\d+)/.exec((await tokenCard(s)).text)[1]
+  s.emitEvent('a', 'turn/end', { turn: 1, reason: { kind: 'completed' } })
   await s.close()
   const saved = JSON.parse(readFileSync(join(s.home, 'im', `${one.id}.json`), 'utf8'))
   assert.equal(saved.cards[`v:${id}`][0].code, code)
@@ -1697,6 +1700,7 @@ test('legacy own-chat question deliveries accept existing answers after restart 
     const question = s.rt.state.questions.a
     assert.equal(question.imOrigin, undefined)
     await s.flush()
+    s.emitEvent('a', 'turn/end', { turn: 1, reason: { kind: 'completed' } })
     await s.close()
     const path = join(s.home, 'im', `${one.id}.json`)
     const data = JSON.parse(readFileSync(path, 'utf8'))
@@ -1780,6 +1784,7 @@ test('text-only and legacy view deliveries do not hide an older numbered questio
     const viewId = s.rt.state.views.a.id
     await s.flush()
     if (legacy) {
+      s.emitEvent('a', 'turn/end', { turn: 1, reason: { kind: 'completed' } })
       await s.close()
       const path = join(s.home, 'im', `${one.id}.json`)
       const data = JSON.parse(readFileSync(path, 'utf8'))
@@ -1966,8 +1971,10 @@ test('reply origin: a background job from one IM turn must not be reported to th
   const agents = new Map()
   jobsCtx.provide('agents', agents)
   t.after(() => jobsCtx.fiber.dispose())
+  await jobsCtx.plugin(SessionProjectionRegistry)
   await jobsCtx.plugin(SystemPrompt)
   await jobsCtx.plugin(ToolRuntime)
+  await jobsCtx.plugin(NativeToolExecutor)
   await jobsCtx.plugin(LocalJobRegistry)
   await jobsCtx.plugin(toolJobs)
 
@@ -2253,6 +2260,38 @@ test('reply origin: the turn ending stops later output from going out', async (t
   s.emitEvent('a', 'assistant/message', { message: { content: [{ type: 'text', text: 'late' }] } })
   await s.flush()
   assert.equal(s.fake.sent.length, 0)
+})
+
+test('native assistant replies return to their admitted IM chat and omit intermediate narration', async (t) => {
+  const s = await start()
+  t.after(s.stop)
+  await pairedConn(s)
+  await dm(s, 'u1', 'Move it.')
+  const session = s.agentOf('a').session
+  let seq = 0
+  const emit = (type, data) => {
+    const event = { seq: ++seq, time: Date.now(), type, data }
+    for (const listener of s.ctx.listeners.get('session/event') ?? []) {
+      if (listener.length >= 2) listener(session, event)
+    }
+  }
+  const reply = (turn, step, text, tool = false) => emit('assistant/message', {
+    turn, step, message: { content: [{ type: 'text', text }, ...(tool ? [{ type: 'tool-call', id: `call-${step}` }] : [])] },
+  })
+  emit('rabiroute/assistant-mode', { version: 2 })
+  emit('turn/start', { turn: 1 })
+  emit('rabiroute/assistant-native-reply', { turn: 1, step: 1 })
+  emit('user/message', { source: { kind: 'user', rpcId: s.prompts.at(-1).requestId } })
+  reply(1, 1, 'I will move it.', true)
+  reply(1, 2, 'Looking up coordinates', true)
+  reply(1, 3, 'It moved.')
+  emit('turn/end', { turn: 1 })
+  emit('turn/start', { turn: 2 })
+  emit('rabiroute/assistant-native-reply', { turn: 2, step: 1 })
+  emit('user/message', { source: { kind: 'user' } })
+  reply(2, 1, 'Only in Web')
+  await s.flush()
+  assert.deepEqual(s.fake.sent.map(entry => [entry.chat.key, entry.text]), [['dm-u1', 'I will move it.'], ['dm-u1', 'It moved.']])
 })
 
 test('reply origin: an IM message this process never registered sends nothing', async (t) => {

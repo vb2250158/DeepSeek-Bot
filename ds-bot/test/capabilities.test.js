@@ -495,14 +495,19 @@ test('catalog holders protect library entries and private Bots refuse attachment
   const { rt } = env
   await rt.capabilitySave(mcp('shared'), { botId: 'worker' })
   await rt.changeCapabilityAttachment('attach', { name: 'shared', mode: 'catalog' }, 'chief')
+  const retiredCreator = rt.state.bots.worker
+  delete rt.state.bots.worker
+  assert.equal(rt.canManageTeam('worker'), false)
   await assert.rejects(rt.capabilityDelete('shared', { botId: 'worker' }), /Another Bot uses/)
-  rt.state.bots.worker.packs = ['shared']
-  rt.dropOrphanCapabilities(rt.state.bots.worker)
+  retiredCreator.packs = ['shared']
+  rt.dropOrphanCapabilities(retiredCreator)
   assert.ok(rt.state.capabilities.items.shared)
-  rt.state.bots.worker.packs = []
+  retiredCreator.packs = []
+  rt.state.bots.worker = retiredCreator
   rt.state.bots.helper.private = true
   await assert.rejects(rt.changeCapabilityAttachment('attach', { name: 'shared', bot: 'Helper', mode: 'catalog' }, 'chief'), /private Bot/)
-  await assert.rejects(rt.changeCapabilityAttachment('attach', { name: 'shared', bot: 'Chief', mode: 'catalog' }, 'worker'), /Only a Main Bot/)
+  await rt.changeCapabilityAttachment('attach', { name: 'shared', bot: 'Chief', mode: 'catalog' }, 'worker')
+  assert.ok(rt.state.bots.chief.packs.includes('shared'), 'a live non-main Bot can manage teammate attachments')
   await assert.rejects(rt.usePack('worker', 'shared'), /not in your/)
   await assert.rejects(rt.usePack('outside', 'shared'), /Only Bots/)
   await assert.rejects(rt.dropPack('outside', 'shared'), /Only Bots/)

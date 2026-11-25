@@ -6,7 +6,8 @@ import { fileURLToPath } from 'node:url'
 import { runInNewContext } from 'node:vm'
 import { build } from 'esbuild'
 import { previewOf } from '../src/client/text.js'
-import { assistantChatText, assistantSayText, ASSISTANT_SCHEDULE_REPLY_EVENT, ASSISTANT_SCHEDULE_REPLY_KEY } from '../src/shared/assistant-chat.js'
+import { assistantChatText, assistantSayText, ASSISTANT_NATIVE_REPLY_EVENT, ASSISTANT_NATIVE_REPLY_KEY, ASSISTANT_SCHEDULE_REPLY_EVENT, ASSISTANT_SCHEDULE_REPLY_KEY } from '../src/shared/assistant-chat.js'
+import { assistantNativeReplyDefinition } from '../src/client/assistant-native-reply.js'
 import { assistantScheduleReplyDefinition } from '../src/client/assistant-schedule-reply.js'
 
 const { outputFiles } = await build({
@@ -44,6 +45,42 @@ test('assistant-mode execution narration stays out of a personal Bot chat', () =
   assert.equal(legacy.type, 'fragment')
   const plain = AssistantCell({ ...props, useAssistantChat: undefined, node })
   assert.equal(plain.type, 'fragment')
+})
+
+test('assistant chat streams the marked reply and displays the settled conclusion', () => {
+  const running = { seq: 4, turn: 1, step: 1, status: 'running', blocks: [{ kind: 'text', text: 'I will move it.' }] }
+  const opening = { ...running, status: 'settled', finalNode: { seq: 7, messageId: 'first' }, blocks: [...running.blocks, { kind: 'tool-call' }] }
+  const progress = { ...opening, step: 2, blocks: [{ kind: 'text', text: 'Looking up coordinates' }, { kind: 'tool-call' }] }
+  const closing = { ...opening, step: 3, finalNode: { seq: 22, messageId: 'closing' }, blocks: [{ kind: 'text', text: 'It moved.' }] }
+  const tail = { closing, branchUnavailable: false }
+  const native = { turn: 1, steps: [1] }
+  const cell = (data, turnTail) => AssistantCell({ ...props,
+    node: { anchorSeq: data.finalNode?.seq ?? data.seq, key: `step:${data.step}`, data },
+    useTurnData: (key) => key === ASSISTANT_NATIVE_REPLY_KEY ? native : turnTail,
+  })
+  const bubbles = (data, turnTail) => cell(data, turnTail).children.at(-1).children[0].children.find(child => child?.props?.texts)
+  assert.deepEqual(Array.from(bubbles(running).props.texts), ['I will move it.'])
+  assert.equal(bubbles(running).props.streaming, true)
+  assert.equal(bubbles(opening, tail).props.msgKey, bubbles(running).props.msgKey)
+  assert.equal(cell(progress, tail).type.name, 'CellEmpty')
+  assert.equal(cell(closing).type.name, 'CellEmpty')
+  assert.deepEqual(Array.from(bubbles(closing, tail).props.texts), ['It moved.'])
+  assert.equal(cell(progress, { ...tail, closing: progress }).type.name, 'CellEmpty')
+})
+
+test('durable native reply markers are scoped to their own turn and merge steering steps', () => {
+  const marker = (step) => ({ type: ASSISTANT_NATIVE_REPLY_EVENT, data: { turn: 4, step } })
+  const { match, start, update, buildLocationData } = assistantNativeReplyDefinition
+  assert.deepEqual(match[ASSISTANT_NATIVE_REPLY_EVENT](marker(1)), { id: '4', role: 'start' })
+  assert.equal(match[ASSISTANT_NATIVE_REPLY_EVENT](marker(0)), null)
+  const onTurn = { event: marker(1), location: { kind: 'turn', turn: { turn: 4 } } }
+  const initial = start({}, onTurn)
+  assert.equal(update({ state: initial }, onTurn), initial)
+  const state = update({ state: initial }, { event: marker(3) })
+  assert.deepEqual(buildLocationData({ start: onTurn, state }, 'turn'), {
+    kind: 'turn', turn: 4, key: ASSISTANT_NATIVE_REPLY_KEY, value: { turn: 4, steps: [1, 3] },
+  })
+  assert.equal(buildLocationData({ start: { ...onTurn, location: { kind: 'turn', turn: { turn: 5 } } }, state }, 'turn'), null)
 })
 
 test('native tool renderer shows only committed say text as full chat bubbles', () => {

@@ -1,4 +1,4 @@
-import { ASSISTANT_SCHEDULE_REPLY_KEY, assistantChatActive, assistantSayText, visibleScheduleReply } from '../shared/assistant-chat.js'
+import { ASSISTANT_NATIVE_REPLY_KEY, ASSISTANT_SCHEDULE_REPLY_KEY, assistantChatActive, assistantNativeReplyVisible, assistantSayText, visibleScheduleReply } from '../shared/assistant-chat.js'
 import { createElement as h, Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import { MarkdownText, writeClipboard } from './dsh-primitives.js'
@@ -262,8 +262,7 @@ export function ThinkingRow({ text, live, at, ms, viewKey, textInteractionSource
 
 // The files a finished turn changed or delivered, linked from inline code in its
 // reply as in DSH's own chat. DSH resolves them for the step that closes the turn.
-function useFileMentions({ node, openFile, fileMentions, useTurnData }) {
-  const tail = useTurnData?.('turn-tail')
+function useFileMentions({ node, openFile, fileMentions, tail }) {
   const location = node.location
   const turn = location?.kind === 'turn' || location?.kind === 'step' ? location.turn : undefined
   const seq = node.data.finalNode?.seq
@@ -277,14 +276,17 @@ export function AssistantCell({ node, groupPart, useAssistantChat, sessionId, op
   const roster = useRoster(value => value)
   const data = node.data
   const assistantMode = assistantChatActive(useAssistantChat?.(value => value), node.anchorSeq ?? data.seq)
+  const nativeReply = useTurnData?.(ASSISTANT_NATIVE_REPLY_KEY)
+  const tail = useTurnData?.('turn-tail')
   const turnSteps = useTurnSteps(String(data.turn))
   const steering = useTurnSteering?.(String(data.turn)) ?? []
   const segment = replySegment(turnSteps, data, steering, node.anchorSeq)
   const steps = segment.steps
   const contexts = useTurnContext(String(data.turn))
-  const mentions = useFileMentions({ node, openFile, fileMentions, useTurnData })
+  const mentions = useFileMentions({ node, openFile, fileMentions, tail })
   const hidden = Boolean(roster.roomsById[sessionId]) || isHiddenTurn(roster, sessionId, data.turn)
-  const texts = groupPart === 'reasoning' || (assistantMode && roster.byId[sessionId]) ? [] : data.blocks
+  const showText = !assistantMode || !roster.byId[sessionId] || assistantNativeReplyVisible(nativeReply, data, tail)
+  const texts = groupPart === 'reasoning' || !showText ? [] : data.blocks
     .filter(block => block.kind === 'text')
     .map(block => stripToolCallTags(block.text))
     .filter(text => text.trim() !== '')
@@ -921,7 +923,10 @@ function SilentTurnHistory({ bot, actions, sessionId, location, useRoster, useUi
   const tools = useTurnTools(String(turn))
   const schedule = location.data?.source?.(ASSISTANT_SCHEDULE_REPLY_KEY) ?? emptyReply
   const recordedReply = useSyncExternalStore(schedule.subscribe, schedule.getSnapshot)
-  const hasReply = steps.some(step => !assistantChatActive(assistantState, step.finalNode?.seq ?? step.seq)
+  const native = location.data?.source?.(ASSISTANT_NATIVE_REPLY_KEY) ?? emptyReply
+  const nativeReply = useSyncExternalStore(native.subscribe, native.getSnapshot)
+  const tail = location.data?.get('turn-tail')
+  const hasReply = steps.some(step => (!assistantChatActive(assistantState, step.finalNode?.seq ?? step.seq) || assistantNativeReplyVisible(nativeReply, step, tail))
     && step.blocks.some(block => block.kind === 'text' && stripToolCallTags(block.text).trim()))
     || tools.some(({ root }) => root.kind === 'tool-result' && assistantSayText(root, root.meta) !== undefined)
   if (hasReply) return null
@@ -930,7 +935,6 @@ function SilentTurnHistory({ bot, actions, sessionId, location, useRoster, useUi
   if (reply) {
     return h(SpeakerReply, { bot, history }, h(ScheduledReply, { reply, bot, actions, sessionId, useRoster, useUi }))
   }
-  const tail = location.data?.get('turn-tail')
   const closing = tail?.closing
   const conclusion = end.data?.reason?.kind === 'completed' && tail?.branchUnavailable === false
     && closing?.status === 'settled' && closing.finalNode?.messageId !== undefined

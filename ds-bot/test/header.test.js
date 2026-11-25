@@ -151,6 +151,30 @@ test('the Bot header follows a later host header registration and releases its s
   assert.equal(listeners.size, 0)
 })
 
+test('the Bot workspace uses the native header navigation even when the Bot header shadows it', () => {
+  const host = {
+    store: {},
+    inject: () => ({ selectView() {}, hooks: { conversationViews: {} } }),
+    children: { 'conversation.session.header.views.actions': { kind: 'list', scope: 'root' } },
+  }
+  const replacement = { store: {}, inject: () => ({}) }
+  const workspace = () => null
+  const registrations = []
+  const slots = {
+    entries: name => name === 'conversation.session.header' ? [replacement, host] : [],
+    subscribe: () => () => {},
+    register: (options, component) => { registrations.push({ options, component }); return () => {} },
+  }
+  const face = { actions: {}, hooks: { roster: {} } }
+  const stop = installHeaderNavigation(slots, () => face, workspace, -100, 'bot.conversation.tabs')
+  const [{ options, component }] = registrations
+  assert.equal(component, workspace)
+  assert.equal(options.name, 'bot.conversation.tabs')
+  assert.equal(options.store, host.store)
+  assert.deepEqual(options.inject('a').hooks, { ...host.inject().hooks, ...face.hooks })
+  stop()
+})
+
 test('a group chat header mounts the approval bar in the top island and answers tool and computer approvals in place (#1623)', () => {
   const room = { id: 'r1', name: 'Ops', members: ['a', 'b'] }
   const groupRoster = {

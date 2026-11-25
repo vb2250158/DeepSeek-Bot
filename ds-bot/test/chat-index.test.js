@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { test } from 'node:test'
 import { install, termQuery } from '../src/host/chat-index.js'
+import { historyEntry } from '../src/host/parts.js'
 
 function runtime(t) {
   const home = mkdtempSync(join(tmpdir(), 'dsb-chat-index-'))
@@ -85,4 +86,27 @@ test('FTS and indexed history agree, including subsequent catch-up and empty rea
   rt.partsOf = () => []
   assert.deepEqual(await rt.latestOwnChat('b'), [])
   assert.deepEqual((await rt.searchOwnChat('b', 'message')).lines, [])
+})
+
+
+test('catch-up indexes native replies when the previous cursor ended inside the turn', async t => {
+  const { rt, events } = runtime(t)
+  rt.loadAssistantChat = async () => ({ since: 0, nativeSince: 0 })
+  rt.historyEntry = historyEntry
+  const event = (seq, type, data) => ({ seq, time: seq, type, data })
+  const text = text => ({ type: 'text', text })
+  const reply = (seq, step, content) => event(seq, 'assistant/message', { turn: 1, step, message: { content } })
+  events.splice(0, events.length,
+    event(0, 'rabiroute/assistant-mode', { version: 2 }),
+    event(1, 'turn/start', { turn: 1 }),
+    event(2, 'rabiroute/assistant-native-reply', { turn: 1, step: 1 }),
+    event(3, 'user/message', { source: { kind: 'user' }, content: [text('Check fixture')] }),
+  )
+  assert.deepEqual((await rt.searchOwnChat('b', 'native')).lines, [])
+  const tool = { type: 'tool-call', name: 'fixture' }
+  events.push(reply(4, 1, [text('Native opening'), tool]), reply(5, 2, [text('Native narration'), tool]),
+    reply(6, 3, [text('Native result')]), event(7, 'turn/end', { turn: 1 }))
+  const expected = ['[#4 · 4] You: Native opening', '[#6 · 6] You: Native result']
+  assert.deepEqual((await rt.searchOwnChat('b', 'native')).lines, expected)
+  assert.deepEqual((await rt.searchOwnChat('b', 'native')).lines, expected)
 })

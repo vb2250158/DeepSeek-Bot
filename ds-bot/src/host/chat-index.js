@@ -11,6 +11,8 @@ import { mkdir, unlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import { ANCHOR_LINE_MAX, HISTORY_PAGE, HISTORY_PAGES_MAX, HISTORY_SCAN_PAGES, HISTORY_TIMEOUT_MS, OWN_CHAT_BRIEF, OWN_CHAT_LINE_MAX, OWN_CHAT_READ, OWN_CHAT_SEARCH } from './constants.js'
 import { excerpt } from './text.js'
+import { foldAssistantNativeReply } from './assistant-chat.js'
+import { assistantNativeReplyStep } from '../shared/assistant-chat.js'
 
 const INDEX_VERSION = 4
 const AROUND_LINES = 6
@@ -164,16 +166,25 @@ export function install(rt) {
       const mark = index.mark.get(part.sessionId)
       if (mark?.sealed) return
       const through = mark?.through ?? -1
+      const agent = await rt.resolveAgent(part.sessionId).catch(() => undefined)
+      const presentation = await rt.loadAssistantChat(part.sessionId, agent?.session, AbortSignal.timeout(INDEX_TIMEOUT_MS))
+      const nativeSince = presentation?.nativeSince
       const events = []
+      const precedingMarkers = []
       for await (const event of eventsBackwards(part.sessionId, AbortSignal.timeout(INDEX_TIMEOUT_MS), Infinity)) {
-        if (event.seq <= through) break
-        events.push(event)
+        if (event.seq > through) {
+          events.push(event)
+          continue
+        }
+        // A mark inside a turn can leave its reply markers before the new events.
+        if (nativeSince === undefined || event.seq < nativeSince || event.seq <= (mark?.turn ?? -1)
+          || events.length === 0 || events.at(-1).type === 'turn/start' || event.type === 'turn/end') break
+        if (assistantNativeReplyStep(event)) precedingMarkers.push(event)
       }
       if (events.length > 0 && events.at(-1).seq !== through + 1) throw new Error(`the history of ${part.sessionId} came back with a gap`)
       events.reverse()
       if (index !== chatIndex) return
-      const agent = await rt.resolveAgent(part.sessionId).catch(() => undefined)
-      const presentation = await rt.loadAssistantChat(part.sessionId, agent?.session, AbortSignal.timeout(INDEX_TIMEOUT_MS))
+      let nativeReply = precedingMarkers.reverse().reduce(foldAssistantNativeReply, null)
       let keep = mark ? mark.keep === 1 : false
       let turn = mark?.turn ?? -1
       const seal = part.endedAt !== undefined && Date.now() - part.endedAt > SEAL_AFTER_MS && rt.isRetiring?.(part.sessionId) !== true
@@ -183,7 +194,8 @@ export function install(rt) {
         for (const event of events) {
           last = event.seq
           if (event.type === 'turn/start') turn = event.seq
-          const entry = rt.historyEntry(event, false, presentation)
+          if (nativeSince !== undefined) nativeReply = foldAssistantNativeReply(nativeReply, event)
+          const entry = rt.historyEntry(event, false, presentation, nativeReply)
           if (entry === undefined) continue
           if (entry.answer) {
             if (keep) index.insert(entry.text, part.sessionId, event.seq, event.time ?? 0, 'you')
