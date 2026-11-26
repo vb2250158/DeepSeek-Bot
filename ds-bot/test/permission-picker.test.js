@@ -82,10 +82,12 @@ const mountPicker = (initial, repick = false) => {
   }
   let tree
   const rerender = (patch) => { props = { ...props, ...patch }; tree = render(PermissionPicker, props); return tree }
+  const buttons = () => (props.showSaving ? tree.props.children[0] : tree).props.children
   const picker = {
     requests, seen, rerender,
-    press(value) { tree.props.children.find(button => button.props.title === value).props.onClick(); rerender() },
-    pressed() { return tree.props.children.find(button => button.props['aria-pressed'])?.props.title },
+    press(value) { buttons().find(button => button.props.title === value).props.onClick(); rerender() },
+    pressed() { return buttons().find(button => button.props['aria-pressed'])?.props.title },
+    status() { return tree.props.children[1].props.children[0] },
     // Lets settled request continuations and their state updates land.
     async flush() { await settle(); rerender() },
   }
@@ -162,4 +164,21 @@ test('repick still lets the shown preset be picked again', async () => {
   assert.equal(picker.requests[0].value, 'read-only')
   picker.requests[0].resolve(true)
   await picker.flush()
+})
+
+test('Bot permissions report saving until the latest selected preset is confirmed', async () => {
+  const picker = mountPicker({ catalog: { options: OPTIONS }, saved: 'read-only', showSaving: true }, true)
+  picker.press('read-only')
+  assert.equal(picker.status(), 'Saving…', 'explicitly saving the inherited preset still waits for the request')
+  picker.requests[0].resolve(true)
+  await picker.flush()
+  assert.equal(picker.status(), '')
+
+  picker.press('workspace-write')
+  picker.requests[1].resolve(true)
+  await picker.flush()
+  assert.equal(picker.status(), 'Saving…')
+  picker.rerender({ saved: 'workspace-write' })
+  assert.equal(picker.status(), '')
+  assert.equal(picker.pressed(), 'workspace-write')
 })

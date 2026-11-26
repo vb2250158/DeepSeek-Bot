@@ -16,7 +16,7 @@ import { GroupMembers } from './group-members.js'
 import { StopRoomWork, useMemberWork } from './member-status.js'
 import { GroupLibrary } from './group-library.js'
 import { canSetGoal, goalView, hasGoalAdmin } from './goal.js'
-import { PermissionPicker, presetDanger, presetName } from './permission-picker.js'
+import { BotPermissionPicker, presetDanger, presetName } from './permission-picker.js'
 import { TaskBoard } from './task-board.js'
 import { DetailsTaskList, isActiveTask, tasksForChat } from './bot-tasks.js'
 import { BotConnectors } from './connectors.js'
@@ -37,21 +37,11 @@ function transcriptOf(list, id, name, hiddenTurns = []) {
   return lines.join('\n\n')
 }
 
-const TAB_LABELS = { details: 'Details', tasks: 'Tasks', browser: 'Browser', computer: 'Computer', library: 'Library', members: 'Members' }
+const TAB_LABELS = { details: 'Details', tasks: 'Background tasks', browser: 'Browser', computer: 'Computer', library: 'Library', members: 'Members' }
 
 const hostOf = (url) => { try { return new URL(url).hostname.replace(/^www\./, '') } catch { return '' } }
 const shortUrl = url => String(url ?? '').replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/$/, '')
 const EMPTY_TABS = { ids: [], active: null }
-
-// The Bot's permission preset, from the presets DeepSeek Harness offers.
-function PermissionRow({ bot, roster, actions, run }) {
-  const catalog = roster.permissions
-  if (!catalog?.options?.length) return null
-  return h('div', { className: 'bt-drawer-permission' },
-    h('div', { className: 'bt-section-title' }, t('Permissions')),
-    // A Bot without its own preset may run on another one set in DSH, so its first pick always applies.
-    h(PermissionPicker, { catalog, saved: bot.permission ?? catalog.defaultPreset, repick: bot.permission === undefined, onPick: permission => run(actions.updateBot(bot.id, { permission })) }))
-}
 
 // The current part's turns, speed, cache hits and context, refreshed when a turn starts or ends.
 export function RunStats({ bot, part, running, actions }) {
@@ -338,14 +328,20 @@ export function DetailsDrawer({ sessionId, startRenaming, startTab, hasStrip, co
       bot && activeTab === 'computer' ? h(ComputerView, { bot, actions, hooks: { useComputer } }) : null,
       room && activeTab === 'library' ? h(GroupLibrary, { key: room.id, room, roster, actions }) : null,
       room && activeTab === 'members' ? h(GroupMembers, { key: room.id, room, roster, actions, useWork, run }) : null,
-      bot && activeTab === 'details' ? [
-        h(RunStats, { key: 'stats', bot, part, running, actions }),
+      bot && activeTab === 'details' ? h(RunStats, { bot, part, running, actions }) : null,
+      bot && compact && activeTab === 'details' ? [
+        h(ScheduleSummary, { key: 'routines', bot, actions }),
+        h(BotConnectors, { key: 'connectors', bot, roster, actions, run }),
+      ] : null,
+      bot && !compact && activeTab === 'details' ? [
         h('div', { key: 'model', className: 'bt-drawer-model' },
           h('div', { className: 'bt-section-title' }, t('Model')),
           h(ModelMenu, { bot, roster, actions, run, wide: true, inline: true }),
           modelOf(bot, roster) ? null : h('div', { className: 'bt-note' }, t('Pick a model and {name} can start.', { name: bot.name })),
         ),
-        h(PermissionRow, { key: 'permission', bot, roster, actions, run }),
+        !roster.readOnly && roster.permissions?.options?.length ? h('div', { key: 'permission', className: 'bt-drawer-permission' },
+          h('div', { className: 'bt-section-title' }, t('Permissions')),
+          h(BotPermissionPicker, { bot, catalog: roster.permissions, onPick: permission => run(actions.updateBot(bot.id, { permission })) })) : null,
         h(BotConnectors, { key: 'connectors', bot, roster, actions, run }),
         h('div', { key: 'folder', className: 'bt-drawer-model' },
           h('div', { className: 'bt-section-title' }, t('Working folder')),

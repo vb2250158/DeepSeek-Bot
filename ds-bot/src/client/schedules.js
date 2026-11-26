@@ -292,7 +292,9 @@ export function RabiSchedules({ bot, actions, tasks = [], roster, summary = fals
   return h('section', { className: 'bt-set-section', 'aria-busy': pending },
     h('div', { className: 'bt-rabi-task-heading' },
       h('div', { className: 'bt-section-title' }, summary ? t('Scheduled tasks · {count}', { count: tasks.length + (value?.total ?? value?.items.length ?? 0) }) : `${bot.name} · Rabi`),
-      h(Button, { variant: 'ghost', disabled: !value || pending || opening, onClick: () => void openEditor() }, h(PlusIcon), t('New task'))),
+      h('div', { className: 'bt-rabi-task-actions' },
+        summary ? h(Button, { variant: 'ghost', onClick: () => actions.openSettings('schedules', 'bot:' + bot.id) }, t('Show all')) : null,
+        h(Button, { variant: 'ghost', disabled: !value || pending || opening, onClick: () => void openEditor() }, h(PlusIcon), t('New task')))),
     !value && !error ? h('div', { className: 'bt-mem-skel', 'aria-label': t('Loading…') }, h('span'), h('span')) : null,
     error ? h('div', { role: 'alert', className: 'bt-error' }, hostText(error.message), ' ', h('button', { type: 'button', className: 'bt-more', disabled: pending, onClick: () => void store.visit(scope) }, t('Retry'))) : null,
     editError ? h('p', { role: 'alert', className: 'bt-error' }, editError) : null,
@@ -716,7 +718,7 @@ export const SCHEDULE_CSS = `
 .bt-task-line svg{flex:none;color:var(--bt-ink-3)}
 .bt-task-line-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bt-task-line-when{flex:none;font-size:12px;color:var(--bt-ink-3)}
-.bt-rabi-task-heading{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.bt-rabi-task-heading{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px}
 .bt-rabi-task-heading .bt-section-title{margin:0}
 .bt-rabi-task-row,.bt-rabi-task>.bt-task-line{display:grid;grid-template-columns:16px minmax(0,1fr) auto;align-items:start;gap:8px}
 .bt-rabi-task>.bt-task-line{box-sizing:border-box}

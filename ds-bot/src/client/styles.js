@@ -1188,6 +1188,7 @@ body[data-ds-dark-theme] .bt-select{color-scheme:dark}
 .bt-seg button:active:not(:disabled){scale:.96}
 .bt-seg>.bt-thumb{top:2px;bottom:2px;border-radius:8px;background:var(--bt-card);box-shadow:0 1px 3px rgba(0,0,0,.08)}
 .bt-seg[data-glide] button[aria-pressed=true]{background:transparent;box-shadow:none}
+.bt-seg.bt-bot-permission-choice button[aria-pressed=true]{box-shadow:inset 0 0 0 1px var(--bt-accent)}
 @keyframes bt-rise{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}
 
 /* Memory dialog: a summary of every entry, the entries behind the menu, "Ask or update" below. */

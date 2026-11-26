@@ -4,7 +4,7 @@ window.__ModuleLoader__.load({
   id: 'ds-bot',
   factory: (require) => {
     const module = { exports: {} }
-    const clientAppHash = '39b241d67067eeb28a86176ac4288829fc4ffd18a308b5dfc84679366021a750'
+    const clientAppHash = '1335524bf6c3eb2748a8100e335f10d40f2c31416bec1ca379aba0b0b63e9a6c'
     async function readClientApp() {
       const response = await fetch(`/api/ds-bot-client-app?v=${clientAppHash}`, { credentials: 'same-origin' })
       if (!response.ok) throw new Error('ds-bot client-app HTTP ' + response.status)

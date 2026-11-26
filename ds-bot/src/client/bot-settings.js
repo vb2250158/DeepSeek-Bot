@@ -6,6 +6,7 @@ import { lookOf, BotMark } from './mark.js'
 import { ModelMenu, modelOf } from './model-menu.js'
 import { RunModeCard } from './agent-cards.js'
 import { FolderMenu } from './folder-menu.js'
+import { BotPermissionPicker } from './permission-picker.js'
 import { BotSchedules } from './schedules.js'
 import { BotCapabilitiesCard } from './capability-settings.js'
 import { BotComputerCard } from './computer.js'
@@ -240,6 +241,10 @@ export function BotSettingsForm({ bot, roster, actions, run }) {
       h('div', { className: 'bt-set-row bt-bs-row' },
         h('span', { className: 'bt-set-copy' }, h('span', { className: 'bt-bs-label' }, t('Model')), h('span', { className: 'bt-set-hint' }, modelHint(bot, roster))),
         h(ModelMenu, { bot, roster, actions, run }))),
+    !roster.readOnly && roster.permissions?.options?.length ? h(Card, { title: t('Permissions') },
+      h('div', { className: 'bt-set-row bt-bs-row bt-bs-stack' },
+        h('span', { className: 'bt-set-hint' }, t('Applies to this Bot’s chats and tasks. A group preset takes priority in that group.')),
+        h(BotPermissionPicker, { bot, catalog: roster.permissions, onPick: permission => save({ permission }) }))) : null,
     h(Card, { title: t('Working folder') },
       h('div', { className: 'bt-set-row bt-bs-row' },
         h('span', { className: 'bt-set-copy' }, h('span', { className: 'bt-bs-label' }, t('Folder'))),

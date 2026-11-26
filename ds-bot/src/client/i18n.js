@@ -1318,6 +1318,7 @@ const ZH = {
   'At least {count} characters.': '至少 {count} 个字符。',
   'Replace value': '替换值',
   'Saving…': '保存中…',
+  'Applies to this Bot’s chats and tasks. A group preset takes priority in that group.': '应用于此 Bot 的聊天和任务。群聊设有独立预设时，优先使用群聊预设。',
   'Could not save this file': '保存这个文件失败',
   Save: '保存',
   'Allowing…': '允许中…',

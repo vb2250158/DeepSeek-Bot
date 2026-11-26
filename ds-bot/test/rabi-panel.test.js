@@ -34,10 +34,12 @@ test('the panel keeps model selection first in Details and Rabi resources in Lib
     stateIndex = 0
     const panel = module.exports.DetailsDrawer({ sessionId: bot.id, compact: true, roster, actions: {}, useSessionStatus: pick => pick(new Map()), useActivity: pick => pick({}), useSessions: () => '', useWork: noop })
     const tree = nodes(panel)
+    const body = panel.find(node => node.props?.className === 'bt-drawer-body')
     observed[tab] = {
       tabs: tree.filter(node => node.props?.role === 'tab').map(node => node.props.children[0]),
-      models: tree.filter(node => node.type?.name === 'BotModelControl').length,
-      firstContent: panel.find(node => node.props?.className === 'bt-drawer-body').props.children.find(Boolean)?.props?.className,
+      models: tree.filter(node => ['BotModelControl', 'ModelMenu'].includes(node.type?.name)).length,
+      firstContent: body.props.children.find(Boolean)?.props?.className,
+      detailSections: body.props.children.flat().filter(node => typeof node?.type === 'function').map(node => node.type.name),
       avatarSize: tree.find(node => node.type?.name === 'BotAvatar')?.props.size,
       resources: tree.filter(node => node.type?.name === 'RabiWorkspace').length,
     }
