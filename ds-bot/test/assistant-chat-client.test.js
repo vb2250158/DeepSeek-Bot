@@ -112,6 +112,26 @@ test('a scheduled fallback is admitted only as a nonempty reply to its owning tu
   assert.equal(assistantChatText(event, { since: 10 }), undefined)
 })
 
+test('a restored user turn shows its completed text without the opening native marker', () => {
+  const closing = { turn: 1, step: 78, status: 'settled', finalNode: { seq: 2663, messageId: 'closing' },
+    blocks: [{ kind: 'text', text: 'The board is cleared.' }] }
+  const render = ({ user = true, native, nativeSince = 7, reason = 'completed' } = {}) => {
+    const entries = new Map([['turn-tail', { closing, branchUnavailable: false }], [ASSISTANT_NATIVE_REPLY_KEY, native]])
+    const data = { get: key => entries.get(key), source: key => ({ subscribe: () => () => {}, getSnapshot: () => entries.get(key) }) }
+    const end = { time: 50, data: { reason: { kind: reason } } }
+    const tree = TurnTailCell({ ...props, turn: { turn: 1, end, data }, useTurnClock: select => select({}),
+      useAssistantChat: select => select({ since: 7, nativeSince }), useTurnSteps: () => [closing], useTurnTools: () => [],
+      useTurnUsers: () => user ? [{ source: { kind: 'user' } }] : [] })
+    const history = tree.children[0]
+    return history.type(history.props)
+  }
+  assert.deepEqual(Array.from(render().children[0].props.texts), ['The board is cleared.'])
+  assert.equal(render({ native: { turn: 1, steps: [1] } }), null)
+  assert.equal(render({ user: false }).children[0].props.className, 'bt-silent-run')
+  assert.equal(render({ nativeSince: 3000 }).children[0].props.className, 'bt-silent-run')
+  assert.equal(render({ reason: 'aborted' }).children[0].props.className, 'bt-silent-run')
+})
+
 test('an unspoken turn shows the Bot name and keeps only its finalized closing text in run history', () => {
   const steps = [{ status: 'settled', finalNode: { seq: 7, messageId: 'closed' }, blocks: [
     { kind: 'reasoning', text: 'Thought' }, { kind: 'text', text: 'Saved conclusion' },
