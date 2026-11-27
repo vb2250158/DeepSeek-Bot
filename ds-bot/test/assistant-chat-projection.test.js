@@ -30,6 +30,8 @@ test('assistant chat awaits real Core projection registration and publishes the 
   fresh.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
   assert.equal(rt.assistantNativeReplyState(fresh, []), null)
   assert.equal(ctx.sessionProjections.snapshot(fresh).values.dsBotAssistantNativeReply, undefined)
+  assert.deepEqual(ctx.sessionProjections.snapshot(fresh).values.dsBotAssistantChat,
+    { since: latest.seq, nativeSince: latest.seq, nativeTurns: [1] })
 })
 
 

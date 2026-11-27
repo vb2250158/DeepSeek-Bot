@@ -6,12 +6,17 @@ const KEY = ASSISTANT_CHAT_KEY
 const empty = () => ({ since: null })
 
 export function foldAssistantChat(state, event) {
+  const reply = assistantNativeReplyStep(event)
+  if (reply && event.seq >= (state.nativeSince ?? Infinity)) {
+    const turns = state.nativeTurns ?? []
+    return turns.includes(reply.turn) ? state : { ...state, nativeTurns: [...turns, reply.turn] }
+  }
   if (event.type !== ASSISTANT_MODE_EVENT || !Number.isInteger(event.seq)) return state
   const { version } = event.data ?? {}
   if (version !== 1 && version !== 2) return state
   const since = Math.min(state.since ?? Infinity, event.seq)
   const nativeSince = version === 2 ? Math.min(state.nativeSince ?? Infinity, event.seq) : state.nativeSince
-  return since === state.since && nativeSince === state.nativeSince ? state : { since, ...(nativeSince === undefined ? {} : { nativeSince }) }
+  return since === state.since && nativeSince === state.nativeSince ? state : { ...state, since, ...(nativeSince === undefined ? {} : { nativeSince }) }
 }
 
 export function foldAssistantNativeReply(state, event) {
@@ -29,11 +34,14 @@ export function installAssistantChat(rt) {
   const nativeTurns = new WeakMap()
   ctx.effect?.(() => () => cached.clear(), 'ds-bot: assistant chat cache')
   const projection = {
-    key: KEY, stateVersion: 2,
+    key: KEY, stateVersion: 3,
     stateSchema: { parse(value) {
       if (value === null || typeof value !== 'object' || (value.since !== null && !Number.isInteger(value.since))
-        || (value.nativeSince !== undefined && !Number.isInteger(value.nativeSince))) throw new Error('Invalid assistant chat projection')
-      return { since: value.since, ...(value.nativeSince === undefined ? {} : { nativeSince: value.nativeSince }) }
+        || (value.nativeSince !== undefined && !Number.isInteger(value.nativeSince))
+        || (value.nativeTurns !== undefined && (!Array.isArray(value.nativeTurns)
+          || !value.nativeTurns.every(turn => Number.isSafeInteger(turn) && turn > 0)))) throw new Error('Invalid assistant chat projection')
+      return { since: value.since, ...(value.nativeSince === undefined ? {} : { nativeSince: value.nativeSince }),
+        ...(value.nativeTurns === undefined ? {} : { nativeTurns: value.nativeTurns }) }
     } },
     init: empty, apply: foldAssistantChat,
     wire: { viewSchema: { parse: value => projection.stateSchema.parse(value) }, view: value => value },

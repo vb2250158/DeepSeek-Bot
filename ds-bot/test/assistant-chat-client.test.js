@@ -120,8 +120,8 @@ test('a restored user turn shows its completed text without the opening native m
     const data = { get: key => entries.get(key), source: key => ({ subscribe: () => () => {}, getSnapshot: () => entries.get(key) }) }
     const end = { time: 50, data: { reason: { kind: reason } } }
     const tree = TurnTailCell({ ...props, turn: { turn: 1, end, data }, useTurnClock: select => select({}),
-      useAssistantChat: select => select({ since: 7, nativeSince }), useTurnSteps: () => [closing], useTurnTools: () => [],
-      useTurnUsers: () => user ? [{ source: { kind: 'user' } }] : [] })
+      useAssistantChat: select => select({ since: 7, nativeSince, nativeTurns: user ? [1] : [2] }),
+      useTurnSteps: () => [closing], useTurnTools: () => [] })
     const history = tree.children[0]
     return history.type(history.props)
   }

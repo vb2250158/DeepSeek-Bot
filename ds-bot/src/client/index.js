@@ -1037,11 +1037,6 @@ export function apply(ctx) {
         if (snapshot === undefined) throw new Error('ds-bot: Chat target is unavailable')
         return snapshot.nodes.turnDataSource(Number(turn), 'tool-call')
       },
-      turnUsers: (turn) => {
-        const snapshot = chat.getSnapshot()
-        if (snapshot === undefined) throw new Error('ds-bot: Chat target is unavailable')
-        return snapshot.nodes.turnDataSource(Number(turn), 'user')
-      },
       turnContext: (turn) => {
         const snapshot = chat.getSnapshot()
         if (snapshot === undefined) throw new Error('ds-bot: Chat target is unavailable')

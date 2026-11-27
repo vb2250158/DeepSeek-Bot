@@ -888,7 +888,7 @@ export const unseenSince = (visit, time) => typeof visit?.seen === 'number' && t
 // An entry in DSH's own turn tail, after what other plugins put there (the cards of
 // the files a turn delivered). The tail sits right before the next turn's first row,
 // so the separator for a pause between turns renders here.
-export function TurnTailCell({ turn: location, sessionId, useTurnClock, useUi, useRoster, useAssistantChat, useTurnSteps, useTurnTools, useTurnUsers, useTurnSteering, actions }) {
+export function TurnTailCell({ turn: location, sessionId, useTurnClock, useUi, useRoster, useAssistantChat, useTurnSteps, useTurnTools, actions }) {
   const turn = location.turn
   // DSH builds the tail from the turn's end, so it is there.
   const time = location.end.time
@@ -910,19 +910,17 @@ export function TurnTailCell({ turn: location, sessionId, useTurnClock, useUi, u
   const showsRunHistory = bot && useTurnSteps && useTurnTools
   if (!showsRunHistory && !label && !fresh) return null
   return h(Fragment, null,
-    showsRunHistory ? h(SilentTurnHistory, { bot, actions, sessionId, location, useRoster, useUi, useTurnSteps, useTurnTools, useTurnUsers, useTurnSteering, assistantState }) : null,
+    showsRunHistory ? h(SilentTurnHistory, { bot, actions, sessionId, location, useRoster, useUi, useTurnSteps, useTurnTools, assistantState }) : null,
     label ? h('div', { className: 'bt-time-sep', role: 'separator' }, label) : null,
     fresh ? h(NewDivider) : null)
 }
 
 const emptyReply = { subscribe: () => () => {}, getSnapshot: () => undefined }
 
-function SilentTurnHistory({ bot, actions, sessionId, location, useRoster, useUi, useTurnSteps, useTurnTools, useTurnUsers, useTurnSteering, assistantState }) {
+function SilentTurnHistory({ bot, actions, sessionId, location, useRoster, useUi, useTurnSteps, useTurnTools, assistantState }) {
   const { turn, end } = location
   const steps = useTurnSteps(String(turn))
   const tools = useTurnTools(String(turn))
-  const users = useTurnUsers?.(String(turn)) ?? []
-  const steers = useTurnSteering?.(String(turn)) ?? []
   const roster = useRoster(value => value)
   const schedule = location.data?.source?.(ASSISTANT_SCHEDULE_REPLY_KEY) ?? emptyReply
   const recordedReply = useSyncExternalStore(schedule.subscribe, schedule.getSnapshot)
@@ -940,10 +938,10 @@ function SilentTurnHistory({ bot, actions, sessionId, location, useRoster, useUi
     && assistantChatActive(assistantState, closing.finalNode.seq)
     ? closing.blocks.filter(block => block.kind === 'text').map(block => stripToolCallTags(block.text).trim()).filter(Boolean).join('\n\n')
     : ''
-  // A restored Turn can have its closing text and the user's durable input even when
-  // the opening native-reply marker was outside the hydrated Chat context.
+  // The Host projects the opening marker from the whole Session, including
+  // when the loaded Chat page contains only the closing steps.
   if (conclusion && closing.finalNode.seq >= (assistantState?.nativeSince ?? Infinity)
-    && (users.length > 0 || steers.length > 0) && !assistantNativeReplyVisible(nativeReply, closing, tail)
+    && assistantState?.nativeTurns?.includes(turn) && !assistantNativeReplyVisible(nativeReply, closing, tail)
     && !closing.blocks.some(block => block.kind === 'tool-call')) {
     return h(SpeakerReply, { bot, history }, h(Bubbles, {
       texts: [conclusion], roster, selfId: bot.id, actions, sessionId,

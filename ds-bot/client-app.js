@@ -43403,7 +43403,7 @@ function openingTurn(turns, firstTurns, hiddenTurns, expectedTurn) {
   return listed ? { turn, start: turns[turn].first } : null;
 }
 var unseenSince = (visit, time) => typeof visit?.seen === "number" && time > visit.seen && time <= visit.entered;
-function TurnTailCell({ turn: location2, sessionId, useTurnClock, useUi, useRoster, useAssistantChat, useTurnSteps, useTurnTools, useTurnUsers, useTurnSteering, actions }) {
+function TurnTailCell({ turn: location2, sessionId, useTurnClock, useUi, useRoster, useAssistantChat, useTurnSteps, useTurnTools, actions }) {
   const turn = location2.turn;
   const time = location2.end.time;
   (0, import_react66.useEffect)(() => {
@@ -43426,19 +43426,17 @@ function TurnTailCell({ turn: location2, sessionId, useTurnClock, useUi, useRost
   return (0, import_react66.createElement)(
     import_react66.Fragment,
     null,
-    showsRunHistory ? (0, import_react66.createElement)(SilentTurnHistory, { bot, actions, sessionId, location: location2, useRoster, useUi, useTurnSteps, useTurnTools, useTurnUsers, useTurnSteering, assistantState }) : null,
+    showsRunHistory ? (0, import_react66.createElement)(SilentTurnHistory, { bot, actions, sessionId, location: location2, useRoster, useUi, useTurnSteps, useTurnTools, assistantState }) : null,
     label ? (0, import_react66.createElement)("div", { className: "bt-time-sep", role: "separator" }, label) : null,
     fresh ? (0, import_react66.createElement)(NewDivider) : null
   );
 }
 var emptyReply = { subscribe: () => () => {
 }, getSnapshot: () => void 0 };
-function SilentTurnHistory({ bot, actions, sessionId, location: location2, useRoster, useUi, useTurnSteps, useTurnTools, useTurnUsers, useTurnSteering, assistantState }) {
+function SilentTurnHistory({ bot, actions, sessionId, location: location2, useRoster, useUi, useTurnSteps, useTurnTools, assistantState }) {
   const { turn, end } = location2;
   const steps = useTurnSteps(String(turn));
   const tools = useTurnTools(String(turn));
-  const users = useTurnUsers?.(String(turn)) ?? [];
-  const steers = useTurnSteering?.(String(turn)) ?? [];
   const roster = useRoster((value) => value);
   const schedule = location2.data?.source?.(ASSISTANT_SCHEDULE_REPLY_KEY) ?? emptyReply;
   const recordedReply = (0, import_react66.useSyncExternalStore)(schedule.subscribe, schedule.getSnapshot);
@@ -43450,7 +43448,7 @@ function SilentTurnHistory({ bot, actions, sessionId, location: location2, useRo
   const history = { actions, sessionId, turn };
   const closing = tail?.closing;
   const conclusion = end.data?.reason?.kind === "completed" && tail?.branchUnavailable === false && closing?.status === "settled" && closing.finalNode?.messageId !== void 0 && assistantChatActive(assistantState, closing.finalNode.seq) ? closing.blocks.filter((block) => block.kind === "text").map((block) => stripToolCallTags(block.text).trim()).filter(Boolean).join("\n\n") : "";
-  if (conclusion && closing.finalNode.seq >= (assistantState?.nativeSince ?? Infinity) && (users.length > 0 || steers.length > 0) && !assistantNativeReplyVisible(nativeReply, closing, tail) && !closing.blocks.some((block) => block.kind === "tool-call")) {
+  if (conclusion && closing.finalNode.seq >= (assistantState?.nativeSince ?? Infinity) && assistantState?.nativeTurns?.includes(turn) && !assistantNativeReplyVisible(nativeReply, closing, tail) && !closing.blocks.some((block) => block.kind === "tool-call")) {
     return (0, import_react66.createElement)(SpeakerReply, { bot, history }, (0, import_react66.createElement)(Bubbles, {
       texts: [conclusion],
       roster,
@@ -56939,11 +56937,6 @@ function apply(ctx) {
         const snapshot = chat.getSnapshot();
         if (snapshot === void 0) throw new Error("ds-bot: Chat target is unavailable");
         return snapshot.nodes.turnDataSource(Number(turn), "tool-call");
-      },
-      turnUsers: (turn) => {
-        const snapshot = chat.getSnapshot();
-        if (snapshot === void 0) throw new Error("ds-bot: Chat target is unavailable");
-        return snapshot.nodes.turnDataSource(Number(turn), "user");
       },
       turnContext: (turn) => {
         const snapshot = chat.getSnapshot();
