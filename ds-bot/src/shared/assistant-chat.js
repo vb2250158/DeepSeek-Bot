@@ -49,6 +49,10 @@ export function addAssistantNativeStep(state, { turn, step }) {
   return state.steps.includes(step) ? state : { turn, steps: [...state.steps, step] }
 }
 
+export function assistantNativeReplyMarked(reply, step) {
+  return reply !== undefined && reply !== null && reply.turn === step.turn && reply.steps.includes(step.step)
+}
+
 export function assistantNativeReplyVisible(reply, step, tail) {
   if (reply?.steps === undefined) return false
   if (reply.steps.includes(step.step)) return true
