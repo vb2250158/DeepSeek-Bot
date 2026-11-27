@@ -47,7 +47,7 @@ test('assistant-mode execution narration stays out of a personal Bot chat', () =
   assert.equal(plain.type, 'fragment')
 })
 
-test('assistant chat streams the marked reply and reserves the final step for the turn tail', () => {
+test('assistant chat streams the marked reply and displays the settled conclusion', () => {
   const running = { seq: 4, turn: 1, step: 1, status: 'running', blocks: [{ kind: 'text', text: 'I will move it.' }] }
   const opening = { ...running, status: 'settled', finalNode: { seq: 7, messageId: 'first' }, blocks: [...running.blocks, { kind: 'tool-call' }] }
   const progress = { ...opening, step: 2, blocks: [{ kind: 'text', text: 'Looking up coordinates' }, { kind: 'tool-call' }] }
@@ -64,29 +64,8 @@ test('assistant chat streams the marked reply and reserves the final step for th
   assert.equal(bubbles(opening, tail).props.msgKey, bubbles(running).props.msgKey)
   assert.equal(cell(progress, tail).type.name, 'CellEmpty')
   assert.equal(cell(closing).type.name, 'CellEmpty')
-  assert.equal(cell(closing, tail).type.name, 'CellEmpty')
+  assert.deepEqual(Array.from(bubbles(closing, tail).props.texts), ['It moved.'])
   assert.equal(cell(progress, { ...tail, closing: progress }).type.name, 'CellEmpty')
-})
-
-test('a long tool-first turn renders its stored conclusion in the chat tail', () => {
-  const opening = { turn: 1, step: 1, status: 'settled', finalNode: { seq: 46, messageId: 'opening' }, blocks: [{ kind: 'tool-call' }] }
-  const closing = { turn: 1, step: 78, status: 'settled', finalNode: { seq: 2663, messageId: 'closing' }, blocks: [{ kind: 'text', text: 'The board is cleared.' }] }
-  const native = { turn: 1, steps: [1] }
-  const end = { time: 50, data: { reason: { kind: 'completed' } } }
-  const render = (last, reason = end) => {
-    const entries = new Map([['turn-tail', { closing: last, branchUnavailable: false }], [ASSISTANT_NATIVE_REPLY_KEY, native]])
-    const data = { get: key => entries.get(key), source: key => ({ subscribe: () => () => {}, getSnapshot: () => entries.get(key) }) }
-    const tree = TurnTailCell({ ...props, turn: { turn: 1, end: reason, data }, useTurnClock: select => select({}),
-      useTurnSteps: () => [opening, last], useTurnTools: () => [] })
-    const history = tree.children[0]
-    return history.type(history.props)
-  }
-  const rendered = render(closing)
-  assert.equal(rendered.type.name, 'SpeakerReply')
-  assert.deepEqual(Array.from(rendered.children[0].props.texts), ['The board is cleared.'])
-  assert.equal(rendered.children[0].props.msgKey, 'bot:conclusion:2663')
-  assert.equal(render({ ...closing, step: 1 }), null)
-  assert.equal(render(closing, { ...end, data: { reason: { kind: 'aborted' } } }).children[0].props.className, 'bt-silent-run')
 })
 
 test('durable native reply markers are scoped to their own turn and merge steering steps', () => {

@@ -360,10 +360,10 @@ test('stop_bot is available to every Bot and refuses outsiders', async (t) => {
 })
 
 function turnsHost() {
-  let listener
+  const listeners = new Map()
   const delivered = []
   const rt = {
-    ctx: { on: (name, fn) => { if (name === 'session/event') listener = fn }, effect: execute => execute() },
+    ctx: { on: (name, fn) => { listeners.set(name, fn) }, effect: execute => execute() },
     state: { exchangeTurns: {}, questions: {} },
     bots: { a: { id: 'a', name: 'Chief' }, b: { id: 'b', name: 'Writer' } },
     isBotSession: () => true,
@@ -381,13 +381,53 @@ function turnsHost() {
   }
   installTurns(rt)
   let seq = 0
-  const emit = (id, type, data) => listener({ id }, { type, seq: ++seq, data })
-  return { rt, emit, delivered }
+  const emit = (id, type, data) => listeners.get('session/event')({ id }, { type, seq: ++seq, data })
+  return { rt, emit, delivered, sessionAdded: summary => listeners.get('api-session/added')(summary) }
 }
 
 const replySource = (role, extra = {}) => ({ kind: SOURCE_KIND, role, senderSessionId: 'a', senderName: 'Chief', exchangeId: 'x1', ...extra })
 const textBlock = (content) => [{ type: 'text', text: content }]
 const assistantText = text => ({ message: { content: textBlock(text) } })
+
+test('clear-history drops stale private-turn numbers before the replacement turn starts', () => {
+  const { rt, emit, sessionAdded } = turnsHost()
+  rt.state.exchangeTurns = { a: [1], b: [1] }
+  sessionAdded({ sessionId: 'b' })
+  assert.deepEqual(rt.state.exchangeTurns.b, [1])
+  sessionAdded({ sessionId: 'b', historyCleared: true })
+  assert.deepEqual(rt.state.exchangeTurns, { a: [1] })
+  emit('b', 'turn/start', { turn: 1 })
+  emit('b', 'user/message', { content: textBlock('first in the replacement'), source: { kind: 'user' } })
+  assert.equal(rt.state.exchangeTurns.b, undefined)
+})
+
+test('startup repairs reused user turn numbers and preserves private turns across history pages', async () => {
+  const { rt } = turnsHost()
+  rt.state.exchangeTurns = { a: [1], b: [1, 2] }
+  let writes = 0
+  rt.save = async () => { writes += 1 }
+  const row = (seq, type, data) => ({ event: { seq, type, data } })
+  rt.ctx.sessionController = { async page({ address, throughSeq, beforeSeq }) {
+    if (address.sessionId === 'a') return { records: [], hasMore: false }
+    if (throughSeq !== undefined) return { records: [row(5, 'session/history-cleared')], hasMore: false }
+    if (beforeSeq === undefined) return { records: [
+      row(33, 'user/message', { source: { kind: 'user' } }),
+      row(35, 'turn/end', { turn: 1 }),
+      row(36, 'turn/start', { turn: 2 }),
+      row(41, 'user/message', { source: replySource('request') }),
+      row(45, 'user/message', { source: { kind: 'user' } }),
+      row(47, 'turn/end', { turn: 2 }),
+    ], hasMore: true }
+    assert.equal(beforeSeq, 33)
+    return { records: [
+      row(5, 'session/history-cleared'),
+      row(11, 'turn/start', { turn: 1 }),
+    ], hasMore: false }
+  } }
+  await rt.repairClearedExchangeTurns()
+  assert.deepEqual(rt.state.exchangeTurns, { a: [1], b: [2] })
+  assert.equal(writes, 1)
+})
 
 for (const [name, source, hidden] of [
   ['private work continuation', replySource('reply', { work: 'parent' }), true],

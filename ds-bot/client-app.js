@@ -70,9 +70,6 @@ function addAssistantNativeStep(state, { turn, step }) {
   if (state?.turn !== turn) return { turn, steps: [step] };
   return state.steps.includes(step) ? state : { turn, steps: [...state.steps, step] };
 }
-function assistantNativeReplyMarked(reply, step) {
-  return reply !== void 0 && reply !== null && reply.turn === step.turn && reply.steps.includes(step.step);
-}
 function assistantNativeReplyVisible(reply, step, tail) {
   if (reply?.steps === void 0) return false;
   if (reply.steps.includes(step.step)) return true;
@@ -42830,7 +42827,7 @@ function AssistantCell({ node, groupPart, useAssistantChat, sessionId, openFile,
   const contexts = useTurnContext(String(data.turn));
   const mentions = useFileMentions({ node, openFile, fileMentions, tail });
   const hidden = Boolean(roster.roomsById[sessionId]) || isHiddenTurn(roster, sessionId, data.turn);
-  const showText = !assistantMode || !roster.byId[sessionId] || assistantNativeReplyMarked(nativeReply, data);
+  const showText = !assistantMode || !roster.byId[sessionId] || assistantNativeReplyVisible(nativeReply, data, tail);
   const texts2 = groupPart === "reasoning" || !showText ? [] : data.blocks.filter((block) => block.kind === "text").map((block) => stripToolCallTags(block.text)).filter((text) => text.trim() !== "");
   const running = data.status === "running";
   const textInteractionSource = data.status === "settled" && data.finalNode?.messageId !== void 0;
@@ -43438,7 +43435,6 @@ var emptyReply = { subscribe: () => () => {
 }, getSnapshot: () => void 0 };
 function SilentTurnHistory({ bot, actions, sessionId, location: location2, useRoster, useUi, useTurnSteps, useTurnTools, assistantState }) {
   const { turn, end } = location2;
-  const roster = useRoster((value) => value);
   const steps = useTurnSteps(String(turn));
   const tools = useTurnTools(String(turn));
   const schedule = location2.data?.source?.(ASSISTANT_SCHEDULE_REPLY_KEY) ?? emptyReply;
@@ -43446,31 +43442,18 @@ function SilentTurnHistory({ bot, actions, sessionId, location: location2, useRo
   const native = location2.data?.source?.(ASSISTANT_NATIVE_REPLY_KEY) ?? emptyReply;
   const nativeReply = (0, import_react66.useSyncExternalStore)(native.subscribe, native.getSnapshot);
   const tail = location2.data?.get("turn-tail");
-  const closing = tail?.closing;
-  const closingTexts = end.data?.reason?.kind === "completed" && tail?.branchUnavailable === false && closing?.status === "settled" && closing.finalNode?.messageId !== void 0 && assistantChatActive(assistantState, closing.finalNode.seq) ? closing.blocks.filter((block) => block.kind === "text").map((block) => stripToolCallTags(block.text)).filter((text) => text.trim()) : [];
-  const history = { actions, sessionId, turn };
-  if (closingTexts.length && nativeReply?.turn === turn && !assistantNativeReplyMarked(nativeReply, closing) && !closing.blocks.some((block) => block.kind === "tool-call")) {
-    return (0, import_react66.createElement)(SpeakerReply, { bot, history }, (0, import_react66.createElement)(Bubbles, {
-      texts: closingTexts,
-      roster,
-      selfId: bot.id,
-      actions,
-      sessionId,
-      msgKey: `${sessionId}:conclusion:${closing.finalNode.seq}`,
-      useUi,
-      fold: FOLD_HUGE,
-      textInteractionSource: true
-    }));
-  }
-  const hasReply = steps.some((step) => (!assistantChatActive(assistantState, step.finalNode?.seq ?? step.seq) || assistantNativeReplyMarked(nativeReply, step)) && step.blocks.some((block) => block.kind === "text" && stripToolCallTags(block.text).trim())) || tools.some(({ root }) => root.kind === "tool-result" && assistantSayText(root, root.meta) !== void 0);
+  const hasReply = steps.some((step) => (!assistantChatActive(assistantState, step.finalNode?.seq ?? step.seq) || assistantNativeReplyVisible(nativeReply, step, tail)) && step.blocks.some((block) => block.kind === "text" && stripToolCallTags(block.text).trim())) || tools.some(({ root }) => root.kind === "tool-result" && assistantSayText(root, root.meta) !== void 0);
   if (hasReply) return null;
   const reply = visibleScheduleReply(location2, assistantState, recordedReply);
+  const history = { actions, sessionId, turn };
   if (reply) {
     return (0, import_react66.createElement)(SpeakerReply, { bot, history }, (0, import_react66.createElement)(ScheduledReply, { reply, bot, actions, sessionId, useRoster, useUi }));
   }
+  const closing = tail?.closing;
+  const conclusion = end.data?.reason?.kind === "completed" && tail?.branchUnavailable === false && closing?.status === "settled" && closing.finalNode?.messageId !== void 0 && assistantChatActive(assistantState, closing.finalNode.seq) ? closing.blocks.filter((block) => block.kind === "text").map((block) => stripToolCallTags(block.text).trim()).filter(Boolean).join("\n\n") : "";
   return (0, import_react66.createElement)(
     SpeakerReply,
-    { bot, chain: false, history: { ...history, conclusion: closingTexts.join("\n\n") } },
+    { bot, chain: false, history: { ...history, conclusion } },
     (0, import_react66.createElement)("div", { className: "bt-silent-run" }, t("No chat reply. Select the avatar to see the run record."))
   );
 }

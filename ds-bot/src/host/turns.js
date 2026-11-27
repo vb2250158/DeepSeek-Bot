@@ -4,7 +4,7 @@
 // Turn tracking: which turns were triggered by another Bot, and what they said.
 import { randomUUID } from 'node:crypto'
 import { carrierKeyOf } from '@deepseek-ai/dsh-scope'
-import { HANDOFF_ACK, LATE_ANSWER, MESSAGE_INLINE_MAX, REFERENCE_KIND, REPLY_KIND, SOURCE_KIND, STEER_CUT } from './constants.js'
+import { HANDOFF_ACK, HISTORY_TIMEOUT_MS, LATE_ANSWER, MESSAGE_INLINE_MAX, REFERENCE_KIND, REPLY_KIND, SOURCE_KIND, STEER_CUT } from './constants.js'
 import { cleanText } from './diagnostics.js'
 import { absoluteLinks } from './links.js'
 import { splitRef, textOf } from './text.js'
@@ -653,6 +653,62 @@ export function install(rt) {
     if (!turns.includes(turn)) return
     state.exchangeTurns[sessionId] = turns.filter(other => other !== turn)
     void rt.save().catch(() => {})
+  }
+
+  ctx.on('api-session/added', ({ sessionId, historyCleared }) => {
+    if (historyCleared !== true || state.exchangeTurns[sessionId] === undefined) return
+    delete state.exchangeTurns[sessionId]
+    void rt.save().catch(error => rt.warn('ds-bot: could not clear exchange visibility for %s: %s', sessionId, error))
+  })
+
+  // Older Bot stores could retain turn numbers after DSH replaced the log.
+  // A current user-origin turn is proof that its old exchange marker is stale.
+  rt.repairClearedExchangeTurns = async () => {
+    if (typeof ctx.sessionController?.page !== 'function') return
+    const sessions = Object.entries(state.exchangeTurns).filter(([, turns]) => turns.length > 0)
+    for (let first = 0; first < sessions.length; first += 4) {
+      await Promise.all(sessions.slice(first, first + 4).map(async ([sessionId, turns]) => {
+        const marked = new Set(turns)
+        const address = { kind: 'session', sessionId }
+        const page = options => ctx.sessionController.page({ address, ...options }, AbortSignal.timeout(HISTORY_TIMEOUT_MS))
+        try {
+          // DSH writes the clear marker immediately after the retained settings.
+          const head = await page({ throughSeq: 31, maxMessages: 32 })
+          if (!head.records.some(record => record.event.type === 'session/history-cleared')) return
+          const stale = new Set()
+          const earliest = Math.min(...marked)
+          let origin
+          let beforeSeq
+          scan: while (true) {
+            const history = await page({ maxMessages: 128, ...(beforeSeq === undefined ? {} : { beforeSeq }) })
+            for (let index = history.records.length - 1; index >= 0; index--) {
+              const event = history.records[index].event
+              if (event.type === 'user/message') {
+                const source = event.data.source
+                if (source?.kind === 'user' || source?.kind === REPLY_KIND || source?.kind === 'schedule'
+                  || (source?.kind === SOURCE_KIND && !(source.handoff === true && source.resume !== true))) origin = source.kind
+              } else if (event.type === 'turn/start') {
+                const { turn } = event.data
+                if (origin === 'user' && marked.has(turn)) stale.add(turn)
+                if (turn <= earliest) break scan
+                origin = undefined
+              }
+            }
+            const next = history.records[0]?.event.seq
+            if (!history.hasMore || next === undefined || (beforeSeq !== undefined && next >= beforeSeq)) break
+            beforeSeq = next
+          }
+          if (stale.size && state.exchangeTurns[sessionId] === turns) {
+            const remaining = turns.filter(turn => !stale.has(turn))
+            if (remaining.length) state.exchangeTurns[sessionId] = remaining
+            else delete state.exchangeTurns[sessionId]
+            await rt.save()
+          }
+        } catch (error) {
+          rt.warn('ds-bot: could not verify old exchange visibility for %s: %s', sessionId, error)
+        }
+      }))
+    }
   }
 
   // A request whose audience is the user is answered in the recipient's own chat: that
